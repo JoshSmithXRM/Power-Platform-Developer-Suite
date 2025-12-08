@@ -1203,6 +1203,24 @@ describe('FetchXmlToSqlTranspiler', () => {
 		});
 
 		describe('branch coverage edge cases', () => {
+			it('should handle ge (greater than or equal) operator', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<filter>
+								<condition attribute="revenue" operator="ge" value="100000" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('revenue >= 100000');
+			});
+
 			it('should handle begins-with without value', () => {
 				const fetchXml = `
 					<fetch>
@@ -1423,6 +1441,506 @@ describe('FetchXmlToSqlTranspiler', () => {
 				expect(result.sql).toContain('SELECT');
 				expect(result.sql).toContain('*');
 				expect(result.sql).toContain('FROM contact');
+			});
+
+			it('should handle single-quoted attribute values', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name='fullname' alias='name' />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('fullname AS name');
+			});
+
+			it('should handle filter with empty condition list', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter type="and">
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).not.toContain('WHERE');
+			});
+
+			it('should handle link-entity with no specific attributes and no all-attributes', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<link-entity name="account" from="accountid" to="parentcustomerid" alias="acc">
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Should have JOIN but no columns from link-entity
+				expect(result.sql).toContain('JOIN');
+			});
+
+			it('should handle aggregate attribute without alias', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="revenue" aggregate="sum" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('SUM(revenue)');
+				expect(result.sql).not.toContain('AS');
+			});
+
+			it('should handle unknown aggregate type', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="revenue" aggregate="unknown" alias="result" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Unknown aggregate should just use column name
+				expect(result.sql).toContain('revenue AS result');
+			});
+
+			it('should handle SUM with distinct', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="revenue" aggregate="sum" distinct="true" alias="total" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('SUM(DISTINCT revenue)');
+			});
+
+			it('should handle AVG with distinct', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="revenue" aggregate="avg" distinct="true" alias="avgrev" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('AVG(DISTINCT revenue)');
+			});
+
+			it('should handle filter comment without conditions', () => {
+				const fetchXml = `
+					<!-- Top accounts -->
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<filter type="and">
+								<condition attribute="revenue" operator="gt" value="1000000" />
+							</filter>
+							<!-- High value filter -->
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('-- Top accounts');
+				expect(result.sql).toContain('-- High value filter');
+			});
+
+			it('should skip columns array access when empty', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<all-attributes />
+							<link-entity name="account" from="accountid" to="parentcustomerid" alias="acc">
+								<attribute name="name" />
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Main entity has all-attributes, link has specific columns
+				expect(result.sql).toContain('*,');
+				expect(result.sql).toContain('acc.name');
+			});
+
+			it('should handle order without attribute and without alias', () => {
+				// This is an edge case - order element without attribute or alias should be skipped
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<order descending="true" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).not.toContain('ORDER BY');
+			});
+
+			it('should handle entity match returning undefined content', () => {
+				// Test when entityMatch[1] is undefined
+				const fetchXml = `<fetch><entity name="contact"><all-attributes/></entity></fetch>`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('FROM contact');
+			});
+
+			it('should handle condition with value but undefined in values array', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="statecode" operator="in">
+									<value></value>
+								</condition>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Empty value tags should still be parsed
+				expect(result.sql).toContain('IN');
+			});
+
+			it('should handle empty leading comments array', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('SELECT');
+				expect(result.sql).not.toContain('--');
+			});
+
+			it('should handle multi-line XML comment', () => {
+				const fetchXml = `
+					<!-- This is a multi-line comment
+					     that spans multiple lines
+					     and should be split -->
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('-- This is a multi-line comment');
+				expect(result.sql).toContain('-- that spans multiple lines');
+				expect(result.sql).toContain('-- and should be split');
+			});
+
+			it('should handle empty XML comment', () => {
+				const fetchXml = `
+					<!--  -->
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				// Empty comments should be ignored
+				expect(result.sql).not.toContain('--  ');
+			});
+
+			it('should handle link-entity attribute without name attribute', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<link-entity name="account" from="accountid" to="parentcustomerid" alias="acc">
+								<attribute />
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('JOIN');
+				// Attribute without name should result in no columns from link-entity
+			});
+
+			it('should handle all-attributes in main entity matching alternative regex', () => {
+				// Test the fallback regex on line 283
+				const fetchXml = `<fetch><entity name="contact"><all-attributes/></entity></fetch>`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('*');
+			});
+
+			it('should handle condition with trailing comment', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<filter>
+								<condition attribute="revenue" operator="gt" value="1000000" />
+								<!-- High value customers -->
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('-- High value customers');
+			});
+
+			it('should handle attribute with trailing comment', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<!-- Company name -->
+							<attribute name="revenue" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('-- Company name');
+			});
+
+			it('should handle order with trailing comment', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<order attribute="revenue" descending="true" />
+							<!-- Sort by revenue -->
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('-- Sort by revenue');
+			});
+
+			it('should handle link-entity attribute with trailing comment via alias', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<link-entity name="account" from="accountid" to="parentcustomerid" alias="acc">
+								<attribute name="name" alias="accountname" />
+								<!-- Parent account -->
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('acc.name AS accountname');
+			});
+
+			it('should handle link-entity attribute without alias', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<link-entity name="account" from="accountid" to="parentcustomerid" alias="acc">
+								<attribute name="revenue" />
+							</link-entity>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('acc.revenue');
+				expect(result.sql).not.toContain('AS');
+			});
+
+			it('should handle MIN aggregate without distinct', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="revenue" aggregate="min" alias="minrev" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('MIN(revenue)');
+				expect(result.sql).not.toContain('DISTINCT');
+			});
+
+			it('should handle MAX aggregate without distinct', () => {
+				const fetchXml = `
+					<fetch aggregate="true">
+						<entity name="account">
+							<attribute name="revenue" aggregate="max" alias="maxrev" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('MAX(revenue)');
+				expect(result.sql).not.toContain('DISTINCT');
+			});
+
+			it('should handle negative decimal numbers', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<filter>
+								<condition attribute="revenue" operator="lt" value="-123.45" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('revenue < -123.45');
+				expect(result.sql).not.toContain("'-123.45'");
+			});
+
+			it('should handle condition with in operator and no values', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="statecode" operator="in"></condition>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("IN ('')");
+			});
+
+			it('should handle condition with not-in operator and no values', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+							<filter>
+								<condition attribute="statecode" operator="not-in"></condition>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain("NOT IN ('')");
+			});
+
+			it('should handle comment that falls between elements', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<!-- Between attributes and filter -->
+							<filter>
+								<condition attribute="statecode" operator="eq" value="0" />
+							</filter>
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('-- Between attributes and filter');
+			});
+
+			it('should handle filter-level trailing comment', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<filter>
+								<condition attribute="statecode" operator="eq" value="0" />
+								<condition attribute="revenue" operator="gt" value="1000" />
+							</filter>
+							<!-- End of filter -->
+						</entity>
+					</fetch>
+				`;
+
+				const result = transpiler.transpile(fetchXml);
+
+				expect(result.success).toBe(true);
+				expect(result.sql).toContain('-- End of filter');
 			});
 		});
 	});

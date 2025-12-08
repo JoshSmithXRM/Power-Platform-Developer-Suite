@@ -27,12 +27,12 @@ describe('FetchXmlParseError', () => {
 			expect(error).toBeInstanceOf(DomainError);
 		});
 
-		it('should format error message with line and column info', () => {
+		it('should store line and column info', () => {
 			const error = new FetchXmlParseError('Test error', 0, 3, 15, sampleFetchXml);
 
-			expect(error.toString()).toContain('line 3');
-			expect(error.toString()).toContain('column 15');
-			expect(error.toString()).toContain('Test error');
+			expect(error.line).toBe(3);
+			expect(error.column).toBe(15);
+			expect(error.message).toBe('Test error');
 		});
 	});
 

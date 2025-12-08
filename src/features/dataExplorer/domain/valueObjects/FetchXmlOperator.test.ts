@@ -6,6 +6,7 @@ import {
 	getOperatorsByCategory,
 	getAllOperators,
 	FETCHXML_OPERATOR_METADATA,
+	type FetchXmlConditionOperator,
 } from './FetchXmlOperator';
 
 describe('FetchXmlOperator', () => {
@@ -81,6 +82,96 @@ describe('FetchXmlOperator', () => {
 			expect(metadata.requiresValue).toBe(true);
 			expect(metadata.allowsMultipleValues).toBe(false);
 		});
+
+		it('should return metadata for ne operator', () => {
+			const metadata = getOperatorMetadata('ne');
+			expect(metadata.operator).toBe('ne');
+			expect(metadata.displayName).toBe('Does Not Equal');
+			expect(metadata.category).toBe('comparison');
+		});
+
+		it('should return metadata for lt operator', () => {
+			const metadata = getOperatorMetadata('lt');
+			expect(metadata.operator).toBe('lt');
+			expect(metadata.displayName).toBe('Less Than');
+			expect(metadata.category).toBe('comparison');
+		});
+
+		it('should return metadata for le operator', () => {
+			const metadata = getOperatorMetadata('le');
+			expect(metadata.operator).toBe('le');
+			expect(metadata.displayName).toBe('Less Than or Equal');
+			expect(metadata.category).toBe('comparison');
+		});
+
+		it('should return metadata for gt operator', () => {
+			const metadata = getOperatorMetadata('gt');
+			expect(metadata.operator).toBe('gt');
+			expect(metadata.displayName).toBe('Greater Than');
+			expect(metadata.category).toBe('comparison');
+		});
+
+		it('should return metadata for ge operator', () => {
+			const metadata = getOperatorMetadata('ge');
+			expect(metadata.operator).toBe('ge');
+			expect(metadata.displayName).toBe('Greater Than or Equal');
+			expect(metadata.category).toBe('comparison');
+		});
+
+		it('should return metadata for not-like operator', () => {
+			const metadata = getOperatorMetadata('not-like');
+			expect(metadata.operator).toBe('not-like');
+			expect(metadata.displayName).toBe('Does Not Contain');
+			expect(metadata.category).toBe('string');
+		});
+
+		it('should return metadata for begins-with operator', () => {
+			const metadata = getOperatorMetadata('begins-with');
+			expect(metadata.operator).toBe('begins-with');
+			expect(metadata.displayName).toBe('Begins With');
+			expect(metadata.category).toBe('string');
+		});
+
+		it('should return metadata for not-begin-with operator', () => {
+			const metadata = getOperatorMetadata('not-begin-with');
+			expect(metadata.operator).toBe('not-begin-with');
+			expect(metadata.displayName).toBe('Does Not Begin With');
+			expect(metadata.category).toBe('string');
+		});
+
+		it('should return metadata for ends-with operator', () => {
+			const metadata = getOperatorMetadata('ends-with');
+			expect(metadata.operator).toBe('ends-with');
+			expect(metadata.displayName).toBe('Ends With');
+			expect(metadata.category).toBe('string');
+		});
+
+		it('should return metadata for not-end-with operator', () => {
+			const metadata = getOperatorMetadata('not-end-with');
+			expect(metadata.operator).toBe('not-end-with');
+			expect(metadata.displayName).toBe('Does Not End With');
+			expect(metadata.category).toBe('string');
+		});
+
+		it('should return metadata for not-null operator', () => {
+			const metadata = getOperatorMetadata('not-null');
+			expect(metadata.operator).toBe('not-null');
+			expect(metadata.displayName).toBe('Is Not Null');
+			expect(metadata.category).toBe('null');
+		});
+
+		it('should return metadata for not-in operator', () => {
+			const metadata = getOperatorMetadata('not-in');
+			expect(metadata.operator).toBe('not-in');
+			expect(metadata.displayName).toBe('Not In');
+			expect(metadata.category).toBe('set');
+		});
+
+		it('should throw error for unknown operator', () => {
+			// Force bypass type safety to test runtime error handling
+			const invalidOperator = 'invalid-op' as unknown as FetchXmlConditionOperator;
+			expect(() => getOperatorMetadata(invalidOperator)).toThrow('Unknown operator: invalid-op');
+		});
 	});
 
 	describe('operatorRequiresValue', () => {
@@ -122,6 +213,17 @@ describe('FetchXmlOperator', () => {
 			expect(ops).toContain('le');
 			expect(ops).toContain('gt');
 			expect(ops).toContain('ge');
+			expect(ops).toHaveLength(6);
+		});
+
+		it('should return string operators', () => {
+			const ops = getOperatorsByCategory('string');
+			expect(ops).toContain('like');
+			expect(ops).toContain('not-like');
+			expect(ops).toContain('begins-with');
+			expect(ops).toContain('not-begin-with');
+			expect(ops).toContain('ends-with');
+			expect(ops).toContain('not-end-with');
 			expect(ops).toHaveLength(6);
 		});
 

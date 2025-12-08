@@ -189,6 +189,12 @@ describe('QueryFilterGroup', () => {
 			expect(group1.equals(group2)).toBe(false);
 		});
 
+		it('should return false when second condition differs', () => {
+			const group1 = new QueryFilterGroup('and', [cond1, cond2]);
+			const group2 = new QueryFilterGroup('and', [cond1, cond3]);
+			expect(group1.equals(group2)).toBe(false);
+		});
+
 		it('should return true for identical nested groups', () => {
 			const nested1 = new QueryFilterGroup('or', [cond2]);
 			const nested2 = new QueryFilterGroup('or', [cond2]);
@@ -202,6 +208,68 @@ describe('QueryFilterGroup', () => {
 			const nested2 = new QueryFilterGroup('or', [cond3]);
 			const group1 = new QueryFilterGroup('and', [cond1], [nested1]);
 			const group2 = new QueryFilterGroup('and', [cond1], [nested2]);
+			expect(group1.equals(group2)).toBe(false);
+		});
+
+		it('should return false when second nested group differs', () => {
+			const nested1a = new QueryFilterGroup('or', [cond2]);
+			const nested1b = new QueryFilterGroup('or', [cond3]);
+			const nested2a = new QueryFilterGroup('or', [cond2]);
+			const nested2b = new QueryFilterGroup('or', [cond1]); // Different from nested1b
+			const group1 = new QueryFilterGroup('and', [], [nested1a, nested1b]);
+			const group2 = new QueryFilterGroup('and', [], [nested2a, nested2b]);
+			expect(group1.equals(group2)).toBe(false);
+		});
+
+		it('should return false for different nested group counts', () => {
+			const nested1 = new QueryFilterGroup('or', [cond2]);
+			const nested2 = new QueryFilterGroup('or', [cond3]);
+			const group1 = new QueryFilterGroup('and', [cond1], [nested1]);
+			const group2 = new QueryFilterGroup('and', [cond1], [nested1, nested2]);
+			expect(group1.equals(group2)).toBe(false);
+		});
+
+		it('should return true for empty groups', () => {
+			const group1 = new QueryFilterGroup('and', []);
+			const group2 = new QueryFilterGroup('and', []);
+			expect(group1.equals(group2)).toBe(true);
+		});
+
+		it('should handle comparing groups with multiple nested groups', () => {
+			const nested1a = new QueryFilterGroup('or', [cond2]);
+			const nested1b = new QueryFilterGroup('or', [cond3]);
+			const nested2a = new QueryFilterGroup('or', [cond2]);
+			const nested2b = new QueryFilterGroup('or', [cond3]);
+			const group1 = new QueryFilterGroup('and', [cond1], [nested1a, nested1b]);
+			const group2 = new QueryFilterGroup('and', [cond1], [nested2a, nested2b]);
+			expect(group1.equals(group2)).toBe(true);
+		});
+
+		it('should handle sparse arrays with undefined elements', () => {
+			const group1 = new QueryFilterGroup('and', [cond1, cond2]);
+			const group2 = new QueryFilterGroup('and', [cond1, cond2]);
+
+			// Create sparse array by deleting an element
+			const sparseConditions = [cond1, cond2];
+			delete sparseConditions[1];
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(group2 as any).conditions = sparseConditions;
+
+			expect(group1.equals(group2)).toBe(false);
+		});
+
+		it('should handle sparse nested groups with undefined elements', () => {
+			const nested1 = new QueryFilterGroup('or', [cond2]);
+			const nested2 = new QueryFilterGroup('or', [cond2]);
+			const group1 = new QueryFilterGroup('and', [cond1], [nested1]);
+			const group2 = new QueryFilterGroup('and', [cond1], [nested2]);
+
+			// Create sparse array by deleting an element
+			const sparseGroups = [nested2];
+			delete sparseGroups[0];
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(group2 as any).nestedGroups = sparseGroups;
+
 			expect(group1.equals(group2)).toBe(false);
 		});
 	});

@@ -1,5 +1,6 @@
 import {
 	SqlColumnRef,
+	SqlAggregateColumn,
 	SqlTableRef,
 	SqlLiteral,
 	SqlComparisonCondition,
@@ -46,6 +47,106 @@ describe('SqlAst Value Objects', () => {
 				const col = new SqlColumnRef(null, 'name', null, false);
 
 				expect(col.getFullName()).toBe('name');
+			});
+		});
+	});
+
+	describe('SqlAggregateColumn', () => {
+		it('should create COUNT(*) aggregate', () => {
+			const agg = new SqlAggregateColumn('COUNT', null, false, null);
+
+			expect(agg.func).toBe('COUNT');
+			expect(agg.column).toBeNull();
+			expect(agg.isDistinct).toBe(false);
+			expect(agg.alias).toBeNull();
+		});
+
+		it('should create COUNT(column) aggregate', () => {
+			const col = new SqlColumnRef(null, 'accountid', null, false);
+			const agg = new SqlAggregateColumn('COUNT', col, false, null);
+
+			expect(agg.func).toBe('COUNT');
+			expect(agg.column).toBe(col);
+		});
+
+		it('should create COUNT(DISTINCT column) aggregate', () => {
+			const col = new SqlColumnRef(null, 'name', null, false);
+			const agg = new SqlAggregateColumn('COUNT', col, true, 'uniqueNames');
+
+			expect(agg.isDistinct).toBe(true);
+			expect(agg.alias).toBe('uniqueNames');
+		});
+
+		it('should create SUM aggregate', () => {
+			const col = new SqlColumnRef(null, 'revenue', null, false);
+			const agg = new SqlAggregateColumn('SUM', col, false, 'totalRevenue');
+
+			expect(agg.func).toBe('SUM');
+			expect(agg.column).toBe(col);
+		});
+
+		it('should create AVG aggregate', () => {
+			const col = new SqlColumnRef(null, 'salary', null, false);
+			const agg = new SqlAggregateColumn('AVG', col, false, null);
+
+			expect(agg.func).toBe('AVG');
+		});
+
+		it('should create MIN aggregate', () => {
+			const col = new SqlColumnRef(null, 'createdon', null, false);
+			const agg = new SqlAggregateColumn('MIN', col, false, null);
+
+			expect(agg.func).toBe('MIN');
+		});
+
+		it('should create MAX aggregate', () => {
+			const col = new SqlColumnRef(null, 'modifiedon', null, false);
+			const agg = new SqlAggregateColumn('MAX', col, false, null);
+
+			expect(agg.func).toBe('MAX');
+		});
+
+		describe('isCountAll', () => {
+			it('should return true for COUNT(*)', () => {
+				const agg = new SqlAggregateColumn('COUNT', null, false, null);
+
+				expect(agg.isCountAll()).toBe(true);
+			});
+
+			it('should return false for COUNT(column)', () => {
+				const col = new SqlColumnRef(null, 'name', null, false);
+				const agg = new SqlAggregateColumn('COUNT', col, false, null);
+
+				expect(agg.isCountAll()).toBe(false);
+			});
+
+			it('should return false for other aggregates', () => {
+				const col = new SqlColumnRef(null, 'revenue', null, false);
+				const agg = new SqlAggregateColumn('SUM', col, false, null);
+
+				expect(agg.isCountAll()).toBe(false);
+			});
+		});
+
+		describe('getColumnName', () => {
+			it('should return null for COUNT(*)', () => {
+				const agg = new SqlAggregateColumn('COUNT', null, false, null);
+
+				expect(agg.getColumnName()).toBeNull();
+			});
+
+			it('should return column name for COUNT(column)', () => {
+				const col = new SqlColumnRef(null, 'accountid', null, false);
+				const agg = new SqlAggregateColumn('COUNT', col, false, null);
+
+				expect(agg.getColumnName()).toBe('accountid');
+			});
+
+			it('should return column name for SUM', () => {
+				const col = new SqlColumnRef(null, 'revenue', null, false);
+				const agg = new SqlAggregateColumn('SUM', col, false, null);
+
+				expect(agg.getColumnName()).toBe('revenue');
 			});
 		});
 	});
@@ -332,6 +433,85 @@ describe('SqlAst Value Objects', () => {
 				const statement = new SqlSelectStatement(columns, from, [], null, [], 100);
 
 				expect(statement.hasRowLimit()).toBe(true);
+			});
+		});
+
+		describe('hasAggregates', () => {
+			it('should return false for query without aggregates', () => {
+				const columns = [new SqlColumnRef(null, 'name', null, false)];
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement(columns, from, [], null, [], null);
+
+				expect(statement.hasAggregates()).toBe(false);
+			});
+
+			it('should return true for query with aggregate', () => {
+				const agg = new SqlAggregateColumn('COUNT', null, false, null);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([agg], from, [], null, [], null);
+
+				expect(statement.hasAggregates()).toBe(true);
+			});
+
+			it('should return true for mixed regular and aggregate columns', () => {
+				const col = new SqlColumnRef(null, 'name', null, false);
+				const agg = new SqlAggregateColumn('COUNT', null, false, 'total');
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([col, agg], from, [], null, [], null);
+
+				expect(statement.hasAggregates()).toBe(true);
+			});
+		});
+
+		describe('getRegularColumns', () => {
+			it('should return only regular columns', () => {
+				const col1 = new SqlColumnRef(null, 'name', null, false);
+				const col2 = new SqlColumnRef(null, 'email', null, false);
+				const agg = new SqlAggregateColumn('COUNT', null, false, null);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([col1, agg, col2], from, [], null, [], null);
+
+				const regular = statement.getRegularColumns();
+
+				expect(regular).toHaveLength(2);
+				expect(regular[0]).toBe(col1);
+				expect(regular[1]).toBe(col2);
+			});
+
+			it('should return empty array when only aggregates', () => {
+				const agg = new SqlAggregateColumn('COUNT', null, false, null);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([agg], from, [], null, [], null);
+
+				const regular = statement.getRegularColumns();
+
+				expect(regular).toHaveLength(0);
+			});
+		});
+
+		describe('getAggregateColumns', () => {
+			it('should return only aggregate columns', () => {
+				const col = new SqlColumnRef(null, 'name', null, false);
+				const agg1 = new SqlAggregateColumn('COUNT', null, false, null);
+				const agg2 = new SqlAggregateColumn('SUM', new SqlColumnRef(null, 'revenue', null, false), false, null);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([col, agg1, agg2], from, [], null, [], null);
+
+				const aggregates = statement.getAggregateColumns();
+
+				expect(aggregates).toHaveLength(2);
+				expect(aggregates[0]).toBe(agg1);
+				expect(aggregates[1]).toBe(agg2);
+			});
+
+			it('should return empty array when no aggregates', () => {
+				const col = new SqlColumnRef(null, 'name', null, false);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([col], from, [], null, [], null);
+
+				const aggregates = statement.getAggregateColumns();
+
+				expect(aggregates).toHaveLength(0);
 			});
 		});
 	});

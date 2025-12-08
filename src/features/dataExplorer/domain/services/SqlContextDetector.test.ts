@@ -262,5 +262,218 @@ describe('SqlContextDetector', () => {
 				expect(context.suggestedKeywords).toContain('DESC');
 			}
 		});
+
+		it('should suggest ON after JOIN entity', () => {
+			const context = detector.detectContext('SELECT * FROM account JOIN contact ', 35);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('ON');
+			}
+		});
+
+		it('should suggest statement keywords after semicolon with partial keyword', () => {
+			const context = detector.detectContext('SELECT * FROM account; INS', 26);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('INSERT');
+			}
+		});
+
+		it('should suggest LIMIT after ORDER BY with direction', () => {
+			const context = detector.detectContext('SELECT * FROM account ORDER BY name ASC ', 40);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('LIMIT');
+			}
+		});
+
+		it('should suggest WHERE operator keywords after WHERE attribute with space', () => {
+			const context = detector.detectContext('SELECT * FROM account WHERE name = ', 35);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('IS');
+				expect(context.suggestedKeywords).toContain('IN');
+				expect(context.suggestedKeywords).toContain('LIKE');
+				expect(context.suggestedKeywords).toContain('NOT');
+			}
+		});
+
+		it('should suggest INSERT keywords after INSERT', () => {
+			const context = detector.detectContext('INSERT ', 7);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('INTO');
+			}
+		});
+
+		it('should suggest UPDATE keywords after UPDATE entity', () => {
+			const context = detector.detectContext('UPDATE account ', 15);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('SET');
+				expect(context.suggestedKeywords).toContain('WHERE');
+			}
+		});
+
+		it('should suggest DELETE keywords after DELETE', () => {
+			const context = detector.detectContext('DELETE ', 7);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('FROM');
+			}
+		});
+	});
+
+	describe('detectContext - string literal handling', () => {
+		it('should detect inside string with escaped quotes', () => {
+			const context = detector.detectContext("SELECT * FROM account WHERE name = 'O''Brien", 44);
+			expect(context.kind).toBe('none');
+		});
+
+		it('should detect outside string after escaped quotes', () => {
+			const context = detector.detectContext("SELECT * FROM account WHERE name = 'O''Brien' AND ", 50);
+			expect(context.kind).toBe('attribute');
+		});
+	});
+
+	describe('detectContext - edge cases for keyword detection', () => {
+		it('should suggest keywords when typing partial SELECT', () => {
+			const context = detector.detectContext('SEL', 3);
+			expect(context.kind).toBe('keyword');
+			if (context.kind === 'keyword') {
+				expect(context.suggestedKeywords).toContain('SELECT');
+			}
+		});
+
+		it('should handle FROM entity without alias when WHERE already present', () => {
+			const context = detector.detectContext('SELECT * FROM account WHERE name = 1', 36);
+			expect(context.kind).not.toBe('keyword');
+		});
+
+		it('should handle JOIN entity without alias when ON already present', () => {
+			const context = detector.detectContext('SELECT * FROM account JOIN contact ON account.id = contact.accountid', 68);
+			expect(context.kind).not.toBe('keyword');
+		});
+
+		it('should not suggest WHERE keywords after condition without trailing space', () => {
+			const context = detector.detectContext("SELECT * FROM account WHERE name = 'test'", 41);
+			expect(context.kind).not.toBe('keyword');
+		});
+
+		it('should not suggest ASC/DESC without trailing space after ORDER BY attribute', () => {
+			const context = detector.detectContext('SELECT * FROM account ORDER BY name', 35);
+			expect(context.kind).toBe('attribute');
+		});
+
+		it('should not suggest keywords in middle of condition value', () => {
+			const context = detector.detectContext('SELECT * FROM account WHERE age > 18 AND status = 1', 51);
+			expect(context.kind).not.toBe('keyword');
+		});
+
+		it('should handle ORDER BY attribute without direction', () => {
+			const context = detector.detectContext('SELECT * FROM account ORDER BY name, created', 44);
+			expect(context.kind).toBe('attribute');
+		});
+
+		it('should handle INSERT statement with VALUES', () => {
+			const context = detector.detectContext('INSERT INTO account VALUES ', 27);
+			expect(context.kind).not.toBe('keyword');
+		});
+
+		it('should handle UPDATE without WHERE', () => {
+			const context = detector.detectContext('UPDATE account SET name = test', 30);
+			expect(context.kind).not.toBe('keyword');
+		});
+
+		it('should handle DELETE with FROM', () => {
+			const context = detector.detectContext('DELETE FROM account', 19);
+			expect(context.kind).not.toBe('keyword');
+		});
+	});
+
+	describe('detectContext - entity extraction edge cases', () => {
+		it('should return null when no FROM clause present', () => {
+			const context = detector.detectContext('SELECT * ', 9);
+			expect(context.kind).not.toBe('attribute');
+		});
+
+		it('should extract entity name with mixed case', () => {
+			const context = detector.detectContext('SELECT  FROM Account', 7);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+	});
+
+	describe('detectContext - SELECT clause before FROM variants', () => {
+		it('should suggest keywords when FROM exists later in full SQL', () => {
+			const sql = 'SELECT  FROM account';
+			const context = detector.detectContext(sql, 7);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+
+		it('should not be in SELECT clause when FROM appears before cursor', () => {
+			const context = detector.detectContext('SELECT * FROM ', 14);
+			expect(context.kind).toBe('entity');
+		});
+	});
+
+	describe('detectContext - WHERE clause variants', () => {
+		it('should detect attribute after WHERE with partial match', () => {
+			const context = detector.detectContext('SELECT * FROM account WHERE na', 30);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+
+		it('should handle WHERE with different operators', () => {
+			const context = detector.detectContext('SELECT * FROM account WHERE age > ', 34);
+			expect(context.kind).toBe('keyword');
+		});
+
+		it('should handle WHERE with IS operator', () => {
+			const context = detector.detectContext('SELECT * FROM account WHERE name IS NULL ', 41);
+			expect(context.kind).toBe('keyword');
+		});
+
+		it('should handle WHERE with BETWEEN operator and trailing space', () => {
+			const context = detector.detectContext("SELECT * FROM account WHERE age = 18 ", 37);
+			expect(context.kind).toBe('keyword');
+		});
+	});
+
+	describe('detectContext - ORDER BY variants', () => {
+		it('should not suggest attributes after ASC', () => {
+			const context = detector.detectContext('SELECT * FROM account ORDER BY name ASC', 39);
+			expect(context.kind).not.toBe('attribute');
+		});
+
+		it('should not suggest attributes after DESC', () => {
+			const context = detector.detectContext('SELECT * FROM account ORDER BY name DESC', 40);
+			expect(context.kind).not.toBe('attribute');
+		});
+
+		it('should handle ORDER BY with trailing space after attribute', () => {
+			const context = detector.detectContext('SELECT * FROM account ORDER BY name, ', 37);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+
+		it('should not suggest ASC/DESC when no attribute after ORDER BY', () => {
+			const context = detector.detectContext('SELECT * FROM account ORDER BY ', 31);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
+	});
+
+	describe('detectContext - additional edge cases for full coverage', () => {
+		it('should handle semicolon with empty space after', () => {
+			const context = detector.detectContext('SELECT * FROM account; ', 23);
+			expect(context.kind).toBe('keyword');
+		});
+
+		it('should handle WHERE clause without FROM', () => {
+			const context = detector.detectContext('SELECT * WHERE name = test', 26);
+			expect(context.kind).not.toBe('attribute');
+		});
+
+		it('should handle WHERE match with partial context', () => {
+			const context = detector.detectContext('SELECT * FROM account WHERE n', 29);
+			expect(context).toEqual({ kind: 'attribute', entityName: 'account' });
+		});
 	});
 });

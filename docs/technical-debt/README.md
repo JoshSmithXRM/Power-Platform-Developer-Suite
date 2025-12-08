@@ -1,6 +1,6 @@
 # Technical Debt Inventory
 
-**Total Items:** 9 (6 items resolved/reclassified earlier, 3 low-priority items, 1 accepted tradeoff added)
+**Total Items:** 10 (6 items resolved/reclassified earlier, 3 low-priority items, 1 scheduled parser refactoring)
 
 ---
 
@@ -10,7 +10,7 @@
 |----------|-------|-----------------|
 | **Accepted Tradeoffs** | 5 | Keep indefinitely (conscious decisions) |
 | **Will Not Implement** | 1 | Rejected (over-engineering) |
-| **Scheduled** | 0 | Fix in next 1-2 sprints (all items resolved) |
+| **Scheduled** | 1 | Fix in next 2-3 releases |
 | **Low Priority** | 3 | Fix when naturally touching code |
 
 ---
@@ -62,11 +62,21 @@ Correctly rejected suggestions that would add ceremony without benefit.
 
 ---
 
-## 📅 Scheduled (0 items)
+## 📅 Scheduled (1 item)
 
 Items with clear triggers or timelines for fixing.
 
-**All scheduled items resolved:**
+| Item | Type | Effort | Timeline |
+|------|------|--------|----------|
+| [Parser Refactoring](scheduled/PARSER_REFACTORING.md) | Architectural (regex → stack-based) | 6-8 hours | Post v0.3.0 (v0.4.0 or v0.5.0) |
+
+### Parser Refactoring Details
+- **Problem**: FetchXmlParser uses regex which cannot handle nested XML structures
+- **Impact**: Nested `<filter>` elements don't parse correctly (edge case)
+- **Solution**: Refactor to stack-based tokenizer approach (zero dependencies)
+- **Coverage**: Files excluded from thresholds until refactoring complete
+
+**Previously resolved:**
 
 ✅ **Clean Architecture Guide Split** (completed 2025-11-23)
 - Split into 3 focused documents:
@@ -108,10 +118,10 @@ Fix when it becomes a problem or when naturally touching the code.
 ### Debt by Category (Visual)
 
 ```
-Accepted Tradeoffs: █████  5 items (56%)
-Will Not Implement: █      1 item  (11%)
-Scheduled:          -      0 items (0%)
-Low Priority:       ███    3 items (33%)
+Accepted Tradeoffs: █████  5 items (50%)
+Will Not Implement: █      1 item  (10%)
+Scheduled:          █      1 item  (10%)
+Low Priority:       ███    3 items (30%)
 ```
 
 ### Decision Quality
@@ -176,7 +186,7 @@ docs/technical-debt/
 │   └── xml-formatter-interface.md
 │
 ├── scheduled/                                   # Has timeline
-│   └── (empty - all items resolved)
+│   └── PARSER_REFACTORING.md                    # Regex → stack-based (v0.4.0+)
 │
 └── low-priority/                                # Opportunistic fix
     ├── notification-service-abstraction.md      # 95+ callsites, defer until refactoring

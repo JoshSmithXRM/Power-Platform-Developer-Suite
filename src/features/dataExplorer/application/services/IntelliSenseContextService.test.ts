@@ -102,5 +102,75 @@ describe('IntelliSenseContextService', () => {
 			expect(listener1).not.toHaveBeenCalled();
 			expect(listener2).toHaveBeenCalledWith('env-123');
 		});
+
+		it('should handle unsubscribe when listener not found', () => {
+			const listener = jest.fn();
+			const unsubscribe = service.onEnvironmentChange(listener);
+
+			unsubscribe();
+			unsubscribe(); // Call again - should handle gracefully
+
+			service.setActiveEnvironment('env-123');
+			expect(listener).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('requestQueryExecution', () => {
+		it('should notify execute query listeners', () => {
+			const listener = jest.fn();
+			service.onExecuteQueryRequest(listener);
+
+			service.requestQueryExecution('SELECT * FROM account');
+
+			expect(listener).toHaveBeenCalledWith('SELECT * FROM account');
+		});
+
+		it('should notify multiple execute query listeners', () => {
+			const listener1 = jest.fn();
+			const listener2 = jest.fn();
+			service.onExecuteQueryRequest(listener1);
+			service.onExecuteQueryRequest(listener2);
+
+			service.requestQueryExecution('SELECT * FROM contact');
+
+			expect(listener1).toHaveBeenCalledWith('SELECT * FROM contact');
+			expect(listener2).toHaveBeenCalledWith('SELECT * FROM contact');
+		});
+	});
+
+	describe('onExecuteQueryRequest', () => {
+		it('should return unsubscribe function', () => {
+			const listener = jest.fn();
+			const unsubscribe = service.onExecuteQueryRequest(listener);
+
+			unsubscribe();
+			service.requestQueryExecution('SELECT * FROM account');
+
+			expect(listener).not.toHaveBeenCalled();
+		});
+
+		it('should only unsubscribe the specific execute query listener', () => {
+			const listener1 = jest.fn();
+			const listener2 = jest.fn();
+			const unsubscribe1 = service.onExecuteQueryRequest(listener1);
+			service.onExecuteQueryRequest(listener2);
+
+			unsubscribe1();
+			service.requestQueryExecution('SELECT * FROM account');
+
+			expect(listener1).not.toHaveBeenCalled();
+			expect(listener2).toHaveBeenCalledWith('SELECT * FROM account');
+		});
+
+		it('should handle unsubscribe when listener not found', () => {
+			const listener = jest.fn();
+			const unsubscribe = service.onExecuteQueryRequest(listener);
+
+			unsubscribe();
+			unsubscribe(); // Call again - should handle gracefully
+
+			service.requestQueryExecution('SELECT * FROM account');
+			expect(listener).not.toHaveBeenCalled();
+		});
 	});
 });

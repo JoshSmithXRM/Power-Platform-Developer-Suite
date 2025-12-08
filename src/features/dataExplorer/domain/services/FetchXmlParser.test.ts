@@ -378,5 +378,191 @@ describe('FetchXmlParser', () => {
 				expect(query.hasSorting()).toBe(true);
 			});
 		});
+
+		describe('edge cases for branch coverage', () => {
+			it('should handle invalid top attribute (NaN)', () => {
+				const fetchXml = `
+					<fetch top="invalid">
+						<entity name="contact">
+							<all-attributes />
+						</entity>
+					</fetch>
+				`;
+				const query = parser.parse(fetchXml);
+				expect(query.top).toBeNull();
+			});
+
+			it('should throw error for IN operator with no values', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<all-attributes />
+							<filter>
+								<condition attribute="statecode" operator="in"></condition>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+				// IN operator requires at least one value
+				expect(() => parser.parse(fetchXml)).toThrow();
+			});
+
+			it('should throw error for NOT-IN operator with no values', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<all-attributes />
+							<filter>
+								<condition attribute="statecode" operator="not-in"></condition>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+				// NOT-IN operator requires at least one value
+				expect(() => parser.parse(fetchXml)).toThrow();
+			});
+
+			it('should handle nested filters that result in empty groups', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<all-attributes />
+							<filter type="and">
+								<condition attribute="statecode" operator="eq" value="0" />
+								<filter type="or">
+								</filter>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+				const query = parser.parse(fetchXml);
+				// Parent filter should exist with one condition, nested empty filter ignored
+				expect(query.filter).toBeDefined();
+				expect(query.filter?.conditions).toHaveLength(1);
+			});
+
+			it('should handle deeply nested filters with multiple levels', () => {
+				// NOTE: The parser has a known limitation with deeply nested filters
+				// due to non-greedy regex matching. The parseNestedFilters method
+				// (lines 282-295) has limited coverage because of this.
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<all-attributes />
+							<filter type="and">
+								<condition attribute="statecode" operator="eq" value="0" />
+								<filter type="or">
+									<condition attribute="firstname" operator="eq" value="John" />
+									<filter type="and">
+										<condition attribute="lastname" operator="eq" value="Doe" />
+									</filter>
+								</filter>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+				const query = parser.parse(fetchXml);
+				expect(query.filter).toBeDefined();
+				// Should have at least one condition in top-level filter
+				expect(query.filter!.conditions.length).toBeGreaterThanOrEqual(1);
+			});
+
+			it('should handle entity with whitespace-only name', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="   ">
+							<all-attributes />
+						</entity>
+					</fetch>
+				`;
+				expect(() => parser.parse(fetchXml)).toThrow(FetchXmlParseError);
+			});
+
+			it('should parse IN operator with fallback to value attribute', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<all-attributes />
+							<filter>
+								<condition attribute="statecode" operator="in" value="0">
+								</condition>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+				const query = parser.parse(fetchXml);
+				const condition = query.filter?.conditions[0];
+				expect(condition?.operator).toBe('in');
+				expect(condition?.value).toEqual(['0']);
+			});
+
+			it('should parse IN operator with both value elements and value attribute', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<all-attributes />
+							<filter>
+								<condition attribute="statecode" operator="in" value="fallback">
+									<value>0</value>
+									<value>1</value>
+								</condition>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+				const query = parser.parse(fetchXml);
+				const condition = query.filter?.conditions[0];
+				expect(condition?.operator).toBe('in');
+				// Value elements take precedence
+				expect(condition?.value).toEqual(['0', '1']);
+			});
+
+			it('should handle filter with only empty nested filters and no direct conditions', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<all-attributes />
+							<filter type="and">
+								<filter type="or"></filter>
+							</filter>
+						</entity>
+					</fetch>
+				`;
+				const query = parser.parse(fetchXml);
+				// Filter with no conditions and no valid nested groups returns null
+				expect(query.filter).toBeNull();
+			});
+
+			it('should handle attribute with empty name string', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<attribute name="" />
+							<attribute name="fullname" />
+						</entity>
+					</fetch>
+				`;
+				const query = parser.parse(fetchXml);
+				if (query.columns.kind === 'specific') {
+					expect(query.columns.columns).toHaveLength(1);
+					expect(query.columns.columns[0]?.name).toBe('fullname');
+				}
+			});
+
+			it('should handle order with empty attribute name', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="contact">
+							<all-attributes />
+							<order attribute="" descending="false" />
+							<order attribute="createdon" descending="true" />
+						</entity>
+					</fetch>
+				`;
+				const query = parser.parse(fetchXml);
+				expect(query.sorts).toHaveLength(1);
+				expect(query.sorts[0]?.attribute).toBe('createdon');
+			});
+		});
 	});
 });

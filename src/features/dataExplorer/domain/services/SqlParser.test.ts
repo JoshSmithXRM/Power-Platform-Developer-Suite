@@ -546,4 +546,214 @@ describe('SqlParser', () => {
 			expect(result.groupBy[0]!.columnName).toBe('statecode');
 		});
 	});
+
+	describe('edge cases for branch coverage', () => {
+		it('should throw error when AS is followed by non-identifier', () => {
+			// AS followed by a number token (not identifier)
+			expect(() => parser.parse('SELECT name AS 123 FROM account')).toThrow(SqlParseError);
+		});
+
+		it('should not treat keyword as alias without AS', () => {
+			// "FROM" is a keyword, should not be parsed as alias
+			const result = parser.parse('SELECT name FROM account');
+
+			expect(asColumnRef(result.columns[0]).columnName).toBe('name');
+			expect(asColumnRef(result.columns[0]).alias).toBeNull();
+		});
+
+		it('should allow keyword as alias with AS', () => {
+			// Keywords are allowed as aliases when using AS
+			const result = parser.parse('SELECT COUNT(*) AS count FROM account');
+
+			const agg = asAggregateColumn(result.columns[0]);
+			expect(agg.alias).toBe('count');
+		});
+
+		it('should handle less than or equal operator', () => {
+			const result = parser.parse('SELECT * FROM account WHERE revenue <= 50000');
+
+			expect(result.where).not.toBeNull();
+			expect(result.where!.kind).toBe('comparison');
+		});
+
+		it('should handle greater than or equal operator', () => {
+			const result = parser.parse('SELECT * FROM account WHERE revenue >= 100000');
+
+			expect(result.where).not.toBeNull();
+			expect(result.where!.kind).toBe('comparison');
+		});
+
+		it('should handle not equals operator', () => {
+			const result = parser.parse('SELECT * FROM account WHERE statecode <> 1');
+
+			expect(result.where).not.toBeNull();
+			expect(result.where!.kind).toBe('comparison');
+		});
+
+		it('should parse string literal in IN clause', () => {
+			const result = parser.parse("SELECT * FROM account WHERE name IN ('Contoso', 'Fabrikam')");
+
+			expect(result.where).not.toBeNull();
+			expect(result.where!.kind).toBe('in');
+		});
+
+		it('should parse NULL literal in comparison', () => {
+			// NULL as a literal value (edge case)
+			const result = parser.parse('SELECT * FROM account WHERE name = NULL');
+
+			expect(result.where).not.toBeNull();
+			expect(result.where!.kind).toBe('comparison');
+		});
+
+		it('should attach trailing comments to columns', () => {
+			const sql = `
+				SELECT
+					name, -- account name
+					revenue -- total revenue
+				FROM account
+			`;
+			const result = parser.parse(sql);
+
+			expect(result.columns.length).toBe(2);
+			expect(asColumnRef(result.columns[0]).trailingComment).toBe('account name');
+			expect(asColumnRef(result.columns[1]).trailingComment).toBe('total revenue');
+		});
+
+		it('should attach trailing comments to GROUP BY columns', () => {
+			const sql = `
+				SELECT statecode, COUNT(*)
+				FROM account
+				GROUP BY statecode -- state filter
+			`;
+			const result = parser.parse(sql);
+
+			expect(result.groupBy.length).toBe(1);
+			expect(result.groupBy[0]!.trailingComment).toBe('state filter');
+		});
+
+		it('should attach trailing comments to ORDER BY items', () => {
+			const sql = `
+				SELECT name
+				FROM account
+				ORDER BY name ASC -- alphabetical
+			`;
+			const result = parser.parse(sql);
+
+			expect(result.orderBy.length).toBe(1);
+			expect(result.orderBy[0]!.trailingComment).toBe('alphabetical');
+		});
+
+		it('should attach trailing comments to conditions', () => {
+			const sql = `
+				SELECT *
+				FROM account
+				WHERE statecode = 0 -- active only
+			`;
+			const result = parser.parse(sql);
+
+			expect(result.where).not.toBeNull();
+			expect(result.where!.trailingComment).toBe('active only');
+		});
+
+		it('should handle multiple comments between tokens', () => {
+			const sql = `
+				SELECT * -- first comment
+				-- second comment
+				FROM account
+			`;
+			const result = parser.parse(sql);
+
+			expect(asColumnRef(result.columns[0]).trailingComment).toContain('first comment');
+		});
+
+		it('should attach leading comments to statement', () => {
+			const sql = `
+				-- This is a test query
+				-- Author: Test
+				SELECT * FROM account
+			`;
+			const result = parser.parse(sql);
+
+			expect(result.leadingComments).toBeDefined();
+			expect(result.leadingComments!.length).toBeGreaterThan(0);
+		});
+
+		it('should attach comment after comma to previous column', () => {
+			const sql = `
+				SELECT
+					name, -- comment after comma
+					revenue
+				FROM account
+			`;
+			const result = parser.parse(sql);
+
+			expect(asColumnRef(result.columns[0]).trailingComment).toBe('comment after comma');
+		});
+
+		it('should attach comment after comma to previous GROUP BY column', () => {
+			const sql = `
+				SELECT statecode, statuscode, COUNT(*)
+				FROM account
+				GROUP BY statecode, -- first grouping
+					statuscode
+			`;
+			const result = parser.parse(sql);
+
+			expect(result.groupBy[0]!.trailingComment).toBe('first grouping');
+		});
+
+		it('should attach comment after comma to previous ORDER BY item', () => {
+			const sql = `
+				SELECT name
+				FROM account
+				ORDER BY statecode ASC, -- primary sort
+					name DESC
+			`;
+			const result = parser.parse(sql);
+
+			expect(result.orderBy[0]!.trailingComment).toBe('primary sort');
+		});
+
+		it('should attach comment to FROM table', () => {
+			const sql = `
+				SELECT *
+				FROM account -- main table
+			`;
+			const result = parser.parse(sql);
+
+			expect(result.from.trailingComment).toBe('main table');
+		});
+
+		it('should attach comment to JOIN', () => {
+			const sql = `
+				SELECT *
+				FROM account a
+				LEFT JOIN contact c ON a.contactid = c.contactid -- related contacts
+			`;
+			const result = parser.parse(sql);
+
+			expect(result.joins.length).toBe(1);
+			expect(result.joins[0]!.trailingComment).toBe('related contacts');
+		});
+
+		it('should handle comment position before first token', () => {
+			const sql = `-- Leading comment
+SELECT * FROM account`;
+			const result = parser.parse(sql);
+
+			expect(result.leadingComments).toContain('Leading comment');
+		});
+
+		it('should handle comment position after last token in WHERE', () => {
+			const sql = `
+				SELECT *
+				FROM account
+				WHERE (statecode = 0) -- parenthesized
+			`;
+			const result = parser.parse(sql);
+
+			expect(result.where).not.toBeNull();
+			expect(result.where!.trailingComment).toBe('parenthesized');
+		});
+	});
 });

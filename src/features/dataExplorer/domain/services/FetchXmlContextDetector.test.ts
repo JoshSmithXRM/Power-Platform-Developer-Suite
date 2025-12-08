@@ -406,6 +406,77 @@ describe('FetchXmlContextDetector', () => {
 				expect(result.suggestedAttributes).toHaveLength(0);
 			}
 		});
+
+		it('should handle attribute value context with undefined element', () => {
+			const xml = '<entity name="';
+			const result = detector.detectContext(xml, xml.length);
+
+			expect(result.kind).toBe('attribute-value');
+		});
+
+		it('should handle malformed attribute syntax', () => {
+			const xml = '<entity ="test"';
+			const result = detector.detectContext(xml, xml.length);
+
+			expect(result.kind).toBe('attribute-name');
+		});
+
+		it('should handle attribute name context with closed tag', () => {
+			const xml = '<fetch></fetch>';
+			const result = detector.detectContext(xml, xml.length);
+
+			expect(result.kind).toBe('none');
+		});
+
+		it('should handle attribute name context with closing tag', () => {
+			const xml = '<fetch></';
+			const result = detector.detectContext(xml, xml.length);
+
+			expect(result.kind).toBe('none');
+		});
+
+		it('should handle attribute name context without trailing space', () => {
+			const xml = '<fetch';
+			const result = detector.detectContext(xml, xml.length);
+
+			expect(result.kind).toBe('element');
+		});
+
+		it('should handle unknown element for child suggestions', () => {
+			const xml = '<fetch><unknown><';
+			const result = detector.detectContext(xml, xml.length);
+
+			expect(result.kind).toBe('element');
+			if (result.kind === 'element') {
+				expect(result.parentElement).toBe('unknown');
+				expect(result.suggestedElements).toHaveLength(0);
+			}
+		});
+
+		it('should handle unknown element for attribute suggestions', () => {
+			const xml = '<fetch><unknown ';
+			const result = detector.detectContext(xml, xml.length);
+
+			expect(result.kind).toBe('attribute-name');
+			if (result.kind === 'attribute-name') {
+				expect(result.element).toBe('unknown');
+				expect(result.suggestedAttributes).toHaveLength(0);
+			}
+		});
+
+		it('should handle entity extraction with empty name', () => {
+			const xml = '<fetch><entity name="">';
+			const result = detector.extractEntityContext(xml);
+
+			expect(result).toBeNull();
+		});
+
+		it('should handle entity extraction with self-closing tag', () => {
+			const xml = '<fetch><entity name="account" />';
+			const result = detector.extractEntityContext(xml);
+
+			expect(result).toBe('account');
+		});
 	});
 
 	// =========================================================================

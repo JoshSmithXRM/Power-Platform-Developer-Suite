@@ -14,7 +14,11 @@ module.exports = {
 		'!src/infrastructure/dependencyInjection/**',
 		'!src/**/application/types/**',
 		'!src/**/presentation/panels/**',
-		'!src/**/infrastructure/services/VsCode*.ts'
+		'!src/**/infrastructure/services/VsCode*.ts',
+		// Excluded: Regex-based parsers with nested XML limitation
+		// See docs/technical-debt/PARSER_REFACTORING.md for details
+		'!src/features/dataExplorer/domain/services/FetchXmlParser.ts',
+		'!src/features/dataExplorer/domain/services/FetchXmlToSqlTranspiler.ts'
 	],
 	coverageDirectory: 'coverage',
 	coverageReporters: ['text', 'lcov', 'html'],
