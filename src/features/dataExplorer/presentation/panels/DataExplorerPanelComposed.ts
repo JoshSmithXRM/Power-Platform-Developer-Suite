@@ -29,40 +29,29 @@ import type { QueryResult } from '../../domain/entities/QueryResult';
 import { VisualQueryBuilderSection } from '../sections/VisualQueryBuilderSection';
 import { DataExplorerExportDropdownSection } from '../sections/DataExplorerExportDropdownSection';
 import { DataExplorerImportDropdownSection } from '../sections/DataExplorerImportDropdownSection';
-import type { EntityOption } from '../views/visualQueryBuilderView';
 import { DataverseRecordUrlService } from '../../../../shared/infrastructure/services/DataverseRecordUrlService';
-import { CsvExportService, type TabularData } from '../../../../shared/infrastructure/services/CsvExportService';
+import { CsvExportService } from '../../../../shared/infrastructure/services/CsvExportService';
 import type { DataExplorerIntelliSenseServices } from '../initialization/registerDataExplorerIntelliSense';
-import { openQueryInNotebook } from '../../notebooks/registerNotebooks';
 import {
-	VisualQuery,
 	FetchXmlGenerator,
 	FetchXmlParser,
 	FetchXmlToSqlTranspiler,
 	SqlParser,
 	SqlToFetchXmlTranspiler,
-	QueryColumn,
-	QueryFilterGroup,
-	QueryCondition,
-	QuerySort,
 } from '../../application/types';
-import type { FetchXmlConditionOperator, AttributeTypeHint } from '../../application/types';
-import type { AttributeSuggestion } from '../../domain/valueObjects/AttributeSuggestion';
 import { ColumnOptionViewModelMapper } from '../../application/mappers/ColumnOptionViewModelMapper';
-import type { FilterConditionViewModel } from '../../application/viewModels/FilterConditionViewModel';
-import { getDefaultOperator } from '../constants/FilterOperatorConfiguration';
-
-/**
- * Internal state for a filter condition being edited in the UI.
- * Holds mutable state before being converted to domain objects.
- */
-interface FilterConditionState {
-	readonly id: string;
-	attribute: string;
-	attributeType: AttributeTypeHint;
-	operator: FetchXmlConditionOperator;
-	value: string | null;
-}
+import {
+	DataExplorerMetadataLoader,
+	type MetadataLoaderPanelContext,
+} from '../coordinators/DataExplorerMetadataLoader';
+import {
+	DataExplorerExportImportCoordinator,
+	type ExportImportPanelContext,
+} from '../coordinators/DataExplorerExportImportCoordinator';
+import {
+	VisualQueryBuilderCoordinator,
+	type VisualQueryBuilderPanelContext,
+} from '../coordinators/VisualQueryBuilderCoordinator';
 
 /**
  * Commands supported by Data Explorer panel.
@@ -115,29 +104,18 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private readonly errorMapper: SqlParseErrorViewModelMapper;
 	private readonly recordUrlService: DataverseRecordUrlService;
 	private readonly csvExportService: CsvExportService;
-	private readonly fetchXmlGenerator: FetchXmlGenerator;
-	private readonly fetchXmlParser: FetchXmlParser;
-	private readonly fetchXmlToSqlTranspiler: FetchXmlToSqlTranspiler;
+	private readonly columnMapper: ColumnOptionViewModelMapper;
+	private currentEnvironmentId: string;
+	private currentResult: QueryResult | null = null;
+
+	// Coordinators
+	private readonly metadataLoader: DataExplorerMetadataLoader;
+	private readonly exportImportCoordinator: DataExplorerExportImportCoordinator;
+	private readonly queryBuilderCoordinator: VisualQueryBuilderCoordinator;
+
+	// Transpilers for external query loading
 	private readonly sqlParser: SqlParser;
 	private readonly sqlToFetchXmlTranspiler: SqlToFetchXmlTranspiler;
-	private currentEnvironmentId: string;
-	private currentVisualQuery: VisualQuery | null = null;
-	private currentEntities: readonly EntityOption[] = [];
-	private isLoadingEntities: boolean = false;
-	private currentResult: QueryResult | null = null;
-	private currentAvailableColumns: readonly AttributeSuggestion[] = [];
-	private isLoadingColumns: boolean = false;
-	private readonly columnMapper: ColumnOptionViewModelMapper;
-	private currentFilterConditions: FilterConditionState[] = [];
-	private filterConditionCounter: number = 0;
-	/** Current sort attribute (null = no sort) */
-	private currentSortAttribute: string | null = null;
-	/** Current sort direction (true = descending, false = ascending) */
-	private currentSortDescending: boolean = false;
-	/** Current Top N limit (null = no limit) */
-	private currentTopN: number | null = null;
-	/** Whether to return distinct results */
-	private currentDistinct: boolean = false;
 
 	/** Monotonic counter for query execution to discard stale results. */
 	private querySequence: number = 0;
@@ -167,12 +145,9 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.errorMapper = new SqlParseErrorViewModelMapper();
 		this.recordUrlService = new DataverseRecordUrlService();
 		this.csvExportService = new CsvExportService(logger);
-		this.fetchXmlGenerator = new FetchXmlGenerator();
-		this.fetchXmlParser = new FetchXmlParser();
-		this.fetchXmlToSqlTranspiler = new FetchXmlToSqlTranspiler();
+		this.columnMapper = new ColumnOptionViewModelMapper();
 		this.sqlParser = new SqlParser();
 		this.sqlToFetchXmlTranspiler = new SqlToFetchXmlTranspiler();
-		this.columnMapper = new ColumnOptionViewModelMapper();
 		logger.debug('DataExplorerPanel: Initialized with visual query builder');
 
 		// Configure webview
@@ -180,6 +155,36 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			enableScripts: true,
 			localResourceRoots: [extensionUri],
 		};
+
+		// Create coordinator instances with panel context implementations
+		this.queryBuilderCoordinator = new VisualQueryBuilderCoordinator(
+			panel,
+			this.columnMapper,
+			panelStateRepository,
+			this.createQueryBuilderPanelContext(),
+			logger
+		);
+
+		this.metadataLoader = new DataExplorerMetadataLoader(
+			panel,
+			intelliSenseServices,
+			this.columnMapper,
+			this.createMetadataLoaderPanelContext(),
+			logger
+		);
+
+		this.exportImportCoordinator = new DataExplorerExportImportCoordinator(
+			panel,
+			this.csvExportService,
+			resultMapper,
+			new FetchXmlGenerator(),
+			new FetchXmlToSqlTranspiler(),
+			new FetchXmlParser(),
+			this.sqlParser,
+			this.sqlToFetchXmlTranspiler,
+			this.createExportImportPanelContext(),
+			logger
+		);
 
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
@@ -256,83 +261,78 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		);
 	}
 
+	// ============================================
+	// PANEL CONTEXT IMPLEMENTATIONS
+	// ============================================
+
+	private createMetadataLoaderPanelContext(): MetadataLoaderPanelContext {
+		return {
+			getCurrentEnvironmentId: (): string => this.currentEnvironmentId,
+			getCurrentVisualQueryEntityName: (): string | null => this.queryBuilderCoordinator.getCurrentVisualQueryEntityName(),
+			getSelectedColumnNames: (): readonly string[] => this.queryBuilderCoordinator.getSelectedColumnNames(),
+			isSelectAll: (): boolean => this.queryBuilderCoordinator.isSelectAll(),
+			onAttributesLoaded: (attributes): void => {
+				this.queryBuilderCoordinator.setAvailableColumns(attributes);
+			},
+			onColumnsLoadedRebuildFilters: async (): Promise<void> => {
+				await this.queryBuilderCoordinator.rebuildVisualQueryFilters();
+			},
+			onSendFiltersUpdate: async (): Promise<void> => {
+				await this.queryBuilderCoordinator.sendFiltersUpdate();
+			},
+			onSendSortUpdate: async (): Promise<void> => {
+				await this.queryBuilderCoordinator.sendSortUpdate();
+			},
+			onSendQueryOptionsUpdate: async (): Promise<void> => {
+				await this.queryBuilderCoordinator.sendQueryOptionsUpdate();
+			},
+		};
+	}
+
+	private createExportImportPanelContext(): ExportImportPanelContext {
+		return {
+			getCurrentEnvironmentId: (): string => this.currentEnvironmentId,
+			getCurrentVisualQuery: () => this.queryBuilderCoordinator.getCurrentVisualQuery(),
+			getCurrentResult: () => this.currentResult,
+			getEnvironmentById: async (envId): Promise<{ name: string; dataverseUrl?: string } | null> => this.getEnvironmentById(envId),
+			loadVisualQueryFromFetchXml: async (fetchXml): Promise<void> => {
+				await this.loadVisualQueryFromFetchXml(fetchXml);
+			},
+			generateSqlFromVisualQuery: (): string => this.queryBuilderCoordinator.generateSqlFromVisualQuery(),
+			setButtonLoading: (buttonId, isLoading): void => this.setButtonLoading(buttonId, isLoading),
+		};
+	}
+
+	private createQueryBuilderPanelContext(): VisualQueryBuilderPanelContext {
+		return {
+			getCurrentEnvironmentId: (): string => this.currentEnvironmentId,
+			getViewType: (): string => DataExplorerPanelComposed.viewType,
+			loadAttributesForEntity: async (entityLogicalName): Promise<void> => {
+				const attributes = await this.metadataLoader.loadAttributesForEntity(entityLogicalName);
+				this.queryBuilderCoordinator.setAvailableColumns(attributes);
+			},
+			clearCurrentResult: (): void => {
+				this.currentResult = null;
+			},
+			entityExists: (entityLogicalName): boolean => this.metadataLoader.entityExists(entityLogicalName),
+			sendEntitySelectionUpdate: async (selectedEntity): Promise<void> => {
+				await this.metadataLoader.sendEntitySelectionUpdate(selectedEntity);
+			},
+		};
+	}
+
+	// ============================================
+	// INITIALIZATION
+	// ============================================
+
 	private async initializeAndLoadData(): Promise<void> {
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
 
 		// Load persisted state (selected entity, columns, and filters)
-		try {
-			const state = await this.panelStateRepository.load({
-				panelType: DataExplorerPanelComposed.viewType,
-				environmentId: this.currentEnvironmentId,
-			});
-			const savedEntity = state?.['selectedEntity'];
-			if (savedEntity && typeof savedEntity === 'string') {
-				this.currentVisualQuery = new VisualQuery(savedEntity);
-
-				// Restore column selection if not "select all"
-				const isSelectAll = state?.['isSelectAll'];
-				const savedColumns = state?.['selectedColumns'];
-				if (isSelectAll === false && Array.isArray(savedColumns) && savedColumns.length > 0) {
-					const queryColumns = savedColumns
-						.filter((name): name is string => typeof name === 'string')
-						.map(name => new QueryColumn(name));
-					this.currentVisualQuery = this.currentVisualQuery.withSpecificColumns(queryColumns);
-				}
-
-				// Restore filter conditions
-				const savedFilters = state?.['filterConditions'];
-				const savedCounter = state?.['filterConditionCounter'];
-				if (Array.isArray(savedFilters)) {
-					this.currentFilterConditions = savedFilters
-						.filter((f): f is Record<string, unknown> => typeof f === 'object' && f !== null)
-						.map(f => ({
-							id: String(f['id'] ?? ''),
-							attribute: String(f['attribute'] ?? ''),
-							attributeType: (f['attributeType'] as AttributeTypeHint) ?? 'String',
-							operator: (f['operator'] as FetchXmlConditionOperator) ?? 'eq',
-							value: f['value'] === null ? null : String(f['value'] ?? ''),
-						}));
-					this.filterConditionCounter = typeof savedCounter === 'number' ? savedCounter : 0;
-				}
-
-				// Restore sort configuration
-				const savedSortAttribute = state?.['sortAttribute'];
-				const savedSortDescending = state?.['sortDescending'];
-				if (typeof savedSortAttribute === 'string') {
-					this.currentSortAttribute = savedSortAttribute;
-				}
-				if (typeof savedSortDescending === 'boolean') {
-					this.currentSortDescending = savedSortDescending;
-				}
-
-				// Restore query options (Top N, Distinct)
-				const savedTopN = state?.['topN'];
-				const savedDistinct = state?.['distinct'];
-				if (typeof savedTopN === 'number') {
-					this.currentTopN = savedTopN;
-				}
-				if (typeof savedDistinct === 'boolean') {
-					this.currentDistinct = savedDistinct;
-				}
-
-				this.logger.debug('Loaded persisted query state', {
-					environmentId: this.currentEnvironmentId,
-					entity: savedEntity,
-					isSelectAll: this.currentVisualQuery.isSelectAll(),
-					columnCount: this.currentVisualQuery.getColumnCount(),
-					filterCount: this.currentFilterConditions.length,
-					sortAttribute: this.currentSortAttribute,
-					topN: this.currentTopN,
-					distinct: this.currentDistinct,
-				});
-			}
-		} catch (error) {
-			this.logger.warn('Failed to load persisted query state', error);
-		}
+		await this.queryBuilderCoordinator.loadInitialState(this.currentEnvironmentId);
 
 		// Initialize coordinator with environments
-		this.isLoadingEntities = true;
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
@@ -347,98 +347,15 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	 * Builds customData for the visual query builder section.
 	 */
 	private buildCustomData(): Record<string, unknown> {
-		const fetchXml = this.currentVisualQuery
-			? this.fetchXmlGenerator.generate(this.currentVisualQuery)
-			: '';
-		const sql = this.generateSqlFromVisualQuery();
-
-		// Map available columns for sort/filter dropdowns, sorted by logical name
-		const availableColumns = [...this.currentAvailableColumns]
-			.sort((a, b) => a.logicalName.localeCompare(b.logicalName))
-			.map(col => ({
-				logicalName: col.logicalName,
-				displayName: col.displayName,
-			}));
-
-		return {
-			entities: this.currentEntities,
-			selectedEntity: this.currentVisualQuery?.entityName ?? null,
-			isLoadingEntities: this.isLoadingEntities,
-			availableColumns,
-			filterConditions: this.mapFilterConditionsToViewModels(),
-			sortAttribute: this.currentSortAttribute,
-			sortDescending: this.currentSortDescending,
-			topN: this.currentTopN,
-			distinct: this.currentDistinct,
-			generatedFetchXml: fetchXml,
-			generatedSql: sql,
-		};
+		return this.queryBuilderCoordinator.buildCustomData(
+			this.metadataLoader.getEntities(),
+			this.metadataLoader.getIsLoadingEntities()
+		);
 	}
 
-	/**
-	 * Generates SQL from the current visual query.
-	 */
-	private generateSqlFromVisualQuery(): string {
-		if (!this.currentVisualQuery) {
-			return '';
-		}
-
-		const fetchXml = this.fetchXmlGenerator.generate(this.currentVisualQuery);
-		const result = this.fetchXmlToSqlTranspiler.transpile(fetchXml);
-		return result.success ? result.sql : '';
-	}
-
-	/**
-	 * Loads entities for the current environment.
-	 */
-	private async loadEntitiesForEnvironment(): Promise<void> {
-		this.isLoadingEntities = true;
-		await this.panel.postMessage({
-			command: 'setLoadingEntities',
-			data: { isLoading: true },
-		});
-
-		try {
-			const entitySuggestions = await this.intelliSenseServices.metadataCache.getEntitySuggestions(
-				this.currentEnvironmentId
-			);
-
-			// Map to EntityOption format and sort by display name
-			this.currentEntities = entitySuggestions
-				.map((e) => ({
-					logicalName: e.logicalName,
-					displayName: e.displayName,
-					isCustomEntity: e.isCustomEntity,
-				}))
-				.sort((a, b) => a.displayName.localeCompare(b.displayName));
-
-			this.logger.debug('Loaded entities for environment', {
-				environmentId: this.currentEnvironmentId,
-				entityCount: this.currentEntities.length,
-			});
-
-			// Send entities to webview
-			await this.panel.postMessage({
-				command: 'entitiesLoaded',
-				data: {
-					entities: this.currentEntities,
-					selectedEntity: this.currentVisualQuery?.entityName ?? null,
-				},
-			});
-		} catch (error) {
-			this.logger.error('Failed to load entities', error);
-			await this.panel.postMessage({
-				command: 'showError',
-				data: { message: 'Failed to load entities. Please try again.' },
-			});
-		} finally {
-			this.isLoadingEntities = false;
-			await this.panel.postMessage({
-				command: 'setLoadingEntities',
-				data: { isLoading: false },
-			});
-		}
-	}
+	// ============================================
+	// COORDINATOR SETUP
+	// ============================================
 
 	private createCoordinator(): {
 		coordinator: PanelCoordinator<DataExplorerCommands>;
@@ -602,6 +519,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		return { coordinator, scaffoldingBehavior };
 	}
 
+	// ============================================
+	// COMMAND HANDLERS
+	// ============================================
+
 	private registerCommandHandlers(): void {
 		this.logger.debug('Registering Data Explorer command handlers');
 
@@ -612,7 +533,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 
 		// Open current query in a notebook
 		this.coordinator.registerHandler('openInNotebook', async () => {
-			await this.handleOpenInNotebook();
+			await this.exportImportCoordinator.handleOpenInNotebook();
 		});
 
 		// Environment change
@@ -623,32 +544,32 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			}
 		});
 
-		// Select entity from picker
+		// Select entity from picker - delegate to query builder
 		this.coordinator.registerHandler('selectEntity', async (data) => {
 			const entityLogicalName = (data as { entityLogicalName?: string | null })?.entityLogicalName;
-			await this.handleSelectEntity(entityLogicalName ?? null);
+			await this.queryBuilderCoordinator.handleSelectEntity(entityLogicalName ?? null);
 		});
 
-		// Select columns for query
+		// Select columns for query - delegate to query builder
 		this.coordinator.registerHandler('selectColumns', async (data) => {
 			const { selectAll, columns } = data as { selectAll?: boolean; columns?: string[] };
-			await this.handleSelectColumns(selectAll ?? true, columns ?? []);
+			await this.queryBuilderCoordinator.handleSelectColumns(selectAll ?? true, columns ?? []);
 		});
 
-		// Add filter condition
+		// Add filter condition - delegate to query builder
 		this.coordinator.registerHandler('addFilterCondition', async () => {
-			await this.handleAddFilterCondition();
+			await this.queryBuilderCoordinator.handleAddFilterCondition();
 		});
 
-		// Remove filter condition
+		// Remove filter condition - delegate to query builder
 		this.coordinator.registerHandler('removeFilterCondition', async (data) => {
 			const { conditionId } = data as { conditionId?: string };
 			if (conditionId) {
-				await this.handleRemoveFilterCondition(conditionId);
+				await this.queryBuilderCoordinator.handleRemoveFilterCondition(conditionId);
 			}
 		});
 
-		// Update filter condition
+		// Update filter condition - delegate to query builder
 		this.coordinator.registerHandler('updateFilterCondition', async (data) => {
 			const payload = data as {
 				conditionId?: string;
@@ -659,7 +580,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				value?: string;
 			};
 			if (payload.conditionId !== undefined && payload.field !== undefined) {
-				await this.handleUpdateFilterCondition({
+				await this.queryBuilderCoordinator.handleUpdateFilterCondition({
 					conditionId: payload.conditionId,
 					field: payload.field,
 					attribute: payload.attribute,
@@ -670,26 +591,26 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			}
 		});
 
-		// Update sort configuration
+		// Update sort configuration - delegate to query builder
 		this.coordinator.registerHandler('updateSort', async (data) => {
 			const payload = data as { attribute?: string; descending?: boolean };
-			await this.handleUpdateSort(payload);
+			await this.queryBuilderCoordinator.handleUpdateSort(payload);
 		});
 
-		// Clear sort configuration
+		// Clear sort configuration - delegate to query builder
 		this.coordinator.registerHandler('clearSort', async () => {
-			await this.handleClearSort();
+			await this.queryBuilderCoordinator.handleClearSort();
 		});
 
-		// Update query options (Top N, Distinct)
+		// Update query options (Top N, Distinct) - delegate to query builder
 		this.coordinator.registerHandler('updateQueryOptions', async (data) => {
 			const payload = data as { topN?: number | null; distinct?: boolean };
-			await this.handleUpdateQueryOptions(payload);
+			await this.queryBuilderCoordinator.handleUpdateQueryOptions(payload);
 		});
 
-		// Clear query (reset columns, filters, sort, options, results - keep entity)
+		// Clear query (reset columns, filters, sort, options, results - keep entity) - delegate to query builder
 		this.coordinator.registerHandler('clearQuery', async () => {
-			await this.handleClearQuery();
+			await this.queryBuilderCoordinator.handleClearQuery();
 		});
 
 		// Open record in browser
@@ -708,11 +629,11 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			}
 		});
 
-		// Export results to CSV - disable automatic loading state since we manage it manually
+		// Export results to CSV - delegate to export coordinator
 		this.coordinator.registerHandler(
 			'exportCsv',
 			async () => {
-				await this.handleExportCsv();
+				await this.exportImportCoordinator.handleExportCsv();
 			},
 			{ disableOnExecute: false }
 		);
@@ -739,759 +660,64 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			await vscode.window.showInformationMessage(`${count} rows copied to clipboard`);
 		});
 
-		// Webview ready - send entities to webview
+		// Webview ready - delegate to metadata loader
 		this.coordinator.registerHandler('webviewReady', async () => {
 			this.logger.debug('Webview ready, sending entities');
-			await this.sendEntitiesToWebview();
+			await this.metadataLoader.sendEntitiesToWebview();
 		});
 
-		// Export Results as CSV
+		// Export Results as CSV - delegate to export coordinator
 		this.coordinator.registerHandler('exportResultsCsv', async () => {
-			await this.handleExportResultsCsv();
+			await this.exportImportCoordinator.handleExportCsv();
 		});
 
-		// Export Results as JSON
+		// Export Results as JSON - delegate to export coordinator
 		this.coordinator.registerHandler('exportResultsJson', async () => {
-			await this.handleExportResultsJson();
+			await this.exportImportCoordinator.handleExportResultsJson();
 		});
 
-		// Export Query as FetchXML
+		// Export Query as FetchXML - delegate to export coordinator
 		this.coordinator.registerHandler('exportQueryFetchXml', async () => {
-			await this.handleExportQueryFetchXml();
+			await this.exportImportCoordinator.handleExportQueryFetchXml();
 		});
 
-		// Export Query as SQL
+		// Export Query as SQL - delegate to export coordinator
 		this.coordinator.registerHandler('exportQuerySql', async () => {
-			await this.handleExportQuerySql();
+			await this.exportImportCoordinator.handleExportQuerySql();
 		});
 
-		// Export Query as Notebook (reuse existing openInNotebook logic)
+		// Export Query as Notebook - delegate to export coordinator
 		this.coordinator.registerHandler('exportQueryNotebook', async () => {
-			await this.handleOpenInNotebook();
+			await this.exportImportCoordinator.handleOpenInNotebook();
 		});
 
-		// Import FetchXML file
+		// Import FetchXML file - delegate to export coordinator
 		this.coordinator.registerHandler('importFetchXml', async () => {
-			await this.handleImportFetchXml();
+			await this.exportImportCoordinator.handleImportFetchXml();
 		});
 
-		// Import SQL file
+		// Import SQL file - delegate to export coordinator
 		this.coordinator.registerHandler('importSql', async () => {
-			await this.handleImportSql();
+			await this.exportImportCoordinator.handleImportSql();
 		});
 	}
 
-	/**
-	 * Sends the current entities to the webview.
-	 * Called when webview signals it's ready.
-	 */
-	private async sendEntitiesToWebview(): Promise<void> {
-		// Always load entities - this is the single entry point for entity loading
-		await this.loadEntitiesForEnvironment();
-
-		// If entity was restored from persisted state, also load its columns and filters
-		if (this.currentVisualQuery) {
-			await this.loadAttributesForEntity(this.currentVisualQuery.entityName);
-			// Rebuild filters after attributes are loaded (needed for filter field dropdown)
-			await this.rebuildVisualQueryFilters();
-			await this.sendFiltersUpdate();
-			// Send sort/options updates AFTER columns are loaded (dropdown needs options first)
-			await this.sendSortUpdate();
-			await this.sendQueryOptionsUpdate();
-		}
-	}
-
-	/**
-	 * Handles entity selection from the picker.
-	 */
-	private async handleSelectEntity(entityLogicalName: string | null): Promise<void> {
-		this.logger.debug('Entity selected', { entityLogicalName });
-
-		// Ignore empty selections (placeholder or loading state)
-		if (entityLogicalName === null || entityLogicalName === '') {
-			// Only clear if we had a previous selection
-			if (this.currentVisualQuery !== null) {
-				this.currentVisualQuery = null;
-				this.currentAvailableColumns = [];
-				await this.updateQueryPreview();
-				// Clear column picker
-				await this.panel.postMessage({
-					command: 'attributesLoaded',
-					data: { columns: [], isSelectAll: true },
-				});
-			}
-			return;
-		}
-
-		// Create new visual query for the selected entity
-		this.currentVisualQuery = new VisualQuery(entityLogicalName);
-		// Clear filter conditions when changing entity
-		this.currentFilterConditions = [];
-		this.filterConditionCounter = 0;
-		// Clear sort and query options when changing entity
-		this.currentSortAttribute = null;
-		this.currentSortDescending = false;
-		this.currentTopN = null;
-		this.currentDistinct = false;
-		this.logger.debug('Created VisualQuery', { entityName: this.currentVisualQuery.entityName });
-
-		// Update query preview
-		await this.updateQueryPreview();
-
-		// Load attributes for column picker
-		await this.loadAttributesForEntity(entityLogicalName);
-
-		// Notify webview about filter changes
-		await this.sendFiltersUpdate();
-
-		// Persist selection
-		void this.saveQueryStateToStorage();
-	}
-
-	/**
-	 * Loads attributes for the selected entity and sends to webview.
-	 */
-	private async loadAttributesForEntity(entityLogicalName: string): Promise<void> {
-		this.isLoadingColumns = true;
-		await this.panel.postMessage({
-			command: 'setLoadingColumns',
-			data: { isLoading: true },
-		});
-
-		try {
-			this.currentAvailableColumns =
-				await this.intelliSenseServices.metadataCache.getAttributeSuggestions(
-					this.currentEnvironmentId,
-					entityLogicalName
-				);
-
-			const isSelectAll = this.currentVisualQuery?.isSelectAll() ?? true;
-			const selectedColumnNames = this.currentVisualQuery?.getColumnNames() ?? [];
-
-			const columnViewModels = this.columnMapper.toViewModels(
-				this.currentAvailableColumns,
-				selectedColumnNames
-			);
-
-			await this.panel.postMessage({
-				command: 'attributesLoaded',
-				data: { columns: columnViewModels, isSelectAll },
-			});
-
-			this.logger.debug('Loaded attributes for entity', {
-				entityLogicalName,
-				attributeCount: this.currentAvailableColumns.length,
-			});
-		} catch (error) {
-			this.logger.error('Failed to load attributes', error);
-			await this.panel.postMessage({
-				command: 'showError',
-				data: { message: 'Failed to load columns. Please try again.' },
-			});
-		} finally {
-			this.isLoadingColumns = false;
-			await this.panel.postMessage({
-				command: 'setLoadingColumns',
-				data: { isLoading: false },
-			});
-		}
-	}
-
-	/**
-	 * Handles column selection changes from the webview.
-	 */
-	private async handleSelectColumns(selectAll: boolean, columnNames: string[]): Promise<void> {
-		if (this.currentVisualQuery === null) {
-			return;
-		}
-
-		if (selectAll) {
-			this.currentVisualQuery = this.currentVisualQuery.withAllColumns();
-		} else {
-			const queryColumns = columnNames.map((name) => new QueryColumn(name));
-			this.currentVisualQuery = this.currentVisualQuery.withSpecificColumns(queryColumns);
-		}
-
-		this.logger.debug('Columns updated', {
-			selectAll,
-			columnCount: columnNames.length,
-			isSelectAll: this.currentVisualQuery.isSelectAll(),
-		});
-
-		await this.updateQueryPreview();
-		void this.saveQueryStateToStorage();
-	}
-
-	/**
-	 * Handles adding a new filter condition.
-	 */
-	private async handleAddFilterCondition(): Promise<void> {
-		if (this.currentVisualQuery === null) {
-			return;
-		}
-
-		// Create new condition with default values
-		const newCondition: FilterConditionState = {
-			id: `filter-${++this.filterConditionCounter}`,
-			attribute: '',
-			attributeType: 'String',
-			operator: getDefaultOperator('String'),
-			value: null,
-		};
-
-		this.currentFilterConditions.push(newCondition);
-		this.logger.debug('Added filter condition', { conditionId: newCondition.id });
-
-		// Update visual query with current filters
-		await this.rebuildVisualQueryFilters();
-		await this.sendFiltersUpdate();
-		void this.saveQueryStateToStorage();
-	}
-
-	/**
-	 * Handles removing a filter condition.
-	 */
-	private async handleRemoveFilterCondition(conditionId: string): Promise<void> {
-		const index = this.currentFilterConditions.findIndex(c => c.id === conditionId);
-		if (index === -1) {
-			this.logger.warn('Filter condition not found', { conditionId });
-			return;
-		}
-
-		this.currentFilterConditions.splice(index, 1);
-		this.logger.debug('Removed filter condition', { conditionId });
-
-		await this.rebuildVisualQueryFilters();
-		await this.sendFiltersUpdate();
-		void this.saveQueryStateToStorage();
-	}
-
-	/**
-	 * Handles updating a filter condition field.
-	 */
-	private async handleUpdateFilterCondition(payload: {
-		conditionId: string;
-		field: 'attribute' | 'operator' | 'value';
-		attribute?: string | undefined;
-		attributeType?: string | undefined;
-		operator?: string | undefined;
-		value?: string | undefined;
-	}): Promise<void> {
-		const condition = this.currentFilterConditions.find(c => c.id === payload.conditionId);
-		if (condition === undefined) {
-			this.logger.warn('Filter condition not found for update', { conditionId: payload.conditionId });
-			return;
-		}
-
-		switch (payload.field) {
-			case 'attribute':
-				condition.attribute = payload.attribute ?? '';
-				condition.attributeType = (payload.attributeType as AttributeTypeHint) ?? 'String';
-				// Reset operator to default for new attribute type
-				condition.operator = getDefaultOperator(condition.attributeType);
-				condition.value = null;
-				break;
-			case 'operator':
-				condition.operator = (payload.operator as FetchXmlConditionOperator) ?? 'eq';
-				// Clear value if operator doesn't require one
-				if (condition.operator === 'null' || condition.operator === 'not-null') {
-					condition.value = null;
-				}
-				break;
-			case 'value':
-				condition.value = payload.value ?? null;
-				break;
-		}
-
-		this.logger.debug('Updated filter condition', {
-			conditionId: payload.conditionId,
-			field: payload.field,
-		});
-
-		await this.rebuildVisualQueryFilters();
-		// Only re-render filter list when field/operator changes (not value)
-		// Value changes don't need a full re-render - it would steal focus from the input
-		if (payload.field !== 'value') {
-			await this.sendFiltersUpdate();
-		}
-		void this.saveQueryStateToStorage();
-	}
-
-	/**
-	 * Handles sort configuration updates.
-	 */
-	private async handleUpdateSort(payload: { attribute?: string; descending?: boolean }): Promise<void> {
-		this.logger.debug('Updating sort', payload);
-
-		// Handle attribute change
-		if (payload.attribute !== undefined) {
-			this.currentSortAttribute = payload.attribute === '' ? null : payload.attribute;
-		}
-
-		// Handle direction change
-		if (payload.descending !== undefined) {
-			this.currentSortDescending = payload.descending;
-		}
-
-		// Rebuild visual query with sort and update UI
-		await this.rebuildVisualQuerySort();
-		await this.sendSortUpdate();
-		void this.saveQueryStateToStorage();
-	}
-
-	/**
-	 * Clears the current sort configuration.
-	 */
-	private async handleClearSort(): Promise<void> {
-		this.logger.debug('Clearing sort');
-
-		this.currentSortAttribute = null;
-		this.currentSortDescending = false;
-
-		await this.rebuildVisualQuerySort();
-		await this.sendSortUpdate();
-		void this.saveQueryStateToStorage();
-	}
-
-	/**
-	 * Handles query options updates (Top N, Distinct).
-	 */
-	private async handleUpdateQueryOptions(payload: { topN?: number | null; distinct?: boolean }): Promise<void> {
-		this.logger.debug('Updating query options', payload);
-
-		// Handle Top N change
-		if (payload.topN !== undefined) {
-			// Validate Top N: must be positive and <= 5000
-			if (payload.topN === null) {
-				this.currentTopN = null;
-			} else if (payload.topN > 0 && payload.topN <= 5000) {
-				this.currentTopN = payload.topN;
-			}
-		}
-
-		// Handle Distinct change
-		if (payload.distinct !== undefined) {
-			this.currentDistinct = payload.distinct;
-		}
-
-		// Rebuild visual query with options and update UI
-		await this.rebuildVisualQueryOptions();
-		await this.sendQueryOptionsUpdate();
-		void this.saveQueryStateToStorage();
-	}
-
-	/**
-	 * Handles clearing the query - resets columns, filters, sort, options, and results.
-	 * Entity selection is preserved.
-	 */
-	private async handleClearQuery(): Promise<void> {
-		if (this.currentVisualQuery === null) {
-			return;
-		}
-
-		this.logger.debug('Clearing query', { entity: this.currentVisualQuery.entityName });
-
-		// Reset to SELECT * (all columns)
-		this.currentVisualQuery = this.currentVisualQuery.withAllColumns();
-
-		// Clear filter conditions
-		this.currentFilterConditions = [];
-		// Note: Don't reset filterConditionCounter to avoid ID collisions
-
-		// Clear sort
-		this.currentSortAttribute = null;
-		this.currentSortDescending = false;
-		this.currentVisualQuery = this.currentVisualQuery.withSorts([]);
-
-		// Clear query options
-		this.currentTopN = null;
-		this.currentDistinct = false;
-		this.currentVisualQuery = this.currentVisualQuery
-			.withTop(null)
-			.withDistinct(false);
-
-		// Clear filter from visual query
-		this.currentVisualQuery = this.currentVisualQuery.withFilter(null);
-
-		// Clear current result
-		this.currentResult = null;
-
-		// Update query preview
-		await this.updateQueryPreview();
-
-		// Map columns for webview (all selected since SELECT *)
-		const isSelectAll = true;
-		const columnViewModels = this.columnMapper.toViewModels(
-			this.currentAvailableColumns,
-			[]
-		);
-
-		// Send consolidated clear message to webview
-		await this.panel.postMessage({
-			command: 'queryCleared',
-			data: {
-				columns: columnViewModels,
-				isSelectAll,
-			},
-		});
-
-		// Persist state
-		void this.saveQueryStateToStorage();
-	}
-
-	/**
-	 * Rebuilds the VisualQuery sort from current sort state.
-	 */
-	private async rebuildVisualQuerySort(): Promise<void> {
-		if (this.currentVisualQuery === null) {
-			return;
-		}
-
-		if (this.currentSortAttribute !== null) {
-			const sort = new QuerySort(this.currentSortAttribute, this.currentSortDescending);
-			this.currentVisualQuery = this.currentVisualQuery.withSorts([sort]);
-		} else {
-			this.currentVisualQuery = this.currentVisualQuery.withSorts([]);
-		}
-
-		await this.updateQueryPreview();
-	}
-
-	/**
-	 * Rebuilds the VisualQuery options (Top N, Distinct).
-	 */
-	private async rebuildVisualQueryOptions(): Promise<void> {
-		if (this.currentVisualQuery === null) {
-			return;
-		}
-
-		this.currentVisualQuery = this.currentVisualQuery
-			.withTop(this.currentTopN)
-			.withDistinct(this.currentDistinct);
-
-		await this.updateQueryPreview();
-	}
-
-	/**
-	 * Sends sort update notification to webview.
-	 */
-	private async sendSortUpdate(): Promise<void> {
-		await this.panel.postMessage({
-			command: 'sortUpdated',
-			data: {
-				sortAttribute: this.currentSortAttribute,
-				sortDescending: this.currentSortDescending,
-			},
-		});
-	}
-
-	/**
-	 * Sends query options update notification to webview.
-	 */
-	private async sendQueryOptionsUpdate(): Promise<void> {
-		await this.panel.postMessage({
-			command: 'queryOptionsUpdated',
-			data: {
-				topN: this.currentTopN,
-				distinct: this.currentDistinct,
-			},
-		});
-	}
-
-	/**
-	 * Rebuilds the VisualQuery filter from current filter conditions.
-	 */
-	private async rebuildVisualQueryFilters(): Promise<void> {
-		if (this.currentVisualQuery === null) {
-			return;
-		}
-
-		// Build valid conditions from current state
-		// Filter out incomplete conditions:
-		// - Must have an attribute selected
-		// - Must have a value (unless using null/not-null operators)
-		const validConditions = this.currentFilterConditions
-			.filter(c => {
-				if (c.attribute === '') return false;
-				// Null operators don't require a value
-				if (c.operator === 'null' || c.operator === 'not-null') return true;
-				// Other operators require a non-empty value
-				return c.value !== null && c.value !== '';
-			})
-			.map(c => {
-				try {
-					// Determine value based on operator
-					const value = (c.operator === 'null' || c.operator === 'not-null')
-						? null
-						: c.value;
-					return new QueryCondition(c.attribute, c.operator, value);
-				} catch (error) {
-					// Invalid condition, skip
-					this.logger.debug('Skipping invalid filter condition', { attribute: c.attribute, error });
-					return null;
-				}
-			})
-			.filter((c): c is QueryCondition => c !== null);
-
-		// Create filter group or clear filter
-		if (validConditions.length > 0) {
-			const filterGroup = new QueryFilterGroup('and', validConditions);
-			this.currentVisualQuery = this.currentVisualQuery.withFilter(filterGroup);
-		} else {
-			this.currentVisualQuery = this.currentVisualQuery.withFilter(null);
-		}
-
-		await this.updateQueryPreview();
-	}
-
-	/**
-	 * Sends filter update notification to webview with full filter data.
-	 */
-	private async sendFiltersUpdate(): Promise<void> {
-		// Map available columns to simple objects for webview, sorted by logical name
-		const availableColumns = [...this.currentAvailableColumns]
-			.sort((a, b) => a.logicalName.localeCompare(b.logicalName))
-			.map(col => ({
-				logicalName: col.logicalName,
-				displayName: col.displayName,
-				attributeType: col.attributeType,
-			}));
-
-		await this.panel.postMessage({
-			command: 'filtersUpdated',
-			data: {
-				filterCount: this.currentFilterConditions.length,
-				filterConditions: this.mapFilterConditionsToViewModels(),
-				availableColumns,
-			},
-		});
-	}
-
-	/**
-	 * Maps current filter conditions to view models.
-	 */
-	private mapFilterConditionsToViewModels(): readonly FilterConditionViewModel[] {
-		return this.currentFilterConditions.map(c => ({
-			id: c.id,
-			attribute: c.attribute,
-			attributeDisplayName: this.getAttributeDisplayName(c.attribute),
-			attributeType: c.attributeType,
-			operator: c.operator,
-			operatorDisplayName: c.operator, // Simplified for MVP
-			value: c.value,
-			enabled: true,
-		}));
-	}
-
-	/**
-	 * Gets the display name for an attribute.
-	 */
-	private getAttributeDisplayName(logicalName: string): string {
-		const attr = this.currentAvailableColumns.find(a => a.logicalName === logicalName);
-		return attr?.displayName ?? logicalName;
-	}
-
-	/**
-	 * Updates the query preview in the webview.
-	 */
-	private async updateQueryPreview(): Promise<void> {
-		const fetchXml = this.currentVisualQuery
-			? this.fetchXmlGenerator.generate(this.currentVisualQuery)
-			: '';
-		const sql = this.generateSqlFromVisualQuery();
-
-		await this.panel.postMessage({
-			command: 'queryPreviewUpdated',
-			data: { fetchXml, sql },
-		});
-	}
+	// ============================================
+	// QUERY EXECUTION
+	// ============================================
 
 	/**
 	 * Executes the current visual query.
 	 */
 	private async handleExecuteVisualQuery(): Promise<void> {
-		if (!this.currentVisualQuery) {
+		const visualQuery = this.queryBuilderCoordinator.getCurrentVisualQuery();
+		if (!visualQuery) {
 			vscode.window.showWarningMessage('Please select an entity first');
 			return;
 		}
 
-		const fetchXml = this.fetchXmlGenerator.generate(this.currentVisualQuery);
+		const fetchXml = this.queryBuilderCoordinator.generateFetchXml();
 		await this.handleExecuteFetchXmlQuery(fetchXml);
-	}
-
-	/**
-	 * Persists current query state (entity, columns, filters) to panel state.
-	 */
-	private async saveQueryStateToStorage(): Promise<void> {
-		try {
-			const existingState = await this.panelStateRepository.load({
-				panelType: DataExplorerPanelComposed.viewType,
-				environmentId: this.currentEnvironmentId,
-			});
-
-			// Serialize filter conditions for persistence
-			const filterConditions = this.currentFilterConditions.map(c => ({
-				id: c.id,
-				attribute: c.attribute,
-				attributeType: c.attributeType,
-				operator: c.operator,
-				value: c.value,
-			}));
-
-			await this.panelStateRepository.save(
-				{
-					panelType: DataExplorerPanelComposed.viewType,
-					environmentId: this.currentEnvironmentId,
-				},
-				{
-					...existingState,
-					selectedEntity: this.currentVisualQuery?.entityName ?? null,
-					isSelectAll: this.currentVisualQuery?.isSelectAll() ?? true,
-					selectedColumns: this.currentVisualQuery?.getColumnNames() ?? [],
-					filterConditions,
-					filterConditionCounter: this.filterConditionCounter,
-					sortAttribute: this.currentSortAttribute,
-					sortDescending: this.currentSortDescending,
-					topN: this.currentTopN,
-					distinct: this.currentDistinct,
-					lastUpdated: new Date().toISOString(),
-				}
-			);
-		} catch (error) {
-			this.logger.warn('Failed to persist query state', error);
-		}
-	}
-
-	private async handleEnvironmentChange(environmentId: string): Promise<void> {
-		this.logger.debug('Environment changed', { environmentId });
-
-		const oldEnvironmentId = this.currentEnvironmentId;
-		this.currentEnvironmentId = environmentId;
-
-		// Update IntelliSense context for the new environment
-		this.intelliSenseServices.contextService.setActiveEnvironment(environmentId);
-
-		// Re-register panel in map for new environment
-		this.reregisterPanel(
-			DataExplorerPanelComposed.panels,
-			oldEnvironmentId,
-			this.currentEnvironmentId
-		);
-
-		const environment = await this.getEnvironmentById(environmentId);
-		if (environment) {
-			this.panel.title = `Data Explorer - ${environment.name}`;
-		}
-
-		// Clear previous results and reset visual query
-		this.currentResult = null;
-		this.currentVisualQuery = null;
-		this.currentFilterConditions = [];
-		this.filterConditionCounter = 0;
-		await this.panel.postMessage({
-			command: 'clearResults',
-		});
-
-		// Load persisted state for the NEW environment
-		await this.loadPersistedStateForEnvironment(environmentId);
-
-		// Reload entities for the new environment
-		await this.loadEntitiesForEnvironment();
-	}
-
-	/**
-	 * Loads persisted query state for a specific environment and updates the UI.
-	 */
-	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
-		// Reset to defaults first
-		this.currentVisualQuery = null;
-		this.currentFilterConditions = [];
-		this.filterConditionCounter = 0;
-		this.currentSortAttribute = null;
-		this.currentSortDescending = false;
-		this.currentTopN = null;
-		this.currentDistinct = false;
-
-		try {
-			const state = await this.panelStateRepository.load({
-				panelType: DataExplorerPanelComposed.viewType,
-				environmentId,
-			});
-
-			if (state) {
-				const savedEntity = state['selectedEntity'];
-				if (savedEntity && typeof savedEntity === 'string') {
-					this.currentVisualQuery = new VisualQuery(savedEntity);
-
-					// Restore column selection if not "select all"
-					const isSelectAll = state['isSelectAll'];
-					const savedColumns = state['selectedColumns'];
-					if (isSelectAll === false && Array.isArray(savedColumns) && savedColumns.length > 0) {
-						const queryColumns = savedColumns
-							.filter((name): name is string => typeof name === 'string')
-							.map(name => new QueryColumn(name));
-						this.currentVisualQuery = this.currentVisualQuery.withSpecificColumns(queryColumns);
-					}
-
-					// Restore filter conditions
-					const savedFilters = state['filterConditions'];
-					const savedCounter = state['filterConditionCounter'];
-					if (Array.isArray(savedFilters)) {
-						this.currentFilterConditions = savedFilters
-							.filter((f): f is Record<string, unknown> => typeof f === 'object' && f !== null)
-							.map(f => ({
-								id: String(f['id'] ?? ''),
-								attribute: String(f['attribute'] ?? ''),
-								attributeType: (f['attributeType'] as AttributeTypeHint) ?? 'String',
-								operator: (f['operator'] as FetchXmlConditionOperator) ?? 'eq',
-								value: f['value'] === null ? null : String(f['value'] ?? ''),
-							}));
-						this.filterConditionCounter = typeof savedCounter === 'number' ? savedCounter : 0;
-					}
-
-					// Restore sort configuration
-					const savedSortAttribute = state['sortAttribute'];
-					const savedSortDescending = state['sortDescending'];
-					if (typeof savedSortAttribute === 'string') {
-						this.currentSortAttribute = savedSortAttribute;
-					}
-					if (typeof savedSortDescending === 'boolean') {
-						this.currentSortDescending = savedSortDescending;
-					}
-
-					// Restore query options (Top N, Distinct)
-					const savedTopN = state['topN'];
-					const savedDistinct = state['distinct'];
-					if (typeof savedTopN === 'number') {
-						this.currentTopN = savedTopN;
-					}
-					if (typeof savedDistinct === 'boolean') {
-						this.currentDistinct = savedDistinct;
-					}
-
-					this.logger.debug('Loaded persisted state for environment', {
-						environmentId,
-						entity: savedEntity,
-						isSelectAll: this.currentVisualQuery.isSelectAll(),
-						columnCount: this.currentVisualQuery.getColumnCount(),
-						filterCount: this.currentFilterConditions.length,
-						sortAttribute: this.currentSortAttribute,
-						topN: this.currentTopN,
-					});
-				}
-			}
-		} catch (error) {
-			this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
-		}
-
-		// Rebuild filters, sort, and options with loaded state
-		await this.rebuildVisualQueryFilters();
-		await this.rebuildVisualQuerySort();
-		await this.rebuildVisualQueryOptions();
-
-		// Send UI updates to reflect restored state
-		await this.sendSortUpdate();
-		await this.sendQueryOptionsUpdate();
 	}
 
 	/**
@@ -1627,6 +853,48 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		}
 	}
 
+	// ============================================
+	// ENVIRONMENT CHANGE
+	// ============================================
+
+	private async handleEnvironmentChange(environmentId: string): Promise<void> {
+		this.logger.debug('Environment changed', { environmentId });
+
+		const oldEnvironmentId = this.currentEnvironmentId;
+		this.currentEnvironmentId = environmentId;
+
+		// Update IntelliSense context for the new environment
+		this.intelliSenseServices.contextService.setActiveEnvironment(environmentId);
+
+		// Re-register panel in map for new environment
+		this.reregisterPanel(
+			DataExplorerPanelComposed.panels,
+			oldEnvironmentId,
+			this.currentEnvironmentId
+		);
+
+		const environment = await this.getEnvironmentById(environmentId);
+		if (environment) {
+			this.panel.title = `Data Explorer - ${environment.name}`;
+		}
+
+		// Clear previous results and reset visual query
+		this.currentResult = null;
+		await this.panel.postMessage({
+			command: 'clearResults',
+		});
+
+		// Load persisted state for the NEW environment via coordinator
+		await this.queryBuilderCoordinator.loadPersistedStateForEnvironment(environmentId);
+
+		// Reload entities for the new environment
+		await this.metadataLoader.loadEntitiesForEnvironment();
+	}
+
+	// ============================================
+	// RECORD OPERATIONS
+	// ============================================
+
 	/**
 	 * Opens a Dataverse record in the browser.
 	 * @param entityType - The entity logical name (e.g., "contact", "account")
@@ -1671,446 +939,28 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		}
 	}
 
-	/**
-	 * Exports current query results to CSV file.
-	 */
-	private async handleExportCsv(): Promise<void> {
-		if (!this.currentResult) {
-			await vscode.window.showWarningMessage('No query results to export. Please execute a query first.');
-			return;
-		}
-
-		const rowCount = this.currentResult.getRowCount();
-		if (rowCount === 0) {
-			await vscode.window.showWarningMessage('No data to export. Query returned 0 rows.');
-			return;
-		}
-
-		this.logger.debug('Exporting query results to CSV', { rowCount });
-		this.setButtonLoading('exportCsv', true);
-
-		try {
-			// Map QueryResult to TabularData
-			const viewModel = this.resultMapper.toViewModel(this.currentResult);
-			const tabularData: TabularData = {
-				headers: viewModel.columns.map((col) => col.header),
-				rows: viewModel.rows.map((row) =>
-					viewModel.columns.map((col) => row[col.name] ?? '')
-				),
-			};
-
-			// Generate CSV content
-			const csvContent = this.csvExportService.toCsv(tabularData);
-
-			// Generate suggested filename
-			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-			const entityName = viewModel.entityLogicalName ?? 'query';
-			const suggestedFilename = `${entityName}_export_${timestamp}.csv`;
-
-			// Save to file
-			const savedPath = await this.csvExportService.saveToFile(csvContent, suggestedFilename);
-
-			// Show notification without awaiting - don't block on user dismissing toast
-			void vscode.window.showInformationMessage(
-				`Exported ${rowCount} rows to ${savedPath}`
-			);
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-
-			// User cancellation is expected - don't show error
-			if (errorMessage.includes('cancelled by user')) {
-				this.logger.debug('CSV export cancelled by user');
-				return;
-			}
-
-			this.logger.error('Failed to export CSV', error);
-			await vscode.window.showErrorMessage(`Failed to export CSV: ${errorMessage}`);
-		} finally {
-			this.setButtonLoading('exportCsv', false);
-		}
-	}
-
-	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.logger.debug('Setting button loading state', { buttonId, isLoading });
-		void this.panel.postMessage({
-			command: 'setButtonState',
-			buttonId,
-			disabled: isLoading,
-			showSpinner: isLoading,
-		});
-	}
-
-	/**
-	 * Opens the current query in a new Dataverse SQL Notebook.
-	 * The notebook inherits the currently selected environment.
-	 */
-	private async handleOpenInNotebook(): Promise<void> {
-		if (!this.currentVisualQuery) {
-			vscode.window.showWarningMessage('Please select an entity first');
-			return;
-		}
-
-		this.logger.debug('Opening current query in notebook');
-
-		try {
-			// Get environment info for display and record links
-			const environmentInfo = await this.getEnvironmentById(this.currentEnvironmentId);
-			const environmentName = environmentInfo?.name ?? 'Unknown Environment';
-
-			// Generate SQL from visual query
-			const sql = this.generateSqlFromVisualQuery();
-
-			const options = {
-				sql,
-				environmentId: this.currentEnvironmentId,
-				environmentName,
-				...(environmentInfo?.dataverseUrl && { environmentUrl: environmentInfo.dataverseUrl }),
-			};
-			await openQueryInNotebook(options);
-
-			this.logger.info('Opened query in notebook', {
-				environmentId: this.currentEnvironmentId,
-				sqlLength: sql.length,
-			});
-		} catch (error) {
-			this.logger.error('Failed to open query in notebook', error);
-			await vscode.window.showErrorMessage('Failed to open query in notebook');
-		}
-	}
-
 	// ============================================
-	// EXPORT HANDLERS
+	// IMPORT SUPPORT
 	// ============================================
-
-	/**
-	 * Exports current query results to CSV file.
-	 * Uses existing CSV export service.
-	 */
-	private async handleExportResultsCsv(): Promise<void> {
-		// Reuse existing handleExportCsv logic
-		await this.handleExportCsv();
-	}
-
-	/**
-	 * Exports current query results to JSON file.
-	 */
-	private async handleExportResultsJson(): Promise<void> {
-		if (!this.currentResult) {
-			await vscode.window.showWarningMessage('No query results to export. Please execute a query first.');
-			return;
-		}
-
-		const rowCount = this.currentResult.getRowCount();
-		if (rowCount === 0) {
-			await vscode.window.showWarningMessage('No data to export. Query returned 0 rows.');
-			return;
-		}
-
-		this.logger.debug('Exporting query results to JSON', { rowCount });
-
-		try {
-			// Map QueryResult to JSON-serializable format
-			const viewModel = this.resultMapper.toViewModel(this.currentResult);
-			const jsonData = viewModel.rows.map((row) => {
-				const obj: Record<string, unknown> = {};
-				for (const col of viewModel.columns) {
-					obj[col.name] = row[col.name] ?? null;
-				}
-				return obj;
-			});
-
-			// Generate JSON content
-			const jsonContent = this.csvExportService.toJson(jsonData);
-
-			// Generate suggested filename
-			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-			const entityName = viewModel.entityLogicalName ?? 'query';
-			const suggestedFilename = `${entityName}_results_${timestamp}.json`;
-
-			// Save to file
-			const savedPath = await this.csvExportService.saveToFile(jsonContent, suggestedFilename);
-
-			void vscode.window.showInformationMessage(
-				`Exported ${rowCount} rows to ${savedPath}`
-			);
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-
-			if (errorMessage.includes('cancelled by user')) {
-				this.logger.debug('JSON export cancelled by user');
-				return;
-			}
-
-			this.logger.error('Failed to export JSON', error);
-			await vscode.window.showErrorMessage(`Failed to export JSON: ${errorMessage}`);
-		}
-	}
-
-	/**
-	 * Exports current query as FetchXML file.
-	 */
-	private async handleExportQueryFetchXml(): Promise<void> {
-		if (!this.currentVisualQuery) {
-			await vscode.window.showWarningMessage('Please select an entity first.');
-			return;
-		}
-
-		this.logger.debug('Exporting query as FetchXML');
-
-		try {
-			const fetchXml = this.fetchXmlGenerator.generate(this.currentVisualQuery);
-
-			// Generate suggested filename
-			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-			const entityName = this.currentVisualQuery.entityName;
-			const suggestedFilename = `${entityName}_query_${timestamp}.xml`;
-
-			// Save to file using custom filters for XML
-			const selectedUri = await vscode.window.showSaveDialog({
-				defaultUri: vscode.Uri.file(suggestedFilename),
-				filters: {
-					'FetchXML': ['xml'],
-					'All Files': ['*'],
-				},
-			});
-
-			if (!selectedUri) {
-				this.logger.debug('FetchXML export cancelled by user');
-				return;
-			}
-
-			// Ensure .xml extension is present
-			const uri = this.ensureFileExtension(selectedUri, '.xml');
-
-			await vscode.workspace.fs.writeFile(uri, Buffer.from(fetchXml, 'utf-8'));
-
-			void vscode.window.showInformationMessage(
-				`Exported FetchXML to ${uri.fsPath}`
-			);
-		} catch (error) {
-			this.logger.error('Failed to export FetchXML', error);
-			await vscode.window.showErrorMessage(`Failed to export FetchXML: ${error instanceof Error ? error.message : String(error)}`);
-		}
-	}
-
-	/**
-	 * Exports current query as SQL file.
-	 */
-	private async handleExportQuerySql(): Promise<void> {
-		if (!this.currentVisualQuery) {
-			await vscode.window.showWarningMessage('Please select an entity first.');
-			return;
-		}
-
-		this.logger.debug('Exporting query as SQL');
-
-		try {
-			const sql = this.generateSqlFromVisualQuery();
-
-			if (!sql) {
-				await vscode.window.showWarningMessage('Could not generate SQL from query.');
-				return;
-			}
-
-			// Generate suggested filename
-			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-			const entityName = this.currentVisualQuery.entityName;
-			const suggestedFilename = `${entityName}_query_${timestamp}.sql`;
-
-			// Save to file
-			const selectedUri = await vscode.window.showSaveDialog({
-				defaultUri: vscode.Uri.file(suggestedFilename),
-				filters: {
-					'SQL': ['sql'],
-					'All Files': ['*'],
-				},
-			});
-
-			if (!selectedUri) {
-				this.logger.debug('SQL export cancelled by user');
-				return;
-			}
-
-			// Ensure .sql extension is present
-			const uri = this.ensureFileExtension(selectedUri, '.sql');
-
-			await vscode.workspace.fs.writeFile(uri, Buffer.from(sql, 'utf-8'));
-
-			void vscode.window.showInformationMessage(
-				`Exported SQL to ${uri.fsPath}`
-			);
-		} catch (error) {
-			this.logger.error('Failed to export SQL', error);
-			await vscode.window.showErrorMessage(`Failed to export SQL: ${error instanceof Error ? error.message : String(error)}`);
-		}
-	}
-
-	// ============================================
-	// IMPORT HANDLERS
-	// ============================================
-
-	/**
-	 * Imports a FetchXML file and loads it into the Visual Query Builder.
-	 */
-	private async handleImportFetchXml(): Promise<void> {
-		this.logger.debug('Import FetchXML file');
-
-		try {
-			// Show file picker
-			const uris = await vscode.window.showOpenDialog({
-				canSelectMany: false,
-				filters: {
-					'FetchXML': ['xml'],
-					'All Files': ['*'],
-				},
-				title: 'Import FetchXML File',
-			});
-
-			const selectedUri = uris?.[0];
-			if (!selectedUri) {
-				this.logger.debug('FetchXML import cancelled by user');
-				return;
-			}
-
-			// Read file content
-			const fileContent = await vscode.workspace.fs.readFile(selectedUri);
-			const fetchXml = Buffer.from(fileContent).toString('utf-8');
-
-			// Parse FetchXML to VisualQuery
-			await this.loadVisualQueryFromFetchXml(fetchXml);
-
-		} catch (error) {
-			this.logger.error('Failed to import FetchXML', error);
-			await vscode.window.showErrorMessage(`Failed to import FetchXML: ${error instanceof Error ? error.message : String(error)}`);
-		}
-	}
-
-	/**
-	 * Imports a SQL file, converts to FetchXML, and loads into the Visual Query Builder.
-	 */
-	private async handleImportSql(): Promise<void> {
-		this.logger.debug('Import SQL file');
-
-		try {
-			// Show file picker
-			const uris = await vscode.window.showOpenDialog({
-				canSelectMany: false,
-				filters: {
-					'SQL': ['sql'],
-					'All Files': ['*'],
-				},
-				title: 'Import SQL File',
-			});
-
-			const selectedUri = uris?.[0];
-			if (!selectedUri) {
-				this.logger.debug('SQL import cancelled by user');
-				return;
-			}
-
-			// Read file content
-			const fileContent = await vscode.workspace.fs.readFile(selectedUri);
-			const sql = Buffer.from(fileContent).toString('utf-8');
-
-			// Parse SQL to AST
-			const ast = this.sqlParser.parse(sql);
-
-			// Transpile to FetchXML
-			const fetchXml = this.sqlToFetchXmlTranspiler.transpile(ast);
-
-			// Load FetchXML into Visual Query Builder
-			await this.loadVisualQueryFromFetchXml(fetchXml);
-
-		} catch (error) {
-			this.logger.error('Failed to import SQL', error);
-			await vscode.window.showErrorMessage(`Failed to import SQL: ${error instanceof Error ? error.message : String(error)}`);
-		}
-	}
 
 	/**
 	 * Loads a FetchXML string into the Visual Query Builder.
 	 * Parses the FetchXML and updates the UI state.
+	 * Shared between import coordinator and external loading.
 	 */
 	private async loadVisualQueryFromFetchXml(fetchXml: string): Promise<void> {
-		// Parse FetchXML to VisualQuery
-		const visualQuery = this.fetchXmlParser.parse(fetchXml);
-		const entityName = visualQuery.entityName;
+		try {
+			await this.queryBuilderCoordinator.loadVisualQueryFromFetchXml(fetchXml);
 
-		this.logger.debug('Parsed FetchXML for import', { entityName });
-
-		// Check if entity exists in current environment
-		const entityExists = this.currentEntities.some(
-			(e) => e.logicalName === entityName
-		);
-
-		if (!entityExists) {
-			await vscode.window.showErrorMessage(
-				`Entity "${entityName}" does not exist in the current environment.`
+			const entityName = this.queryBuilderCoordinator.getCurrentVisualQueryEntityName();
+			void vscode.window.showInformationMessage(
+				`Imported query for "${entityName}"`
 			);
-			return;
+		} catch (error) {
+			await vscode.window.showErrorMessage(
+				error instanceof Error ? error.message : String(error)
+			);
 		}
-
-		// Update visual query state
-		this.currentVisualQuery = visualQuery;
-
-		// Clear and rebuild filter conditions from the parsed query
-		this.currentFilterConditions = [];
-		const filter = visualQuery.filter;
-		if (filter) {
-			for (const condition of filter.conditions) {
-				this.filterConditionCounter++;
-				const value = condition.value;
-				this.currentFilterConditions.push({
-					id: `filter-${this.filterConditionCounter}`,
-					attribute: condition.attribute,
-					attributeType: 'String', // Default - will be refined when columns load
-					operator: condition.operator,
-					value: Array.isArray(value) ? value.join(', ') : value,
-				});
-			}
-		}
-
-		// Update sort state
-		const firstSort = visualQuery.sorts[0];
-		if (firstSort !== undefined) {
-			this.currentSortAttribute = firstSort.attribute;
-			this.currentSortDescending = firstSort.descending;
-		} else {
-			this.currentSortAttribute = null;
-			this.currentSortDescending = false;
-		}
-
-		// Update query options
-		this.currentTopN = visualQuery.top;
-		this.currentDistinct = visualQuery.distinct;
-
-		// Load attributes for the entity
-		await this.loadAttributesForEntity(entityName);
-
-		// Rebuild filters with proper attribute types
-		await this.rebuildVisualQueryFilters();
-
-		// Send entity selection to webview
-		await this.panel.postMessage({
-			command: 'entitiesLoaded',
-			data: {
-				entities: this.currentEntities,
-				selectedEntity: entityName,
-			},
-		});
-
-		// Update UI
-		await this.sendFiltersUpdate();
-		await this.sendSortUpdate();
-		await this.sendQueryOptionsUpdate();
-		await this.updateQueryPreview();
-
-		// Persist state
-		void this.saveQueryStateToStorage();
-
-		void vscode.window.showInformationMessage(
-			`Imported query for "${entityName}"`
-		);
 	}
 
 	/**
@@ -2122,18 +972,9 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	 */
 	public async loadQueryFromExternal(query: string, language: 'sql' | 'fetchxml'): Promise<void> {
 		// Ensure entities are loaded (handles case where panel just opened and hasn't finished init)
-		if (this.currentEntities.length === 0) {
+		if (this.metadataLoader.getEntities().length === 0) {
 			try {
-				const entitySuggestions = await this.intelliSenseServices.metadataCache.getEntitySuggestions(
-					this.currentEnvironmentId
-				);
-				this.currentEntities = entitySuggestions
-					.map((e) => ({
-						logicalName: e.logicalName,
-						displayName: e.displayName,
-						isCustomEntity: e.isCustomEntity,
-					}))
-					.sort((a, b) => a.displayName.localeCompare(b.displayName));
+				await this.metadataLoader.loadEntitiesForEnvironment();
 			} catch (error) {
 				this.logger.error('Failed to load entities for external query', error);
 				await vscode.window.showErrorMessage('Failed to load entity metadata. Please try again.');
@@ -2141,42 +982,35 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			}
 		}
 
-		let fetchXml: string;
+		try {
+			await this.queryBuilderCoordinator.loadQueryFromExternal(
+				query,
+				language,
+				this.sqlParser,
+				this.sqlToFetchXmlTranspiler
+			);
 
-		if (language === 'sql') {
-			// Transpile SQL to FetchXML
-			try {
-				const ast = this.sqlParser.parse(query);
-				fetchXml = this.sqlToFetchXmlTranspiler.transpile(ast);
-			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
-				await vscode.window.showErrorMessage(`Failed to parse SQL: ${errorMessage}`);
-				return;
-			}
-		} else {
-			fetchXml = query;
+			const entityName = this.queryBuilderCoordinator.getCurrentVisualQueryEntityName();
+			void vscode.window.showInformationMessage(
+				`Loaded query for "${entityName}"`
+			);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			await vscode.window.showErrorMessage(`Failed to load query: ${errorMessage}`);
 		}
-
-		await this.loadVisualQueryFromFetchXml(fetchXml);
 	}
 
 	// ============================================
 	// UTILITY METHODS
 	// ============================================
 
-	/**
-	 * Ensures a file URI has the expected extension.
-	 * If the URI doesn't end with the expected extension, appends it.
-	 *
-	 * @param uri - The file URI from save dialog
-	 * @param extension - The expected extension (e.g., '.xml', '.sql')
-	 * @returns URI with the extension guaranteed
-	 */
-	private ensureFileExtension(uri: vscode.Uri, extension: string): vscode.Uri {
-		const fsPath = uri.fsPath;
-		if (!fsPath.toLowerCase().endsWith(extension.toLowerCase())) {
-			return vscode.Uri.file(fsPath + extension);
-		}
-		return uri;
+	private setButtonLoading(buttonId: string, isLoading: boolean): void {
+		this.logger.debug('Setting button loading state', { buttonId, isLoading });
+		void this.panel.postMessage({
+			command: 'setButtonState',
+			buttonId,
+			disabled: isLoading,
+			showSpinner: isLoading,
+		});
 	}
 }
