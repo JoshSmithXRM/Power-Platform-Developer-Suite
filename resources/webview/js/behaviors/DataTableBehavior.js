@@ -244,6 +244,52 @@
 	function initialize() {
 		wireSearch();
 		wireSorting();
+		initializeCellSelection();
+	}
+
+	/**
+	 * Initializes cell selection behavior for Excel-style selection.
+	 * Works with non-virtual tables using DOM-based data extraction.
+	 */
+	function initializeCellSelection() {
+		const table = document.querySelector('table.data-table');
+		if (!table || !window.CellSelectionBehavior) {
+			return;
+		}
+
+		// Extract columns from table headers
+		const headers = Array.from(table.querySelectorAll('th'));
+		const columns = headers.map((th, index) => ({
+			key: th.getAttribute('data-sort') || `col${index}`,
+			header: th.textContent.replace(/\s*[▲▼]$/, '').trim()
+		}));
+
+		// Get row data from DOM (for non-virtual tables)
+		const getRowData = (rowIndex) => {
+			const rows = table.querySelectorAll('tbody tr');
+			const row = rows[rowIndex];
+			if (!row) {
+				return null;
+			}
+
+			const data = {};
+			const cells = row.querySelectorAll('td');
+			columns.forEach((col, colIndex) => {
+				const cell = cells[colIndex];
+				data[col.key] = cell ? cell.textContent.trim() : '';
+			});
+			return data;
+		};
+
+		const getTotalRowCount = () => {
+			return table.querySelectorAll('tbody tr').length;
+		};
+
+		window.CellSelectionBehavior.attach(table, {
+			columns: columns,
+			getRowData: getRowData,
+			getTotalRowCount: getTotalRowCount
+		});
 	}
 
 	// Re-apply striping after table updates

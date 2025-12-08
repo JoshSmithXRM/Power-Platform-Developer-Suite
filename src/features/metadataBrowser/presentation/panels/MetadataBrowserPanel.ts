@@ -23,6 +23,7 @@ import { MetadataBrowserLayoutSection } from '../sections/MetadataBrowserLayoutS
 import { AttributeMetadataSerializer } from '../serializers/AttributeMetadataSerializer';
 import type { AttributeMetadata } from '../../domain/entities/AttributeMetadata';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 
 /**
  * Commands supported by Metadata Browser panel.
@@ -76,7 +77,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	private detailPanelWidth: number | null = null;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly context: vscode.ExtensionContext,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
@@ -125,6 +126,10 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	 */
 	protected reveal(column: vscode.ViewColumn): void {
 		this.panel.reveal(column);
+	}
+
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
 	}
 
 	/**
@@ -254,6 +259,9 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'CellSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
@@ -271,7 +279,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -441,7 +449,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 
 		// Send detail panel width to webview if it was persisted
 		if (this.detailPanelWidth) {
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'restoreDetailPanelWidth',
 				data: { width: this.detailPanelWidth }
 			});
@@ -473,7 +481,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 				this.currentEnvironmentId
 			);
 
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'populateTree',
 				data: {
 					entities: result.entities,
@@ -526,7 +534,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 					selectedTab: this.currentTab as string
 				}
 			};
-			await this.panel.webview.postMessage(postData);
+			await this.panel.postMessage(postData);
 
 			this.logger.info('Entity metadata loaded', { logicalName });
 			await this.persistState();
@@ -557,7 +565,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 			);
 
 			// Send choice data to client
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'setChoiceMode',
 				data: {
 					choice: result.choice,
@@ -623,11 +631,11 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 				rawEntity
 			}
 		};
-		await this.panel.webview.postMessage(postData);
+		await this.panel.postMessage(postData);
 
 		// Restore persisted width (deferred application after panel shown)
 		if (this.detailPanelWidth !== null) {
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'restoreDetailPanelWidth',
 				data: { width: this.detailPanelWidth }
 			});
@@ -642,7 +650,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	private async handleCloseDetailPanel(): Promise<void> {
 		this.logger.debug('Closing detail panel');
 
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'hideDetailPanel'
 		});
 
@@ -657,7 +665,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 
 		// Show loading state
 		this.setButtonLoading('refresh', true);
-		await this.panel.webview.postMessage({ command: 'showDetailLoading' });
+		await this.panel.postMessage({ command: 'showDetailLoading' });
 
 		try {
 			// Clear cache to force fresh data
@@ -715,7 +723,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 			}
 
 			// Clear tables
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'clearSelection'
 			});
 
@@ -777,7 +785,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 			this.logger.debug('Detail panel width loaded from storage', { width: state.detailPanelWidth });
 
 			// Send detail panel width to webview
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'restoreDetailPanelWidth',
 				data: { width: this.detailPanelWidth }
 			});
@@ -840,7 +848,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	 * Sets button state (enabled/disabled).
 	 */
 	private setButtonState(buttonId: string, disabled: boolean): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'setButtonState',
 			buttonId,
 			disabled,
@@ -852,7 +860,7 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	 * Sets button loading state with spinner.
 	 */
 	private setButtonLoading(buttonId: string, isLoading: boolean): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'setButtonState',
 			buttonId,
 			disabled: isLoading,

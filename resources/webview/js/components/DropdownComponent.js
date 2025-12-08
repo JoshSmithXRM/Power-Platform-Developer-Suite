@@ -323,6 +323,19 @@ function handleDropdownItemClick(dropdownId, itemId) {
 			'10': 'setAutoRefresh',
 			'30': 'setAutoRefresh',
 			'60': 'setAutoRefresh'
+		},
+		// Data Explorer Export dropdown
+		'dataExplorerExportDropdown': {
+			'resultsCsv': 'exportResultsCsv',
+			'resultsJson': 'exportResultsJson',
+			'queryFetchXml': 'exportQueryFetchXml',
+			'querySql': 'exportQuerySql',
+			'queryNotebook': 'exportQueryNotebook'
+		},
+		// Data Explorer Import dropdown
+		'dataExplorerImportDropdown': {
+			'fetchXml': 'importFetchXml',
+			'sql': 'importSql'
 		}
 	};
 

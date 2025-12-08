@@ -21,6 +21,7 @@ window.createBehavior({
 		setupRowSelection();
 		initializeDropdowns();
 		setupFilterPanel();
+		setupKeyboardShortcuts();
 	},
 	handleMessage(message) {
 		// Handle data-driven updates
@@ -1626,4 +1627,32 @@ function renderTimelineNode(node) {
 			${hasChildren ? `<div class="timeline-children">${node.children.map(child => renderTimelineNode(child)).join('')}</div>` : ''}
 		</div>
 	`;
+}
+
+/**
+ * Sets up keyboard shortcuts for input elements.
+ * VS Code webviews intercept certain shortcuts (Ctrl+A, Ctrl+C, etc.) before they reach inputs.
+ * This handler prevents that interception for standard text editing shortcuts.
+ */
+function setupKeyboardShortcuts() {
+	document.addEventListener('keydown', (e) => {
+		// Only handle events in input/textarea elements
+		const target = e.target;
+		if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
+			return;
+		}
+
+		// Ctrl+A (Select All) - prevent VS Code from intercepting
+		if (e.ctrlKey && e.key === 'a') {
+			e.stopPropagation();
+			// Let the default browser behavior handle select all
+			return;
+		}
+
+		// Ctrl+C, Ctrl+V, Ctrl+X - also prevent interception for completeness
+		if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'x')) {
+			e.stopPropagation();
+			return;
+		}
+	}, true); // Use capture phase to intercept before VS Code
 }

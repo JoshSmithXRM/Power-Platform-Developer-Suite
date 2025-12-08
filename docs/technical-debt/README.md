@@ -1,6 +1,6 @@
 # Technical Debt Inventory
 
-**Total Items:** 7 (6 items resolved/reclassified earlier, 1 low-priority item added, 1 accepted tradeoff added)
+**Total Items:** 11 (6 items resolved/reclassified earlier, 3 low-priority items, 2 scheduled items)
 
 ---
 
@@ -10,8 +10,8 @@
 |----------|-------|-----------------|
 | **Accepted Tradeoffs** | 5 | Keep indefinitely (conscious decisions) |
 | **Will Not Implement** | 1 | Rejected (over-engineering) |
-| **Scheduled** | 0 | Fix in next 1-2 sprints (all items resolved) |
-| **Low Priority** | 1 | Fix when naturally touching code |
+| **Scheduled** | 2 | Fix in next 2-3 releases |
+| **Low Priority** | 3 | Fix when naturally touching code |
 
 ---
 
@@ -62,11 +62,22 @@ Correctly rejected suggestions that would add ceremony without benefit.
 
 ---
 
-## 📅 Scheduled (0 items)
+## 📅 Scheduled (2 items)
 
 Items with clear triggers or timelines for fixing.
 
-**All scheduled items resolved:**
+| Item | Type | Effort | Timeline |
+|------|------|--------|----------|
+| [Parser Refactoring](scheduled/PARSER_REFACTORING.md) | Architectural (regex → stack-based) | 6-8 hours | Post v0.3.0 (v0.4.0 or v0.5.0) |
+| [README Screenshots](scheduled/readme-screenshots.md) | Documentation (visual examples) | 2-3 hours | Before major promotion or v1.0 |
+
+### Parser Refactoring Details
+- **Problem**: FetchXmlParser uses regex which cannot handle nested XML structures
+- **Impact**: Nested `<filter>` elements don't parse correctly (edge case)
+- **Solution**: Refactor to stack-based tokenizer approach (zero dependencies)
+- **Coverage**: Files excluded from thresholds until refactoring complete
+
+**Previously resolved:**
 
 ✅ **Clean Architecture Guide Split** (completed 2025-11-23)
 - Split into 3 focused documents:
@@ -84,13 +95,15 @@ Items with clear triggers or timelines for fixing.
 
 ---
 
-## 🔵 Low Priority (1 item)
+## 🔵 Low Priority (3 items)
 
 Fix when it becomes a problem or when naturally touching the code.
 
 | Item | Type | Effort | Trigger |
 |------|------|--------|---------|
 | [Notification Service Abstraction](low-priority/notification-service-abstraction.md) | Refactoring (consistency enforcement) | 4-6 hours | When refactoring 10+ notification callsites |
+| [FileSystemProvider Complexity](low-priority/filesystemprovider-complexity.md) | Refactoring (separation of concerns) | 4-6 hours | When adding new content modes or conflict features |
+| [Environment Repository Caching](low-priority/environment-repository-caching.md) | Performance (redundant loading) | 2-3 hours | When modifying EnvironmentRepository or SharedFactories |
 
 **Previously resolved items:**
 
@@ -106,17 +119,17 @@ Fix when it becomes a problem or when naturally touching the code.
 ### Debt by Category (Visual)
 
 ```
-Accepted Tradeoffs: █████  5 items (71%)
-Will Not Implement: █      1 item  (14%)
-Scheduled:          -      0 items (0%)
-Low Priority:       █      1 item  (14%)
+Accepted Tradeoffs: █████  5 items (50%)
+Will Not Implement: █      1 item  (10%)
+Scheduled:          █      1 item  (10%)
+Low Priority:       ███    3 items (30%)
 ```
 
 ### Decision Quality
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| **Items with zero bugs** | 7/7 (100%) | ✅ Excellent - all decisions validated |
+| **Items with zero bugs** | 9/9 (100%) | ✅ Excellent - all decisions validated |
 | **Patterns promoted to architecture docs** | 2 items | ✅ Industry standards (static factories, OData) |
 | **Rejected over-engineering** | 1 item | ✅ Good judgment (avoided cargo cult patterns) |
 | **Items resolved in last review** | 4 items | ✅ Proactive (DateTimeFilter, split guide, shared DTO, ESLint rule) |
@@ -124,7 +137,7 @@ Low Priority:       █      1 item  (14%)
 | **ESLint rule quality** | Prefix matching (future-proof) | ✅ Improved (12 suppressions eliminated) |
 | **Notification consistency** | 99% (1/95 fixed) | ✅ Excellent (abstraction deferred, not urgent) |
 
-**Overall Health:** 🟢 Excellent (7 items total: 5 accepted, 1 rejected over-engineering, 1 low-priority future improvement)
+**Overall Health:** 🟢 Excellent (9 items total: 5 accepted, 1 rejected over-engineering, 3 low-priority future improvements)
 
 ---
 
@@ -174,10 +187,13 @@ docs/technical-debt/
 │   └── xml-formatter-interface.md
 │
 ├── scheduled/                                   # Has timeline
-│   └── (empty - all items resolved)
+│   ├── PARSER_REFACTORING.md                    # Regex → stack-based (v0.4.0+)
+│   └── readme-screenshots.md                    # Visual documentation (pre-v1.0)
 │
 └── low-priority/                                # Opportunistic fix
-    └── notification-service-abstraction.md      # 95+ callsites, defer until refactoring
+    ├── notification-service-abstraction.md      # 95+ callsites, defer until refactoring
+    ├── filesystemprovider-complexity.md         # ~800 lines, extract when adding features
+    └── environment-repository-caching.md        # Redundant getAll() calls, add TTL cache
 
 Reclassified as architectural patterns (moved to docs/architecture/):
 - static-factory-methods.md → STATIC_FACTORY_PATTERN.md

@@ -51,6 +51,18 @@ interface DataverseWebResourceDto {
 	createdon: string;
 	/** modifiedon field - Last modification timestamp */
 	modifiedon: string;
+	/** _createdby_value field - Creator user GUID */
+	_createdby_value: string;
+	/** createdby expanded navigation - Creator user entity */
+	createdby?: {
+		fullname: string;
+	};
+	/** _modifiedby_value field - Last modifier user GUID */
+	_modifiedby_value: string;
+	/** modifiedby expanded navigation - Last modifier user entity */
+	modifiedby?: {
+		fullname: string;
+	};
 }
 
 /**
@@ -75,8 +87,11 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 				'webresourcetype',
 				'ismanaged',
 				'createdon',
-				'modifiedon'
+				'modifiedon',
+				'_createdby_value',
+				'_modifiedby_value'
 			],
+			expand: 'createdby($select=fullname),modifiedby($select=fullname)',
 			orderBy: 'name'
 		};
 
@@ -165,7 +180,7 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		webResourceId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<WebResource | null> {
-		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})?$select=webresourceid,name,displayname,webresourcetype,ismanaged,modifiedon`;
+		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})?$select=webresourceid,name,displayname,webresourcetype,ismanaged,createdon,modifiedon,_createdby_value,_modifiedby_value&$expand=createdby($select=fullname),modifiedby($select=fullname)`;
 
 		this.logger.debug('Fetching web resource by ID', { environmentId, webResourceId });
 
@@ -202,9 +217,13 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		webResourceId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<string> {
-		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})?$select=content`;
+		// Use RetrieveUnpublished bound function to get unpublished content.
+		// This ensures developers see their latest changes (before publish).
+		// Standard query returns published content; RetrieveUnpublished returns unpublished.
+		// Note: modifiedon timestamp is the same for both (always unpublished modified time).
+		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})/Microsoft.Dynamics.CRM.RetrieveUnpublished?$select=content`;
 
-		this.logger.debug('Fetching web resource content', { environmentId, webResourceId });
+		this.logger.debug('Fetching unpublished web resource content', { environmentId, webResourceId });
 
 		CancellationHelper.throwIfCancelled(cancellationToken);
 
@@ -217,7 +236,7 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 
 			CancellationHelper.throwIfCancelled(cancellationToken);
 
-			this.logger.debug('Fetched web resource content', {
+			this.logger.debug('Fetched unpublished web resource content', {
 				webResourceId,
 				contentLength: response.content?.length ?? 0
 			});
@@ -226,6 +245,41 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		} catch (error) {
 			const normalizedError = normalizeError(error);
 			this.logger.error('Failed to fetch web resource content', normalizedError);
+			throw normalizedError;
+		}
+	}
+
+	async getPublishedContent(
+		environmentId: string,
+		webResourceId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<string> {
+		// Standard OData query returns published content (what end users see).
+		// Used to compare with unpublished content to detect pending changes.
+		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})?$select=content`;
+
+		this.logger.debug('Fetching published web resource content', { environmentId, webResourceId });
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			const response = await this.apiService.get<DataverseWebResourceContentResponse>(
+				environmentId,
+				endpoint,
+				cancellationToken
+			);
+
+			CancellationHelper.throwIfCancelled(cancellationToken);
+
+			this.logger.debug('Fetched published web resource content', {
+				webResourceId,
+				contentLength: response.content?.length ?? 0
+			});
+
+			return response.content ?? '';
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to fetch published web resource content', normalizedError);
 			throw normalizedError;
 		}
 	}
@@ -279,7 +333,8 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 
 		// Build query with pagination and count
 		const queryParts: string[] = [
-			'$select=webresourceid,name,displayname,webresourcetype,ismanaged,modifiedon',
+			'$select=webresourceid,name,displayname,webresourcetype,ismanaged,createdon,modifiedon,_createdby_value,_modifiedby_value',
+			'$expand=createdby($select=fullname),modifiedby($select=fullname)',
 			'$count=true',
 			`$top=${pageSize}`,
 			`$skip=${skip}`,
@@ -478,6 +533,47 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 		}
 	}
 
+	/**
+	 * Gets the current modifiedOn timestamp for a web resource.
+	 * Lightweight query for conflict detection - only fetches modifiedon field.
+	 */
+	async getModifiedOn(
+		environmentId: string,
+		webResourceId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<Date | null> {
+		const endpoint = `/api/data/v9.2/webresourceset(${webResourceId})?$select=modifiedon`;
+
+		this.logger.debug('Fetching web resource modifiedOn', { environmentId, webResourceId });
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			const response = await this.apiService.get<{ modifiedon: string }>(
+				environmentId,
+				endpoint,
+				cancellationToken
+			);
+
+			CancellationHelper.throwIfCancelled(cancellationToken);
+
+			const modifiedOn = new Date(response.modifiedon);
+
+			this.logger.debug('Fetched web resource modifiedOn', { webResourceId, modifiedOn: modifiedOn.toISOString() });
+
+			return modifiedOn;
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			// 404 means not found - return null
+			if (normalizedError.message.includes('404') || normalizedError.message.includes('Not Found')) {
+				this.logger.debug('Web resource not found', { webResourceId });
+				return null;
+			}
+			this.logger.error('Failed to fetch web resource modifiedOn', normalizedError);
+			throw normalizedError;
+		}
+	}
+
 	private mapToEntity(dto: DataverseWebResourceDto): WebResource {
 		return new WebResource(
 			dto.webresourceid,
@@ -486,7 +582,9 @@ export class DataverseWebResourceRepository implements IWebResourceRepository {
 			WebResourceType.fromCode(dto.webresourcetype),
 			dto.ismanaged,
 			new Date(dto.createdon),
-			new Date(dto.modifiedon)
+			new Date(dto.modifiedon),
+			dto.createdby?.fullname ?? 'Unknown',
+			dto.modifiedby?.fullname ?? 'Unknown'
 		);
 	}
 }

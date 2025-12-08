@@ -68,19 +68,9 @@
 			return; // Not a virtual table
 		}
 
-		// Read row data from data attribute
-		const rowsJson = tbody.getAttribute('data-rows');
+		// Read configuration from data attributes (always needed)
 		const columnsJson = tbody.getAttribute('data-columns');
 		const heightAttr = tbody.getAttribute('data-row-height');
-
-		if (rowsJson) {
-			try {
-				allRows = JSON.parse(rowsJson);
-				filteredRows = [...allRows];
-			} catch (e) {
-				console.error('VirtualTableRenderer: Failed to parse row data', e);
-			}
-		}
 
 		if (columnsJson) {
 			try {
@@ -98,14 +88,33 @@
 		const scrollContainer = scrollWrapper || tbody;
 		setupScrollHandler(scrollContainer, tbody);
 
-		// Set up search handling
+		// Set up other handlers
 		setupSearchHandler();
-
-		// Set up row selection handling
 		setupRowSelectionHandler(tbody);
-
-		// Set up column sorting
 		setupSortingHandler();
+
+		// Initialize cell selection behavior
+		initializeCellSelection(tbody);
+
+		// Check if table is in loading state - don't overwrite loading row
+		const isLoading = tbody.getAttribute('data-loading') === 'true';
+		if (isLoading) {
+			// Table is loading - skip initial render, wait for updateVirtualTable message
+			// Handlers are set up, columns/rowHeight are initialized - ready for data
+			return;
+		}
+
+		// Read row data from data attribute
+		const rowsJson = tbody.getAttribute('data-rows');
+
+		if (rowsJson) {
+			try {
+				allRows = JSON.parse(rowsJson);
+				filteredRows = [...allRows];
+			} catch (e) {
+				console.error('VirtualTableRenderer: Failed to parse row data', e);
+			}
+		}
 
 		// Calculate visible range based on container height
 		const visibleCount = calculateVisibleRowCount(scrollContainer);
@@ -121,6 +130,23 @@
 
 		// Initial render
 		renderVisibleRows(tbody);
+	}
+
+	/**
+	 * Initializes cell selection behavior for Excel-style selection.
+	 * @param {HTMLElement} tbody - The virtual table body element
+	 */
+	function initializeCellSelection(tbody) {
+		const table = tbody.closest('table');
+		if (!table || !window.CellSelectionBehavior) {
+			return;
+		}
+
+		window.CellSelectionBehavior.attach(table, {
+			columns: columns,
+			getRowData: (rowIndex) => filteredRows[rowIndex] || null,
+			getTotalRowCount: () => filteredRows.length
+		});
 	}
 
 	/**
@@ -529,6 +555,9 @@
 		}
 
 		applyRowStriping(tbody);
+
+		// Refresh cell selection visuals after render
+		window.CellSelectionBehavior?.refresh?.();
 	}
 
 	/**
@@ -822,9 +851,14 @@
 		selectedRowId = null;
 		selectedRowIds.clear();
 
+		// Clear cell selection on new data
+		window.CellSelectionBehavior?.clearSelection?.();
+
 		// Update columns if provided
 		if (data.columns) {
 			columns = data.columns;
+			// Update CellSelectionBehavior columns
+			window.CellSelectionBehavior?.updateColumns?.(columns);
 		}
 
 		// Update pagination state for server search fallback
@@ -841,6 +875,9 @@
 		const scrollContainer = scrollWrapper || tbody;
 
 		if (tbody) {
+			// Clear loading state now that data has arrived
+			tbody.removeAttribute('data-loading');
+
 			// Update data attributes
 			tbody.setAttribute('data-rows', JSON.stringify(allRows));
 

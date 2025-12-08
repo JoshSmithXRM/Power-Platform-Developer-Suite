@@ -28,6 +28,14 @@ export type SqlTokenType =
 	| 'OUTER'
 	| 'ON'
 	| 'AS'
+	| 'DISTINCT'
+	| 'GROUP'
+	// Aggregate functions
+	| 'COUNT'
+	| 'SUM'
+	| 'AVG'
+	| 'MIN'
+	| 'MAX'
 	// Operators
 	| 'EQUALS' // =
 	| 'NOT_EQUALS' // <> or !=
@@ -117,6 +125,13 @@ const SQL_KEYWORDS = new Set<SqlTokenType>([
 	'OUTER',
 	'ON',
 	'AS',
+	'DISTINCT',
+	'GROUP',
+	'COUNT',
+	'SUM',
+	'AVG',
+	'MIN',
+	'MAX',
 ]);
 
 /**
@@ -158,4 +173,28 @@ export const KEYWORD_MAP: ReadonlyMap<string, SqlTokenType> = new Map([
 	['OUTER', 'OUTER'],
 	['ON', 'ON'],
 	['AS', 'AS'],
+	['DISTINCT', 'DISTINCT'],
+	['GROUP', 'GROUP'],
+	['COUNT', 'COUNT'],
+	['SUM', 'SUM'],
+	['AVG', 'AVG'],
+	['MIN', 'MIN'],
+	['MAX', 'MAX'],
 ]);
+
+/**
+ * Value Object: SQL Comment
+ *
+ * Represents a comment extracted during lexical analysis.
+ * Tracks position for associating with nearby tokens/AST nodes.
+ */
+export class SqlComment {
+	constructor(
+		/** The comment text (without delimiters) */
+		public readonly text: string,
+		/** Character position where the comment starts in the source */
+		public readonly position: number,
+		/** Whether this is a block comment vs line comment */
+		public readonly isBlock: boolean
+	) {}
+}

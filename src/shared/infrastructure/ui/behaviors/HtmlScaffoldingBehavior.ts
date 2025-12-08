@@ -3,10 +3,9 @@
  * Handles HTML scaffolding (<html>, <head>, CSS, JS) and webview rendering.
  */
 
-import type * as vscode from 'vscode';
-
 import type { SectionRenderData } from '../types/SectionRenderData';
 import { escapeHtml } from '../../../../infrastructure/ui/utils/HtmlUtils';
+import type { ISafePanel } from '../panels/ISafePanel';
 
 import type { IPanelBehavior } from './IPanelBehavior';
 import type { SectionCompositionBehavior } from './SectionCompositionBehavior';
@@ -30,7 +29,7 @@ export interface HtmlScaffoldingConfig {
  */
 export class HtmlScaffoldingBehavior implements IPanelBehavior {
 	constructor(
-		private readonly webview: vscode.Webview,
+		private readonly panel: ISafePanel,
 		private readonly composer: SectionCompositionBehavior,
 		private readonly config: HtmlScaffoldingConfig
 	) {}
@@ -49,10 +48,10 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 	public async refresh(data: SectionRenderData): Promise<void> {
 		const bodyHtml = this.composer.compose(data);
 		const fullHtml = this.wrapInHtmlScaffolding(bodyHtml);
-		this.webview.html = fullHtml;
+		this.panel.html = fullHtml;
 
 		// Notify webview that HTML has been updated (for re-initialization)
-		await this.webview.postMessage({ command: 'htmlUpdated' });
+		await this.panel.postMessage({ command: 'htmlUpdated' });
 	}
 
 	/**
@@ -85,7 +84,7 @@ export class HtmlScaffoldingBehavior implements IPanelBehavior {
 	 */
 	private wrapInHtmlScaffolding(bodyHtml: string): string {
 		const { cssUris, jsUris, cspNonce, title, customCss, customJavaScript } = this.config;
-		const cspSource = this.webview.cspSource;
+		const cspSource = this.panel.cspSource;
 
 		return `<!DOCTYPE html>
 <html lang="en">

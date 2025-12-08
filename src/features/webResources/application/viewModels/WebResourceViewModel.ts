@@ -14,12 +14,16 @@ export interface WebResourceViewModel {
 	readonly displayName: string;
 	readonly type: string;
 	readonly typeCode: number;
+	/** File extension for this type (e.g., '.js', '.html'). Used for syntax highlighting. */
+	readonly fileExtension: string;
 	readonly createdOn: string;
 	/** Sort value for createdOn (timestamp for proper date sorting) */
 	readonly createdOnSortValue: number;
 	readonly modifiedOn: string;
 	/** Sort value for modifiedOn (timestamp for proper date sorting) */
 	readonly modifiedOnSortValue: number;
+	readonly createdBy: string;
+	readonly modifiedBy: string;
 	/** Display value for isManaged ('Yes' or 'No') */
 	readonly managed: string;
 	/** Raw boolean for isManaged (used for filtering/logic) */

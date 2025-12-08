@@ -19,6 +19,7 @@ export class WebResourceViewModelMapper {
 	public toViewModel(webResource: WebResource): WebResourceViewModel {
 		const name = webResource.name.getValue();
 		const typeCode = webResource.webResourceType.getCode();
+		const fileExtension = webResource.webResourceType.getFileExtension();
 		const canEdit = webResource.canEdit();
 
 		// Base view model without optional nameLink
@@ -28,10 +29,13 @@ export class WebResourceViewModelMapper {
 			displayName: webResource.displayName || name,
 			type: WebResourceTypeFormatter.formatDisplayName(webResource.webResourceType),
 			typeCode,
+			fileExtension,
 			createdOn: DateFormatter.formatDate(webResource.createdOn),
 			createdOnSortValue: webResource.createdOn.getTime(),
 			modifiedOn: DateFormatter.formatDate(webResource.modifiedOn),
 			modifiedOnSortValue: webResource.modifiedOn.getTime(),
+			createdBy: webResource.createdBy,
+			modifiedBy: webResource.modifiedBy,
 			managed: webResource.isManaged ? 'Yes' : 'No',
 			isManaged: webResource.isManaged,
 			isEditable: canEdit
@@ -45,7 +49,7 @@ export class WebResourceViewModelMapper {
 				commandData: {
 					id: webResource.id,
 					name: name,
-					'type-code': String(typeCode)
+					'file-extension': fileExtension
 				},
 				className: 'clickable-link'
 			};

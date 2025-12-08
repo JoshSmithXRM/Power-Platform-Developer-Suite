@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
+import { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
 import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
 import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
@@ -91,7 +92,7 @@ export class PersistenceInspectorPanelComposed {
 	private scaffoldingBehavior!: HtmlScaffoldingBehavior;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly inspectStorageUseCase: InspectStorageUseCase,
 		private readonly revealSecretUseCase: RevealSecretUseCase,
@@ -140,7 +141,7 @@ export class PersistenceInspectorPanelComposed {
 		}
 
 		// Create new panel
-		const panel = vscode.window.createWebviewPanel(
+		const rawPanel = vscode.window.createWebviewPanel(
 			PersistenceInspectorPanelComposed.viewType,
 			'Persistence Inspector',
 			column,
@@ -152,8 +153,11 @@ export class PersistenceInspectorPanelComposed {
 			}
 		);
 
+		// Wrap in SafeWebviewPanel for safe messaging and disposal tracking
+		const safePanel = new SafeWebviewPanel(rawPanel);
+
 		PersistenceInspectorPanelComposed.currentPanel = new PersistenceInspectorPanelComposed(
-			panel,
+			safePanel,
 			extensionUri,
 			inspectStorageUseCase,
 			revealSecretUseCase,
@@ -270,7 +274,7 @@ export class PersistenceInspectorPanelComposed {
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -350,7 +354,7 @@ export class PersistenceInspectorPanelComposed {
 		try {
 			const viewModel = await this.inspectStorageUseCase.execute();
 
-			this.panel.webview.postMessage({
+			void this.panel.postMessage({
 				command: 'storageData',
 				data: viewModel
 			});
@@ -382,7 +386,7 @@ export class PersistenceInspectorPanelComposed {
 			// Execute with confirmation
 			const value = await this.revealSecretUseCase.execute(key, true);
 
-			this.panel.webview.postMessage({
+			void this.panel.postMessage({
 				command: 'secretRevealed',
 				key,
 				value
@@ -498,7 +502,7 @@ export class PersistenceInspectorPanelComposed {
 
 	private handleError(error: unknown): void {
 		const message = error instanceof Error ? error.message : String(error);
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'error',
 			message
 		});

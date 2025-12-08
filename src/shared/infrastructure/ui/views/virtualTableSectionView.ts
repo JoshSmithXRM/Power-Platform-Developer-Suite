@@ -50,9 +50,10 @@ export function renderVirtualTableSection(viewData: VirtualTableViewData): strin
 		return renderError(errorMessage);
 	}
 
-	if (isLoading && data.length === 0) {
-		return renderLoading();
-	}
+	// NOTE: Do NOT early return with renderLoading() here!
+	// Virtual tables need the table structure (virtualTableBody) to exist so
+	// VirtualTableRenderer.js can update it when data arrives via postMessage.
+	// Instead, pass isLoading to renderVirtualTable to show loading row INSIDE tbody.
 
 	const sortColumn = viewData.sortColumn || config.defaultSortColumn;
 	const sortDirection = viewData.sortDirection || config.defaultSortDirection;
@@ -70,7 +71,7 @@ export function renderVirtualTableSection(viewData: VirtualTableViewData): strin
 		<div class="table-wrapper virtual-table-wrapper">
 			${config.enableSearch !== false ? renderSearchBox(config.searchPlaceholder, searchQuery) : ''}
 			<div class="table-content">
-				${renderVirtualTable(data, calculatedColumns, config, sortColumn, sortDirection, searchQuery, rowDataJson, estimatedRowHeight)}
+				${renderVirtualTable(data, calculatedColumns, config, sortColumn, sortDirection, searchQuery, rowDataJson, estimatedRowHeight, isLoading)}
 			</div>
 			${renderVirtualFooter(data.length, pagination, isLoading)}
 		</div>
@@ -98,6 +99,9 @@ function renderSearchBox(placeholder: string, searchQuery?: string): string {
  *
  * The tbody is a virtual scroll container that JS will populate.
  * Row data is stored in data-rows attribute for JS to read.
+ *
+ * IMPORTANT: Table structure MUST always be rendered (even when loading)
+ * because VirtualTableRenderer.js needs virtualTableBody to exist to update it.
  */
 function renderVirtualTable(
 	data: ReadonlyArray<Record<string, unknown>>,
@@ -107,7 +111,8 @@ function renderVirtualTable(
 	sortDirection: 'asc' | 'desc',
 	searchQuery: string | undefined,
 	rowDataJson: string,
-	estimatedRowHeight: number
+	estimatedRowHeight: number,
+	isLoading?: boolean
 ): string {
 	// Virtual scroll wrapper fills available space via CSS (height: 100%)
 	// JS reads actual container height and calculates visible rows dynamically
@@ -133,9 +138,12 @@ function renderVirtualTable(
 						data-rows="${escapeHtml(rowDataJson)}"
 						data-columns="${escapeHtml(JSON.stringify(columns))}"
 						data-row-height="${estimatedRowHeight}"
+						${isLoading ? 'data-loading="true"' : ''}
 					>
 						${data.length === 0
-							? renderNoDataRow(columns.length, config.noDataMessage, searchQuery)
+							? (isLoading
+								? renderLoadingRow(columns.length)
+								: renderNoDataRow(columns.length, config.noDataMessage, searchQuery))
 							: renderInitialRows(data, columns, estimatedRowHeight)
 						}
 					</tbody>
@@ -241,6 +249,24 @@ function renderTableRow(
 }
 
 /**
+ * Renders loading spinner row inside table.
+ *
+ * Unlike renderLoading() which replaces the entire table, this renders
+ * a loading indicator AS A TABLE ROW, preserving the table structure.
+ * This allows VirtualTableRenderer.js to find and update virtualTableBody.
+ */
+function renderLoadingRow(columnCount: number): string {
+	return `
+		<tr>
+			<td colspan="${columnCount}" style="text-align: center; padding: 24px;">
+				<span class="spinner"></span>
+				<span style="margin-left: 8px;">Loading...</span>
+			</td>
+		</tr>
+	`;
+}
+
+/**
  * Renders "No data" message in table.
  */
 function renderNoDataRow(columnCount: number, noDataMessage: string, searchQuery?: string): string {
@@ -296,18 +322,6 @@ function renderVirtualFooter(
 
 	// No filter - show simple "X records" format (matches regular DataTable)
 	return `<div class="table-footer">${availableCount.toLocaleString()} ${recordText}${loadingIndicator}</div>`;
-}
-
-/**
- * Renders loading spinner.
- */
-function renderLoading(): string {
-	return `
-		<div class="loading-container">
-			<span class="spinner"></span>
-			<span>Loading...</span>
-		</div>
-	`;
 }
 
 /**

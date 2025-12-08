@@ -79,6 +79,10 @@ class TestPanel extends EnvironmentScopedPanel<TestPanel> {
 		this.panel.reveal(column);
 	}
 
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
+	}
+
 	public static getPanelsMap(): Map<string, TestPanel> {
 		return TestPanel.panels;
 	}
@@ -325,7 +329,8 @@ describe('EnvironmentScopedPanel', () => {
 				);
 
 				expect(panel1.revealCallCount).toBe(1);
-				expect(mockPanel.reveal).toHaveBeenCalledWith(ViewColumn.One);
+				// SafeWebviewPanel.reveal passes both viewColumn and preserveFocus (undefined)
+				expect(mockPanel.reveal).toHaveBeenCalledWith(ViewColumn.One, undefined);
 			});
 		});
 
@@ -435,6 +440,10 @@ describe('EnvironmentScopedPanel', () => {
 					protected reveal(column: number): void {
 						this.panel.reveal(column);
 					}
+
+					protected getCurrentEnvironmentId(): string {
+						return this.currentEnvironmentId;
+					}
 				}
 
 				await MinimalTestPanel.createOrShow(
@@ -467,7 +476,9 @@ describe('EnvironmentScopedPanel', () => {
 					'env1'
 				);
 
-				expect(mockPanel.onDidDispose).toHaveBeenCalledTimes(1);
+				// Called twice: once by SafeWebviewPanel (for tracking disposal state)
+				// and once by EnvironmentScopedPanel (for cleanup)
+				expect(mockPanel.onDidDispose).toHaveBeenCalledTimes(2);
 				expect(mockPanel.onDidDispose).toHaveBeenCalledWith(expect.any(Function));
 			});
 
@@ -621,6 +632,35 @@ describe('EnvironmentScopedPanel', () => {
 			expect(TestPanel.getPanelsMap().size).toBe(2);
 			expect(TestPanel.getPanelsMap().get('env1')).toBe(panel2);
 			expect(TestPanel.getPanelsMap().get('env2')).toBe(panel1);
+		});
+
+		it('should remove panel from current environment (not original) when disposed after reregistration', async () => {
+			// Regression test: disposal closure was capturing original environment ID
+			// instead of using current environment ID after reregistration
+			const panel = await TestPanel.createOrShow(
+				mockExtensionUri,
+				mockGetEnvironments,
+				mockGetEnvironmentById,
+				'env1'
+			);
+
+			expect(TestPanel.getPanelsMap().get('env1')).toBe(panel);
+
+			// Simulate environment change - panel re-registers under env2
+			panel.simulateEnvironmentChange('env2');
+
+			expect(TestPanel.getPanelsMap().has('env1')).toBe(false);
+			expect(TestPanel.getPanelsMap().get('env2')).toBe(panel);
+
+			// Trigger disposal - should remove env2 entry, not try to remove env1
+			if (disposableCallback) {
+				disposableCallback();
+			}
+
+			// BUG: With old code, disposal closure still has 'env1' captured,
+			// so it tries to delete 'env1' (no-op) and leaves 'env2' orphaned
+			expect(TestPanel.getPanelsMap().has('env2')).toBe(false);
+			expect(TestPanel.getPanelsMap().size).toBe(0);
 		});
 	});
 });

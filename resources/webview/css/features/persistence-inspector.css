@@ -1,5 +1,26 @@
 /* Persistence Inspector Panel Styles */
 
+/* ===========================================
+   Text Selection - Enable for content elements
+   Overrides base reset.css user-select: none
+   Enables mouse selection and Ctrl+A within entries
+   =========================================== */
+.entry-key,
+.entry-value,
+.entry-meta,
+.tree-node,
+.tree-property,
+.tree-property-line,
+.tree-property-key-line,
+.tree-property-key,
+.tree-value,
+.tree-label,
+.tree-closing-bracket,
+.tree-children {
+	user-select: text;
+	-webkit-user-select: text;
+}
+
 /* Make main-section a flex container so children can use flex: 1 */
 .main-section:has(.persistence-inspector-content) {
 	display: flex;
@@ -51,6 +72,8 @@
 .entry-actions button {
 	padding: 4px 8px;
 	font-size: 12px;
+	user-select: none;
+	-webkit-user-select: none;
 }
 
 .entry-value {
@@ -86,7 +109,6 @@
 	align-items: center;
 	cursor: pointer;
 	padding: 2px 0;
-	user-select: none;
 }
 
 .tree-header:hover {
@@ -104,6 +126,7 @@
 	font-size: 9px;
 	order: 2;
 	margin-left: 4px;
+	user-select: none; /* Prevent text selection on toggle icon only */
 }
 
 /* Make down arrow bigger - target when children are expanded (not collapsed) */
@@ -213,6 +236,8 @@ div.tree-children {
 	opacity: 0;
 	transition: opacity 0.15s, background-color 0.15s;
 	flex-shrink: 0;
+	user-select: none;
+	-webkit-user-select: none;
 }
 
 .tree-property-line:hover .tree-delete-btn {

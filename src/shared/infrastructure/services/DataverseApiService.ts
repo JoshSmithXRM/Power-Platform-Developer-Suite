@@ -182,9 +182,14 @@ export class DataverseApiService implements IDataverseApiService {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': `multipart/mixed; boundary=${batchBoundary}`,
           'OData-MaxVersion': '4.0',
-          'OData-Version': '4.0'
+          'OData-Version': '4.0',
+          // Defensive cache prevention for admin tool reliability.
+          // Admin tools must show current state; stale data could cause overwrites.
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         },
-        body: batchBody
+        body: batchBody,
+        cache: 'no-store'
       });
 
       if (!response.ok) {
@@ -302,12 +307,17 @@ export class DataverseApiService implements IDataverseApiService {
       'OData-MaxVersion': '4.0',
       'OData-Version': '4.0',
       // Request all OData annotations (formatted values, lookup entity types, etc.)
-      'Prefer': 'odata.include-annotations="*"'
+      'Prefer': 'odata.include-annotations="*"',
+      // Defensive cache prevention for admin tool reliability.
+      // Admin tools must show current state; stale data could cause overwrites.
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache'
     };
 
     const fetchOptions: RequestInit = {
       method,
-      headers
+      headers,
+      cache: 'no-store'
     };
 
     if (body !== undefined) {

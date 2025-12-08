@@ -1,9 +1,8 @@
-import type { Webview } from 'vscode';
-
 import { DataTableConfig } from '../DataTablePanel';
 import { VsCodeCancellationTokenAdapter } from '../../adapters/VsCodeCancellationTokenAdapter';
 import { OperationCancelledException } from '../../../domain/errors/OperationCancelledException';
 import { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { ISafePanel } from '../panels/ISafePanel';
 
 import { IDataLoader } from './IDataLoader';
 import { DataBehavior } from './DataBehavior';
@@ -16,13 +15,15 @@ jest.mock('vscode', () => ({
 	}))
 }), { virtual: true });
 
-// Mock webview with only the methods needed for testing
-interface MockWebview {
+// Mock ISafePanel with only the methods needed for testing
+interface MockSafePanel {
 	postMessage: jest.Mock;
+	disposed: boolean;
+	abortSignal: AbortSignal;
 }
 
 describe('DataBehavior', () => {
-	let webviewMock: MockWebview;
+	let panelMock: MockSafePanel;
 	let dataLoaderMock: jest.Mocked<IDataLoader>;
 	let loggerMock: jest.Mocked<ILogger>;
 	let config: DataTableConfig;
@@ -31,8 +32,10 @@ describe('DataBehavior', () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 
-		webviewMock = {
-			postMessage: jest.fn()
+		panelMock = {
+			postMessage: jest.fn().mockResolvedValue(true),
+			disposed: false,
+			abortSignal: new AbortController().signal
 		};
 
 		dataLoaderMock = {
@@ -61,8 +64,8 @@ describe('DataBehavior', () => {
 			toolbarButtons: []
 		};
 
-		// Cast is safe: MockWebview implements all Webview methods used by DataBehavior
-		behavior = new DataBehavior(webviewMock as unknown as Webview, config, dataLoaderMock, loggerMock);
+		// Cast is safe: MockSafePanel implements all ISafePanel methods used by DataBehavior
+		behavior = new DataBehavior(panelMock as unknown as ISafePanel, config, dataLoaderMock, loggerMock);
 	});
 
 	describe('initialize', () => {
@@ -73,14 +76,14 @@ describe('DataBehavior', () => {
 			await behavior.initialize();
 
 			expect(dataLoaderMock.load).toHaveBeenCalled();
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'loading'
 			});
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'testData',
 				data: testData
 			});
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'loaded'
 			});
 		});
@@ -93,7 +96,7 @@ describe('DataBehavior', () => {
 
 			await behavior.loadData();
 
-			const loadingCall = webviewMock.postMessage.mock.calls.find(
+			const loadingCall = panelMock.postMessage.mock.calls.find(
 				(call) => call[0].command === 'loading'
 			);
 			expect(loadingCall).toBeDefined();
@@ -105,7 +108,7 @@ describe('DataBehavior', () => {
 
 			await behavior.loadData();
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'testData',
 				data: testData
 			});
@@ -117,7 +120,7 @@ describe('DataBehavior', () => {
 
 			await behavior.loadData();
 
-			const loadedCall = webviewMock.postMessage.mock.calls.find(
+			const loadedCall = panelMock.postMessage.mock.calls.find(
 				(call) => call[0].command === 'loaded'
 			);
 			expect(loadedCall).toBeDefined();
@@ -128,7 +131,7 @@ describe('DataBehavior', () => {
 
 			await behavior.loadData();
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'testData',
 				data: []
 			});
@@ -141,7 +144,7 @@ describe('DataBehavior', () => {
 			await behavior.loadData();
 
 			expect(loggerMock.error).toHaveBeenCalledWith('Failed to load data', error);
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'error',
 				error: 'Load failed'
 			});
@@ -154,7 +157,7 @@ describe('DataBehavior', () => {
 			await behavior.loadData();
 
 			expect(loggerMock.error).not.toHaveBeenCalled();
-			expect(webviewMock.postMessage).not.toHaveBeenCalledWith(
+			expect(panelMock.postMessage).not.toHaveBeenCalledWith(
 				expect.objectContaining({ command: 'error' })
 			);
 		});
@@ -165,7 +168,7 @@ describe('DataBehavior', () => {
 
 			await behavior.loadData();
 
-			const loadedCall = webviewMock.postMessage.mock.calls.find(
+			const loadedCall = panelMock.postMessage.mock.calls.find(
 				(call) => call[0].command === 'loaded'
 			);
 			expect(loadedCall).toBeDefined();
@@ -192,7 +195,7 @@ describe('DataBehavior', () => {
 
 			await behavior.loadData();
 
-			const dataCall = webviewMock.postMessage.mock.calls.find(
+			const dataCall = panelMock.postMessage.mock.calls.find(
 				(call) => call[0].command === 'testData'
 			);
 			expect(dataCall).toBeUndefined();
@@ -205,7 +208,7 @@ describe('DataBehavior', () => {
 
 			behavior.sendData(testData);
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'testData',
 				data: testData
 			});
@@ -216,7 +219,7 @@ describe('DataBehavior', () => {
 		it('should post loading message when set to true', () => {
 			behavior.setLoading(true);
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'loading'
 			});
 		});
@@ -224,7 +227,7 @@ describe('DataBehavior', () => {
 		it('should post loaded message when set to false', () => {
 			behavior.setLoading(false);
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'loaded'
 			});
 		});
@@ -236,7 +239,7 @@ describe('DataBehavior', () => {
 
 			behavior.handleError(error);
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'error',
 				error: 'Test error'
 			});
@@ -245,7 +248,7 @@ describe('DataBehavior', () => {
 		it('should post error message with string error', () => {
 			behavior.handleError('String error');
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'error',
 				error: 'String error'
 			});
@@ -254,7 +257,7 @@ describe('DataBehavior', () => {
 		it('should convert non-Error objects to string', () => {
 			behavior.handleError({ custom: 'error' });
 
-			expect(webviewMock.postMessage).toHaveBeenCalledWith({
+			expect(panelMock.postMessage).toHaveBeenCalledWith({
 				command: 'error',
 				error: '[object Object]'
 			});
@@ -272,7 +275,7 @@ describe('DataBehavior', () => {
 			vscode.CancellationTokenSource.mockImplementation(() => mockTokenSource);
 
 			// Cast is safe: MockWebview implements all Webview methods used by DataBehavior
-			const newBehavior = new DataBehavior(webviewMock as unknown as Webview, config, dataLoaderMock, loggerMock);
+			const newBehavior = new DataBehavior(panelMock as unknown as ISafePanel, config, dataLoaderMock, loggerMock);
 			dataLoaderMock.load.mockResolvedValue([]);
 
 			// Trigger token creation
@@ -310,7 +313,7 @@ describe('DataBehavior', () => {
 			});
 
 			// Cast is safe: MockWebview implements all Webview methods used by DataBehavior
-			const newBehavior = new DataBehavior(webviewMock as unknown as Webview, config, dataLoaderMock, loggerMock);
+			const newBehavior = new DataBehavior(panelMock as unknown as ISafePanel, config, dataLoaderMock, loggerMock);
 			dataLoaderMock.load.mockResolvedValue([]);
 
 			// First load

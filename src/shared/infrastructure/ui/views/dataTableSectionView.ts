@@ -26,6 +26,9 @@ export interface DataTableViewData {
 /**
  * Renders complete data table with search, headers, and rows.
  * Calculates column widths from data when types are defined.
+ *
+ * IMPORTANT: Table structure MUST always be rendered (even when loading)
+ * because JS behaviors need tbody to exist for updateTableData messages.
  */
 export function renderDataTableSection(viewData: DataTableViewData): string {
 	const { data, config, isLoading, errorMessage, searchQuery } = viewData;
@@ -34,9 +37,9 @@ export function renderDataTableSection(viewData: DataTableViewData): string {
 		return renderError(errorMessage);
 	}
 
-	if (isLoading) {
-		return renderLoading();
-	}
+	// NOTE: Do NOT early return with renderLoading() here!
+	// Table structure (tbody) must exist for JS behaviors to update via postMessage.
+	// Instead, pass isLoading to renderTable to show loading row INSIDE tbody.
 
 	const sortColumn = viewData.sortColumn || config.defaultSortColumn;
 	const sortDirection = viewData.sortDirection || config.defaultSortDirection;
@@ -50,9 +53,9 @@ export function renderDataTableSection(viewData: DataTableViewData): string {
 		<div class="table-wrapper">
 			${config.enableSearch !== false ? renderSearchBox(config.searchPlaceholder, viewData.searchQuery) : ''}
 			<div class="table-content">
-				${renderTable(data, calculatedColumns, config, sortColumn, sortDirection, searchQuery)}
+				${renderTable(data, calculatedColumns, config, sortColumn, sortDirection, searchQuery, isLoading)}
 			</div>
-			${renderFooter(data.length)}
+			${renderFooter(data.length, isLoading)}
 		</div>
 	`;
 }
@@ -76,6 +79,8 @@ function renderSearchBox(placeholder: string, searchQuery?: string): string {
 /**
  * Renders table with headers and data rows.
  * Uses data-table class for CSS consistency pattern styling.
+ *
+ * IMPORTANT: Always renders table structure (even when loading) so JS can update tbody.
  */
 function renderTable(
 	data: ReadonlyArray<Record<string, unknown>>,
@@ -83,7 +88,8 @@ function renderTable(
 	config: DataTableConfig,
 	sortColumn: string,
 	sortDirection: 'asc' | 'desc',
-	searchQuery?: string
+	searchQuery?: string,
+	isLoading?: boolean
 ): string {
 	return `
 		<div class="table-container" data-selection-zone="table">
@@ -95,7 +101,9 @@ function renderTable(
 				</thead>
 				<tbody>
 					${data.length === 0
-						? renderNoDataRow(columns.length, config.noDataMessage, searchQuery)
+						? (isLoading
+							? renderLoadingRow(columns.length)
+							: renderNoDataRow(columns.length, config.noDataMessage, searchQuery))
 						: data.map(row => renderTableRow(row, columns)).join('')
 					}
 				</tbody>
@@ -180,6 +188,23 @@ function renderTableRow(
 }
 
 /**
+ * Renders loading spinner row inside table.
+ *
+ * Unlike a standalone loading div, this renders a loading indicator AS A TABLE ROW,
+ * preserving the table structure so JS behaviors can find and update tbody.
+ */
+function renderLoadingRow(columnCount: number): string {
+	return `
+		<tr>
+			<td colspan="${columnCount}" style="text-align: center; padding: 24px;">
+				<span class="spinner"></span>
+				<span style="margin-left: 8px;">Loading...</span>
+			</td>
+		</tr>
+	`;
+}
+
+/**
  * Renders "No data" message in table.
  * Shows different message for search results vs empty data.
  */
@@ -197,21 +222,12 @@ function renderNoDataRow(columnCount: number, noDataMessage: string, searchQuery
 /**
  * Renders table footer with record count.
  */
-function renderFooter(count: number): string {
+function renderFooter(count: number, isLoading?: boolean): string {
+	if (isLoading) {
+		return `<div class="table-footer">Loading...</div>`;
+	}
 	const recordText = count === 1 ? 'record' : 'records';
 	return `<div class="table-footer">${count} ${recordText}</div>`;
-}
-
-/**
- * Renders loading spinner.
- */
-function renderLoading(): string {
-	return `
-		<div class="loading-container">
-			<span class="spinner"></span>
-			<span>Loading...</span>
-		</div>
-	`;
 }
 
 /**

@@ -1,5 +1,7 @@
 import { SqlParseError } from '../errors/SqlParseError';
 import {
+	SqlAggregateColumn,
+	SqlAggregateFunction,
 	SqlColumnRef,
 	SqlComparisonCondition,
 	SqlComparisonOperator,
@@ -12,11 +14,12 @@ import {
 	SqlLogicalCondition,
 	SqlNullCondition,
 	SqlOrderByItem,
+	SqlSelectColumn,
 	SqlSelectStatement,
 	SqlSortDirection,
 	SqlTableRef,
 } from '../valueObjects/SqlAst';
-import { SqlToken, SqlTokenType } from '../valueObjects/SqlToken';
+import { SqlComment, SqlToken, SqlTokenType } from '../valueObjects/SqlToken';
 
 import { SqlLexer } from './SqlLexer';
 
@@ -28,7 +31,11 @@ import { SqlLexer } from './SqlLexer';
  *
  * Supported SQL:
  * - SELECT columns FROM table
+ * - SELECT DISTINCT columns FROM table
  * - SELECT TOP n columns FROM table
+ * - Aggregate functions: COUNT(*), COUNT(column), SUM, AVG, MIN, MAX
+ * - COUNT(DISTINCT column)
+ * - GROUP BY column1, column2
  * - WHERE with comparison, LIKE, IS NULL, IN operators
  * - AND/OR logical operators with parentheses
  * - ORDER BY column ASC/DESC
@@ -37,13 +44,15 @@ import { SqlLexer } from './SqlLexer';
  * Not Supported (for now):
  * - Subqueries
  * - UNION/INTERSECT/EXCEPT
- * - GROUP BY, HAVING, aggregates
- * - DISTINCT
+ * - HAVING clause
  */
 export class SqlParser {
 	private tokens: SqlToken[] = [];
+	private comments: SqlComment[] = [];
 	private position: number = 0;
 	private sql: string = '';
+	/** Index of the next comment to consider for association */
+	private commentIndex: number = 0;
 
 	/**
 	 * Parses SQL text into an AST.
@@ -52,18 +61,96 @@ export class SqlParser {
 	public parse(sql: string): SqlSelectStatement {
 		this.sql = sql;
 		this.position = 0;
+		this.commentIndex = 0;
 
 		const lexer = new SqlLexer(sql);
-		this.tokens = lexer.tokenize();
+		const { tokens, comments } = lexer.tokenize();
+		this.tokens = tokens;
+		this.comments = comments;
 
 		return this.parseSelectStatement();
+	}
+
+	/**
+	 * Gets the trailing comment for the element that just finished parsing.
+	 * A comment is "trailing" if it appears after the last consumed token
+	 * but before the next token.
+	 */
+	private getTrailingComment(): string | undefined {
+		if (this.commentIndex >= this.comments.length) {
+			return undefined;
+		}
+
+		const lastTokenEnd = this.previous().position + this.previous().value.length;
+		const nextTokenStart = this.peek().position;
+
+		// Collect comments that fall between the last token and the next token
+		const trailingComments: string[] = [];
+
+		while (this.commentIndex < this.comments.length) {
+			const comment = this.comments[this.commentIndex];
+			if (comment === undefined) break;
+
+			if (comment.position > lastTokenEnd && comment.position < nextTokenStart) {
+				trailingComments.push(comment.text);
+				this.commentIndex++;
+			} else if (comment.position >= nextTokenStart) {
+				// Comment is beyond the next token, stop looking
+				break;
+			} else {
+				// Comment is before the last token (shouldn't happen but handle it)
+				this.commentIndex++;
+			}
+		}
+
+		// Return combined comments or undefined
+		return trailingComments.length > 0 ? trailingComments.join(' | ') : undefined;
+	}
+
+	/**
+	 * Gets all leading comments (comments before the first token).
+	 */
+	private getLeadingComments(): string[] {
+		const leading: string[] = [];
+		const firstTokenPos = this.tokens[0]?.position ?? 0;
+
+		while (this.commentIndex < this.comments.length) {
+			const comment = this.comments[this.commentIndex];
+			if (comment === undefined) break;
+
+			if (comment.position < firstTokenPos) {
+				leading.push(comment.text);
+				this.commentIndex++;
+			} else {
+				break;
+			}
+		}
+
+		return leading;
+	}
+
+	/**
+	 * Attaches a trailing comment to an AST node if one exists.
+	 * Only assigns if there's actually a comment to attach.
+	 */
+	private attachTrailingComment(node: { trailingComment?: string }): void {
+		const comment = this.getTrailingComment();
+		if (comment !== undefined) {
+			node.trailingComment = comment;
+		}
 	}
 
 	/**
 	 * Parses a complete SELECT statement.
 	 */
 	private parseSelectStatement(): SqlSelectStatement {
+		// Get any leading comments before SELECT
+		const leadingComments = this.getLeadingComments();
+
 		this.expect('SELECT');
+
+		// Optional DISTINCT keyword
+		const distinct = this.match('DISTINCT');
 
 		// Optional TOP clause
 		let top: number | null = null;
@@ -72,32 +159,71 @@ export class SqlParser {
 			top = parseInt(topToken.value, 10);
 		}
 
-		// SELECT columns
-		const columns = this.parseColumnList();
+		// SELECT columns (may include aggregates)
+		const columns = this.parseSelectColumnList();
 
 		// FROM clause
 		this.expect('FROM');
 		const from = this.parseTableRef();
+		this.attachTrailingComment(from);
 
 		// Optional JOIN clauses
 		const joins: SqlJoin[] = [];
 		while (this.matchJoinKeyword()) {
-			joins.push(this.parseJoin());
+			const join = this.parseJoin();
+			this.attachTrailingComment(join);
+			joins.push(join);
 		}
 
 		// Optional WHERE clause
 		let where: SqlCondition | null = null;
 		if (this.match('WHERE')) {
 			where = this.parseCondition();
+			// Trailing comment is attached in parseCondition
+		}
+
+		// Optional GROUP BY clause
+		const groupBy: SqlColumnRef[] = [];
+		if (this.match('GROUP')) {
+			this.expect('BY');
+			groupBy.push(this.parseColumnRef());
+
+			while (this.match('COMMA')) {
+				// Comment after comma belongs to previous column
+				const prevGroupBy = groupBy[groupBy.length - 1];
+				if (prevGroupBy) {
+					this.attachTrailingComment(prevGroupBy);
+				}
+				groupBy.push(this.parseColumnRef());
+			}
+
+			// Trailing comment for last column
+			const lastGroupBy = groupBy[groupBy.length - 1];
+			if (lastGroupBy && !lastGroupBy.trailingComment) {
+				this.attachTrailingComment(lastGroupBy);
+			}
 		}
 
 		// Optional ORDER BY clause
 		const orderBy: SqlOrderByItem[] = [];
 		if (this.match('ORDER')) {
 			this.expect('BY');
-			do {
+			orderBy.push(this.parseOrderByItem());
+
+			while (this.match('COMMA')) {
+				// Comment after comma belongs to previous item
+				const prevOrderBy = orderBy[orderBy.length - 1];
+				if (prevOrderBy) {
+					this.attachTrailingComment(prevOrderBy);
+				}
 				orderBy.push(this.parseOrderByItem());
-			} while (this.match('COMMA'));
+			}
+
+			// Trailing comment for last item
+			const lastOrderBy = orderBy[orderBy.length - 1];
+			if (lastOrderBy && !lastOrderBy.trailingComment) {
+				this.attachTrailingComment(lastOrderBy);
+			}
 		}
 
 		// Optional LIMIT clause (alternative to TOP)
@@ -113,28 +239,114 @@ export class SqlParser {
 			throw this.error(`Unexpected token: ${this.peek().value}`);
 		}
 
-		return new SqlSelectStatement(
+		const statement = new SqlSelectStatement(
 			columns,
 			from,
 			joins,
 			where,
 			orderBy,
-			top
+			top,
+			distinct,
+			groupBy
+		);
+		statement.leadingComments = leadingComments;
+
+		return statement;
+	}
+
+	/**
+	 * Parses SELECT column list (may include aggregates).
+	 * Tolerates trailing commas for better UX.
+	 *
+	 * Note: Comments after commas (e.g., "name, -- comment") are attached
+	 * to the preceding column by checking for comments AFTER matching the comma.
+	 */
+	private parseSelectColumnList(): SqlSelectColumn[] {
+		const columns: SqlSelectColumn[] = [];
+
+		// Parse first column
+		columns.push(this.parseSelectColumn());
+
+		while (this.match('COMMA')) {
+			// After matching comma, check for comment that belongs to previous column
+			// (in "name, -- comment" the comment is AFTER the comma)
+			const prevColumn = columns[columns.length - 1];
+			if (prevColumn) {
+				this.attachTrailingComment(prevColumn);
+			}
+
+			// Check for trailing comma before FROM/WHERE/etc.
+			if (this.isAtClauseKeyword()) break;
+
+			// Parse next column
+			columns.push(this.parseSelectColumn());
+		}
+
+		// For the last column, attach any trailing comment between it and the next token.
+		// Skip if we already attached one (trailing comma case where column already has comment).
+		const lastColumn = columns[columns.length - 1];
+		if (lastColumn && !lastColumn.trailingComment) {
+			this.attachTrailingComment(lastColumn);
+		}
+
+		return columns;
+	}
+
+	/**
+	 * Parses a single SELECT column (regular column or aggregate function).
+	 */
+	private parseSelectColumn(): SqlSelectColumn {
+		// Check for aggregate functions
+		if (this.isAggregateFunction()) {
+			return this.parseAggregateColumn();
+		}
+
+		// Regular column reference
+		return this.parseColumnRef();
+	}
+
+	/**
+	 * Checks if current token is an aggregate function.
+	 */
+	private isAggregateFunction(): boolean {
+		return (
+			this.check('COUNT') ||
+			this.check('SUM') ||
+			this.check('AVG') ||
+			this.check('MIN') ||
+			this.check('MAX')
 		);
 	}
 
 	/**
-	 * Parses SELECT column list.
-	 * Tolerates trailing commas for better UX.
+	 * Parses an aggregate function: COUNT(*), COUNT(column), SUM(column), etc.
 	 */
-	private parseColumnList(): SqlColumnRef[] {
-		const columns: SqlColumnRef[] = [];
+	private parseAggregateColumn(): SqlAggregateColumn {
+		const funcToken = this.advance();
+		const func = funcToken.type as SqlAggregateFunction;
 
-		do {
-			columns.push(this.parseColumnRef());
-		} while (this.match('COMMA') && !this.isAtClauseKeyword());
+		this.expect('LPAREN');
 
-		return columns;
+		let column: SqlColumnRef | null = null;
+		let isDistinct = false;
+
+		if (func === 'COUNT' && this.match('STAR')) {
+			// COUNT(*)
+			column = null;
+		} else {
+			// Check for DISTINCT inside aggregate: COUNT(DISTINCT column)
+			isDistinct = this.match('DISTINCT');
+
+			// Parse column reference
+			column = this.parseColumnRef();
+		}
+
+		this.expect('RPAREN');
+
+		// Parse optional alias
+		const alias = this.parseOptionalAlias();
+
+		return new SqlAggregateColumn(func, column, isDistinct, alias);
 	}
 
 	/**
@@ -145,6 +357,7 @@ export class SqlParser {
 		return (
 			this.check('FROM') ||
 			this.check('WHERE') ||
+			this.check('GROUP') ||
 			this.check('ORDER') ||
 			this.check('LIMIT') ||
 			this.check('JOIN') ||
@@ -183,12 +396,19 @@ export class SqlParser {
 
 	/**
 	 * Parses optional AS alias or just alias.
+	 * Aliases can be identifiers or even keywords (e.g., "COUNT(*) AS count").
 	 */
 	private parseOptionalAlias(): string | null {
 		if (this.match('AS')) {
-			return this.expect('IDENTIFIER').value;
+			// After AS, accept identifier or keyword as alias
+			const token = this.peek();
+			if (token.is('IDENTIFIER') || token.isKeyword()) {
+				return this.advance().value;
+			}
+			throw this.error(`Expected alias after AS, found ${token.type}`);
 		}
-		// Check for alias without AS keyword
+		// Check for alias without AS keyword - must be an identifier (not keyword)
+		// to avoid ambiguity like "SELECT name count FROM" being parsed as "name AS count"
 		if (this.check('IDENTIFIER') && !this.checkKeyword()) {
 			return this.advance().value;
 		}
@@ -286,6 +506,7 @@ export class SqlParser {
 		if (this.match('LPAREN')) {
 			const condition = this.parseCondition();
 			this.expect('RPAREN');
+			this.attachTrailingComment(condition);
 			return condition;
 		}
 
@@ -296,33 +517,43 @@ export class SqlParser {
 		if (this.match('IS')) {
 			const isNegated = this.match('NOT');
 			this.expect('NULL');
-			return new SqlNullCondition(column, isNegated);
+			const cond = new SqlNullCondition(column, isNegated);
+			this.attachTrailingComment(cond);
+			return cond;
 		}
 
 		// [NOT] LIKE
 		const likeNegated = this.match('NOT');
 		if (this.match('LIKE')) {
 			const pattern = this.expect('STRING');
-			return new SqlLikeCondition(column, pattern.value, likeNegated);
+			const cond = new SqlLikeCondition(column, pattern.value, likeNegated);
+			this.attachTrailingComment(cond);
+			return cond;
 		}
 		if (likeNegated) {
 			// NOT was consumed but no LIKE followed
 			// Check for NOT IN
 			if (this.match('IN')) {
-				return this.parseInList(column, true);
+				const cond = this.parseInList(column, true);
+				this.attachTrailingComment(cond);
+				return cond;
 			}
 			throw this.error('Expected LIKE or IN after NOT');
 		}
 
 		// [NOT] IN
 		if (this.match('IN')) {
-			return this.parseInList(column, false);
+			const cond = this.parseInList(column, false);
+			this.attachTrailingComment(cond);
+			return cond;
 		}
 
 		// Comparison operator
 		const operator = this.parseComparisonOperator();
 		const value = this.parseLiteral();
-		return new SqlComparisonCondition(column, operator, value);
+		const cond = new SqlComparisonCondition(column, operator, value);
+		this.attachTrailingComment(cond);
+		return cond;
 	}
 
 	/**

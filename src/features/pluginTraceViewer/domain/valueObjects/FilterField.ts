@@ -47,40 +47,36 @@ export class FilterField {
 	static readonly CreatedOnBehalfBy = new FilterField('Created On Behalf By', '_createdonbehalfby_value', 'guid');
 
 	/**
-	 * All available filter fields, grouped by category.
+	 * All available filter fields, sorted by OData name for consistency.
+	 * Display name shown in UI, sorted by logical/OData name.
 	 */
 	static readonly All = [
-		// Core fields (9)
-		FilterField.Id,
-		FilterField.CreatedOn,
-		FilterField.PluginName,
-		FilterField.EntityName,
-		FilterField.MessageName,
-		FilterField.OperationType,
-		FilterField.Mode,
-		FilterField.Stage,
-		FilterField.Depth,
-		// Performance fields (4)
-		FilterField.Duration,
-		FilterField.ConstructorDuration,
-		FilterField.ExecutionStartTime,
-		FilterField.ConstructorStartTime,
-		// Execution details (5)
-		FilterField.ExceptionDetails,
-		FilterField.MessageBlock,
-		FilterField.Configuration,
-		FilterField.SecureConfiguration,
-		FilterField.Profile,
-		// Correlation & tracking (5)
-		FilterField.CorrelationId,
-		FilterField.RequestId,
-		FilterField.PluginStepId,
-		FilterField.PersistenceKey,
-		FilterField.OrganizationId,
-		// Audit fields (3)
-		FilterField.IsSystemCreated,
-		FilterField.CreatedBy,
-		FilterField.CreatedOnBehalfBy
+		FilterField.CreatedBy,              // _createdby_value
+		FilterField.CreatedOnBehalfBy,      // _createdonbehalfby_value
+		FilterField.Configuration,          // configuration
+		FilterField.CorrelationId,          // correlationid
+		FilterField.CreatedOn,              // createdon
+		FilterField.Depth,                  // depth
+		FilterField.ExceptionDetails,       // exceptiondetails
+		FilterField.IsSystemCreated,        // issystemcreated
+		FilterField.MessageBlock,           // messageblock
+		FilterField.MessageName,            // messagename
+		FilterField.Mode,                   // mode
+		FilterField.OperationType,          // operationtype
+		FilterField.OrganizationId,         // organizationid
+		FilterField.ConstructorDuration,    // performanceconstructorduration
+		FilterField.ConstructorStartTime,   // performanceconstructorstarttime
+		FilterField.Duration,               // performanceexecutionduration
+		FilterField.ExecutionStartTime,     // performanceexecutionstarttime
+		FilterField.PersistenceKey,         // persistencekey
+		FilterField.PluginStepId,           // pluginstepid
+		FilterField.Id,                     // plugintracelogid
+		FilterField.EntityName,             // primaryentity
+		FilterField.Profile,                // profile
+		FilterField.RequestId,              // requestid
+		FilterField.SecureConfiguration,    // secureconfiguration
+		FilterField.Stage,                  // stage
+		FilterField.PluginName,             // typename
 	];
 
 	/**

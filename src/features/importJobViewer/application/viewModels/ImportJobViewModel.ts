@@ -1,3 +1,5 @@
+import type { CellLink } from '../../../../shared/infrastructure/ui/types/CellLink';
+
 /**
  * View model for presenting import job data in the UI.
  * All fields are formatted as strings for display purposes.
@@ -8,7 +10,7 @@ export interface ImportJobViewModel {
 	readonly id: string;
 	readonly name: string;
 	readonly solutionName: string;
-	readonly solutionNameHtml: string;  // Clickable link for opening import log
+	readonly solutionNameLink: CellLink;  // Structured link for opening import log
 	readonly createdBy: string;
 	readonly createdOn: string;  // Formatted date string
 	readonly completedOn: string;  // Formatted date string or empty

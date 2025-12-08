@@ -30,12 +30,19 @@ import type { ISolutionRepository } from '../../../solutionExplorer/domain/inter
 import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/solutionFilterView';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import { createWebResourceUri, WebResourceFileSystemProvider } from '../../infrastructure/providers/WebResourceFileSystemProvider';
+import type { WebResourceConnectionRegistry, EnvironmentResources } from '../../infrastructure/providers/WebResourceConnectionRegistry';
+import type { GetWebResourceContentUseCase } from '../../application/useCases/GetWebResourceContentUseCase';
+import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
 import { PublishBehavior } from '../../../../shared/infrastructure/ui/behaviors/PublishBehavior';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
+import { AbortSignalCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/AbortSignalCancellationTokenAdapter';
+import { CompositeCancellationToken } from '../../../../shared/infrastructure/adapters/CompositeCancellationToken';
 import { OperationCancelledException } from '../../../../shared/domain/errors/OperationCancelledException';
+import type { ICancellationToken } from '../../../../shared/domain/interfaces/ICancellationToken';
 
 /**
  * Commands supported by Web Resources panel.
@@ -88,8 +95,15 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	// Cancelled when user switches solutions to stop wasted API calls
 	private currentCancellationSource: vscode.CancellationTokenSource | null = null;
 
+	// Panel-level cancellation token - aborted when panel is disposed
+	// Used to stop ALL operations when user closes the panel
+	private readonly panelCancellationToken: ICancellationToken;
+
+	// Resources for FileSystemProvider registration (kept for re-registration on environment change)
+	private readonly environmentResources: EnvironmentResources;
+
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
@@ -102,11 +116,32 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		private readonly logger: ILogger,
 		environmentId: string,
 		private readonly panelStateRepository: IPanelStateRepository | undefined,
-		private readonly fileSystemProvider: WebResourceFileSystemProvider | undefined
+		private readonly fileSystemProvider: WebResourceFileSystemProvider | undefined,
+		private readonly connectionRegistry: WebResourceConnectionRegistry | undefined,
+		getWebResourceContentUseCase: GetWebResourceContentUseCase,
+		updateWebResourceUseCase: UpdateWebResourceUseCase
 	) {
 		super();
 		this.currentEnvironmentId = environmentId;
-		logger.debug('WebResourcesPanel: Initialized with virtual table architecture');
+
+		// Create panel-level cancellation token from SafeWebviewPanel's abortSignal
+		// This token is cancelled when the panel is disposed, stopping all in-flight operations
+		this.panelCancellationToken = new AbortSignalCancellationTokenAdapter(panel.abortSignal);
+
+		// Create environment resources for FileSystemProvider registration
+		this.environmentResources = {
+			getWebResourceContentUseCase,
+			updateWebResourceUseCase,
+			publishWebResourceUseCase,
+			webResourceRepository
+		};
+
+		// Register resources with registry if we have a valid environment
+		if (this.connectionRegistry && environmentId) {
+			this.connectionRegistry.register(environmentId, this.environmentResources);
+		}
+
+		logger.debug('WebResourcesPanel: Initialized with virtual table architecture', { environmentId });
 
 		// Virtual table config - no artificial limits. Primary data display uses
 		// listWebResourcesUseCase with OData pagination (unlimited records).
@@ -134,12 +169,12 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		);
 
 		// Initialize loading behavior for toolbar buttons
-		// Note: openMaker excluded - it only needs environmentId which is already known
+		// All buttons must be included so they get re-enabled after scaffold renders with isLoading: true
 		// Publish button stays disabled until row is selected
 		this.loadingBehavior = new LoadingStateBehavior(
 			panel,
 			LoadingStateBehavior.createButtonConfigs(
-				['refresh', 'publish', 'publishAll', 'toggleShowAll'],
+				['openMaker', 'refresh', 'publish', 'publishAll', 'toggleShowAll'],
 				{ keepDisabledButtons: ['publish'] } // Publish requires row selection
 			),
 			logger
@@ -148,6 +183,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.registerCommandHandlers();
 
 		// Subscribe to FileSystemProvider save events for auto-refresh
+		// Only process events for this panel's current environment
 		if (this.fileSystemProvider) {
 			this.saveSubscription = this.fileSystemProvider.onDidSaveWebResource((event) => {
 				void this.handleWebResourceSaved(event.environmentId, event.webResourceId);
@@ -194,12 +230,16 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.panel.reveal(column);
 	}
 
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
+	}
+
 	/**
 	 * Cleans up resources when the panel is disposed.
 	 * Cancels any background loading and clears caches.
 	 */
 	public dispose(): void {
-		this.logger.debug('WebResourcesPanel: Disposing');
+		this.logger.debug('WebResourcesPanel: Disposing', { environmentId: this.currentEnvironmentId });
 
 		// Cancel any in-flight solution data request
 		if (this.currentCancellationSource) {
@@ -223,6 +263,10 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		// Dispose behaviors
 		this.publishBehavior.dispose();
 
+		// Note: We don't unregister from the connection registry on dispose
+		// because another panel might be using the same environment's resources.
+		// The registry is designed to be shared across panels.
+
 		this.logger.debug('WebResourcesPanel: Disposed successfully');
 	}
 
@@ -239,8 +283,16 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		logger: ILogger,
 		initialEnvironmentId?: string,
 		panelStateRepository?: IPanelStateRepository,
-		fileSystemProvider?: WebResourceFileSystemProvider
+		fileSystemProvider?: WebResourceFileSystemProvider,
+		connectionRegistry?: WebResourceConnectionRegistry,
+		getWebResourceContentUseCase?: GetWebResourceContentUseCase,
+		updateWebResourceUseCase?: UpdateWebResourceUseCase
 	): Promise<WebResourcesPanelComposed> {
+		// These use cases must be provided for the panel to function properly
+		if (getWebResourceContentUseCase === undefined || updateWebResourceUseCase === undefined) {
+			throw new Error('WebResourcesPanelComposed requires getWebResourceContentUseCase and updateWebResourceUseCase');
+		}
+
 		return EnvironmentScopedPanel.createOrShowPanel({
 			viewType: WebResourcesPanelComposed.viewType,
 			titlePrefix: 'Web Resources',
@@ -262,7 +314,10 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				logger,
 				envId,
 				panelStateRepository,
-				fileSystemProvider
+				fileSystemProvider,
+				connectionRegistry,
+				getWebResourceContentUseCase,
+				updateWebResourceUseCase
 			),
 			webviewOptions: {
 				enableScripts: true,
@@ -288,17 +343,19 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			}
 		}
 
-		// Initial render - openMaker stays enabled (only needs environmentId)
+		// Initial render with loading state - prevents "No data" flash
+		// isLoading: true renders spinner in HTML immediately (no race condition)
 		const environments = await this.getEnvironments();
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			solutions: [],
 			currentSolutionId: this.currentSolutionId,
-			tableData: []
+			tableData: [],
+			isLoading: true
 		});
 
-		// Disable refresh button during initial load (shows spinner)
+		// Disable refresh button during initial load
 		await this.loadingBehavior.setLoading(true);
 
 		try {
@@ -325,17 +382,14 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				}
 			}
 
-			// IMMEDIATELY render solutions (user can interact while data loads)
-			await this.scaffoldingBehavior.refresh({
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				solutions,
-				currentSolutionId: finalSolutionId,
-				tableData: []
+			// Update solutions dropdown via message (avoids full HTML refresh that causes "No data" flash)
+			await this.panel.postMessage({
+				command: 'updateSolutionSelector',
+				data: {
+					solutions,
+					currentSolutionId: finalSolutionId
+				}
 			});
-
-			// Show loading state in table AFTER scaffold refresh (refresh replaces HTML, so loading must come after)
-			this.showTableLoading();
 
 			// Set up cancellation for initial data load (can be cancelled by solution change)
 			const myVersion = ++this.requestVersion;
@@ -360,13 +414,16 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 			const viewModels = this.viewModelMapper.toViewModels(webResources);
 
-			// Final render with data
-			await this.scaffoldingBehavior.refresh({
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				solutions,
-				currentSolutionId: finalSolutionId,
-				tableData: viewModels
+			this.logger.info('Web resources loaded successfully', { count: viewModels.length });
+
+			// Send data to frontend via message (scaffoldingBehavior.refresh regenerates HTML
+			// which resets the table state; we need to use postMessage instead)
+			await this.panel.postMessage({
+				command: 'updateVirtualTable',
+				data: {
+					rows: viewModels,
+					noDataMessage: this.getTableConfig().noDataMessage
+				}
 			});
 		} finally {
 			// Re-enable buttons after load completes (publish stays disabled until row selected)
@@ -415,6 +472,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'CellSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
@@ -429,7 +489,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -473,9 +533,10 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		// Open web resource in editor
 		this.coordinator.registerHandler('openWebResource', async (data) => {
-			const payload = data as { id?: string; name?: string; typeCode?: string } | undefined;
-			if (payload?.id && payload?.name && payload?.typeCode) {
-				await this.handleOpenWebResource(payload.id, payload.name, parseInt(payload.typeCode, 10));
+			// kebab-case 'file-extension' in HTML becomes camelCase 'fileExtension' via messaging.js kebabToCamel
+			const payload = data as { id?: string; name?: string; fileExtension?: string } | undefined;
+			if (payload?.id && payload?.name && payload?.fileExtension) {
+				await this.handleOpenWebResource(payload.id, payload.name, payload.fileExtension);
 			}
 		});
 
@@ -529,7 +590,9 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				{ key: 'type', label: 'Type' },
 				{ key: 'managed', label: 'Managed' },
 				{ key: 'createdOn', label: 'Created On', type: 'datetime' },
-				{ key: 'modifiedOn', label: 'Modified On', type: 'datetime' }
+				{ key: 'createdBy', label: 'Created By' },
+				{ key: 'modifiedOn', label: 'Modified On', type: 'datetime' },
+				{ key: 'modifiedBy', label: 'Modified By' }
 			],
 			searchPlaceholder: '🔍 Search web resources...',
 			noDataMessage: 'No web resources found.',
@@ -594,15 +657,20 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			solutionId: this.currentSolutionId
 		});
 
-		// Wrap VS Code token in domain adapter if provided
+		// Create composite cancellation token:
+		// - Panel-level: cancelled when panel is disposed (stops ALL operations)
+		// - Operation-level: cancelled when user changes solution (stops THIS operation)
 		const domainToken = cancellationToken
-			? new VsCodeCancellationTokenAdapter(cancellationToken)
-			: undefined;
+			? new CompositeCancellationToken(
+				this.panelCancellationToken,
+				new VsCodeCancellationTokenAdapter(cancellationToken)
+			)
+			: this.panelCancellationToken;
 
 		const webResources = await this.listWebResourcesUseCase.execute(
 			this.currentEnvironmentId,
 			this.currentSolutionId,
-			domainToken, // Pass cancellation token to use case
+			domainToken, // Pass composite cancellation token to use case
 			{ textBasedOnly: false } // Always fetch ALL types
 		);
 
@@ -671,8 +739,31 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
+		// Immediately show loading state to clear stale data from previous environment
+		await this.panel.postMessage({
+			command: 'showLoading',
+			message: 'Switching environment...'
+		});
+
+		// Show loading placeholder in solution selector to prevent stale selection
+		await this.panel.postMessage({
+			command: 'updateSolutionSelector',
+			data: {
+				solutions: [{ id: '', name: 'Loading solutions...', uniqueName: '' }],
+				currentSolutionId: '',
+				disabled: true
+			}
+		});
+
 		const oldEnvironmentId = this.currentEnvironmentId;
 		this.currentEnvironmentId = environmentId;
+
+		// Register resources for the new environment in the registry
+		// This ensures FileSystemProvider can find credentials when opening web resources
+		if (this.connectionRegistry && environmentId) {
+			this.connectionRegistry.register(environmentId, this.environmentResources);
+			this.logger.debug('Registered environment resources in registry', { environmentId });
+		}
 
 		// Clear cache - new environment means fresh data
 		this.clearCache();
@@ -704,7 +795,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		}
 
 		// Update solution selector in UI
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateSolutionSelector',
 			data: {
 				solutions: this.solutionOptions,
@@ -819,7 +910,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 				fromCache: !forceRefresh && this.dataCache.has(this.getCacheKey(this.currentSolutionId))
 			});
 
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateVirtualTable',
 				data: {
 					rows: viewModels,
@@ -852,7 +943,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	 * Provides visual feedback during environment/solution switches.
 	 */
 	private showTableLoading(): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'updateVirtualTable',
 			data: {
 				rows: [],
@@ -870,34 +961,198 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 	/**
 	 * Opens a web resource in VS Code editor.
+	 * Compares published vs unpublished content and shows diff if different.
 	 *
 	 * @param webResourceId - Web resource GUID
 	 * @param name - Web resource name (used for filename)
-	 * @param typeCode - Web resource type code (determines file extension)
+	 * @param fileExtension - File extension (e.g., '.js', '.html') for syntax highlighting
 	 */
-	private async handleOpenWebResource(webResourceId: string, name: string, _typeCode: number): Promise<void> {
-		this.logger.debug('Opening web resource in editor', { webResourceId, name });
+	private async handleOpenWebResource(webResourceId: string, name: string, fileExtension: string): Promise<void> {
+		// Require environment selection before opening web resources
+		if (!this.currentEnvironmentId) {
+			vscode.window.showWarningMessage('Please select an environment first.');
+			return;
+		}
+
+		this.logger.debug('Opening web resource in editor', { webResourceId, name, environmentId: this.currentEnvironmentId });
 
 		try {
-			// Web resource name already includes the file extension (e.g., "new_script.js")
-			// No need to append extension based on type code
-			const filename = name;
+			// Get friendly environment name for the filename suffix
+			const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+			const envName = environment?.name ?? this.currentEnvironmentId;
+			// Sanitize environment name for filename safety (remove invalid characters)
+			const sanitizedEnvName = envName.replace(/[<>:"/\\|?*]/g, '_').trim();
 
-			const uri = createWebResourceUri(
-				this.currentEnvironmentId,
-				webResourceId,
-				filename
-			);
+			// Check if name already has an extension, otherwise use type-based extension
+			// (Web resource names may or may not include extensions)
+			const nameParts = name.split('.');
+			const nameHasExtension = nameParts.length > 1;
+			const ext = nameHasExtension ? `.${nameParts.pop()}` : fileExtension;
+			const baseName = nameParts.join('.');
+			const filename = `${baseName} [${sanitizedEnvName}]${ext}`;
 
-			const document = await vscode.workspace.openTextDocument(uri);
-			await vscode.window.showTextDocument(document, { preview: true });
+			// Check for unpublished changes before opening
+			const hasUnpublishedChanges = await this.checkForUnpublishedChanges(webResourceId);
 
-			this.logger.info('Opened web resource in editor', { webResourceId, filename });
+			if (hasUnpublishedChanges) {
+				// Show diff view: published (left) vs unpublished (right)
+				await this.showPublishedVsUnpublishedDiff(webResourceId, filename);
+				return;
+			}
+
+			// No unpublished changes - open normally
+			await this.openWebResourceDirectly(webResourceId, filename);
 		} catch (error) {
 			this.logger.error('Failed to open web resource', error);
 			const message = error instanceof Error ? error.message : 'Unknown error';
 			vscode.window.showErrorMessage(`Failed to open web resource: ${message}`);
 		}
+	}
+
+	/**
+	 * Checks if a web resource has unpublished changes.
+	 * Compares published vs unpublished content.
+	 *
+	 * @returns true if content differs, false if same
+	 */
+	private async checkForUnpublishedChanges(webResourceId: string): Promise<boolean> {
+		const repository = this.environmentResources.webResourceRepository;
+		if (repository === undefined) {
+			this.logger.debug('Repository not available, skipping unpublished check');
+			return false;
+		}
+
+		try {
+			// Fetch both versions in parallel
+			const [publishedContent, unpublishedContent] = await Promise.all([
+				repository.getPublishedContent(this.currentEnvironmentId, webResourceId),
+				repository.getContent(this.currentEnvironmentId, webResourceId)
+			]);
+
+			const hasChanges = publishedContent !== unpublishedContent;
+
+			this.logger.debug('Checked for unpublished changes', {
+				webResourceId,
+				hasChanges,
+				publishedLength: publishedContent.length,
+				unpublishedLength: unpublishedContent.length
+			});
+
+			return hasChanges;
+		} catch (error) {
+			// If check fails, proceed without diff (don't block opening)
+			this.logger.warn('Failed to check for unpublished changes, proceeding without diff', error);
+			return false;
+		}
+	}
+
+	/**
+	 * Shows diff between published and unpublished versions with version selection.
+	 * User views the diff, then chooses which version to edit.
+	 *
+	 * Flow:
+	 * 1. Show diff view (Published left, Unpublished right)
+	 * 2. Show modal: "Edit Unpublished" / "Edit Published" / "Cancel"
+	 * 3. Close diff, open chosen version as normal editable file
+	 */
+	private async showPublishedVsUnpublishedDiff(webResourceId: string, filename: string): Promise<void> {
+		this.logger.info('Unpublished changes detected, showing diff for version selection', { webResourceId, filename });
+
+		// Create URIs for both versions
+		const publishedUri = createWebResourceUri(
+			this.currentEnvironmentId,
+			webResourceId,
+			filename,
+			'published'
+		);
+
+		const unpublishedUri = createWebResourceUri(
+			this.currentEnvironmentId,
+			webResourceId,
+			filename
+		);
+
+		// Invalidate cache to ensure fresh content
+		if (this.fileSystemProvider) {
+			this.fileSystemProvider.invalidateCache(this.currentEnvironmentId, webResourceId);
+		}
+
+		// Open diff view: published (left) vs unpublished (right) - for viewing only
+		await vscode.commands.executeCommand(
+			'vscode.diff',
+			publishedUri,
+			unpublishedUri,
+			`${filename}: Published ↔ Unpublished`
+		);
+
+		this.logger.debug('Diff view opened, showing version selection notification', { webResourceId });
+
+		// Show non-modal notification so user can scroll the diff while deciding
+		const selection = await vscode.window.showInformationMessage(
+			'This file has unpublished changes. Which version do you want to edit?',
+			'Edit Unpublished',
+			'Edit Published',
+			'Cancel'
+		);
+
+		// Close the diff view
+		await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+
+		if (selection === 'Edit Unpublished') {
+			this.logger.info('User chose to edit unpublished version', { webResourceId });
+			await this.openWebResourceDirectly(webResourceId, filename, 'unpublished');
+
+			// Offer to publish since we know there are unpublished changes
+			this.offerToPublishUnpublishedChanges(webResourceId, filename);
+		} else if (selection === 'Edit Published') {
+			this.logger.info('User chose to edit published version', { webResourceId });
+			await this.openWebResourceDirectly(webResourceId, filename, 'published');
+		} else {
+			// User clicked Cancel or dismissed the notification - diff is already closed
+			this.logger.info('User cancelled version selection', { webResourceId });
+		}
+	}
+
+	/**
+	 * Opens a web resource directly in the editor.
+	 *
+	 * @param webResourceId - Web resource GUID
+	 * @param filename - Display filename
+	 * @param mode - 'unpublished' (default) or 'published'
+	 */
+	private async openWebResourceDirectly(
+		webResourceId: string,
+		filename: string,
+		mode?: 'published' | 'unpublished'
+	): Promise<void> {
+		const uri = createWebResourceUri(
+			this.currentEnvironmentId,
+			webResourceId,
+			filename,
+			mode
+		);
+
+		// Invalidate our internal cache to ensure fresh fetch
+		if (this.fileSystemProvider) {
+			this.fileSystemProvider.invalidateCache(this.currentEnvironmentId, webResourceId);
+		}
+
+		// Open the document
+		const document = await vscode.workspace.openTextDocument(uri);
+		await vscode.window.showTextDocument(document, { preview: false });
+
+		// Set language mode based on file extension (VS Code doesn't auto-detect for custom schemes)
+		const languageId = this.getLanguageIdFromFilename(filename);
+		if (languageId !== null && document.languageId !== languageId) {
+			await vscode.languages.setTextDocumentLanguage(document, languageId);
+		}
+
+		this.logger.info('Opened web resource in editor', {
+			webResourceId,
+			filename,
+			mode: mode ?? 'unpublished',
+			environmentId: this.currentEnvironmentId
+		});
 	}
 
 	/**
@@ -909,7 +1164,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.selectedWebResourceName = name;
 
 		// Enable/disable the Publish button
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'setButtonState',
 			buttonId: 'publish',
 			disabled: webResourceId === null
@@ -973,6 +1228,34 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	}
 
 	/**
+	 * Offers to publish unpublished changes when user opens the unpublished version.
+	 * Shows a non-modal notification so user can continue working while deciding.
+	 *
+	 * @param webResourceId - Web resource GUID
+	 * @param filename - Display filename
+	 */
+	private offerToPublishUnpublishedChanges(webResourceId: string, filename: string): void {
+		// Fire and forget - don't await, let user continue working
+		void vscode.window
+			.showInformationMessage(
+				`"${filename}" has unpublished changes. Would you like to publish them now?`,
+				'Publish',
+				'Not Now'
+			)
+			.then(async (choice) => {
+				if (choice === 'Publish') {
+					this.logger.info('User chose to publish unpublished changes', { webResourceId });
+					await this.publishBehavior.executePublish(
+						'publish',
+						async () =>
+							this.publishWebResourceUseCase.execute(this.currentEnvironmentId, webResourceId),
+						`Published: ${filename}`
+					);
+				}
+			});
+	}
+
+	/**
 	 * Toggles between showing text-based types only and all types.
 	 */
 	private async handleToggleShowAll(): Promise<void> {
@@ -982,7 +1265,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		this.logger.debug('Toggle show all types', { showTextBasedOnly: this.showTextBasedOnly });
 
 		// Update button label
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'setButtonLabel',
 			buttonId: 'toggleShowAll',
 			label: newLabel
@@ -1009,7 +1292,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			const viewModels = this.viewModelMapper.toViewModels(result.results);
 
 			// Send results back to webview
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'serverSearchResults',
 				data: {
 					viewModels,
@@ -1027,7 +1310,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 		} catch (error) {
 			this.logger.error('Server search failed', error);
 			// Send error back to webview so it can show appropriate message
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'serverSearchResults',
 				data: {
 					viewModels: [],
@@ -1042,14 +1325,17 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 	/**
 	 * Handles web resource save events from FileSystemProvider.
 	 * Fetches the updated web resource and refreshes the table row.
+	 *
+	 * @param environmentId - Environment ID from the save event
+	 * @param webResourceId - Web resource GUID that was saved
 	 */
 	private async handleWebResourceSaved(environmentId: string, webResourceId: string): Promise<void> {
-		// Only process events for the current environment
+		// Only process events for this panel's current environment
 		if (environmentId !== this.currentEnvironmentId) {
 			return;
 		}
 
-		this.logger.debug('WebResourcesPanel: Handling save event', { webResourceId });
+		this.logger.debug('WebResourcesPanel: Handling save event', { webResourceId, environmentId });
 
 		try {
 			// Fetch the updated web resource from the server
@@ -1091,7 +1377,7 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 
 		const viewModels = this.viewModelMapper.toViewModels(records);
 
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels,
@@ -1111,5 +1397,33 @@ export class WebResourcesPanelComposed extends EnvironmentScopedPanel<WebResourc
 			isFullyLoaded: state.isFullyCached(),
 			totalCount: state.getTotalRecordCount()
 		});
+	}
+
+	/**
+	 * Maps file extension to VS Code language ID for syntax highlighting.
+	 * Returns null if extension is not recognized.
+	 */
+	private getLanguageIdFromFilename(filename: string): string | null {
+		const ext = filename.toLowerCase().split('.').pop();
+		if (ext === undefined) {
+			return null;
+		}
+
+		const languageMap: Record<string, string> = {
+			'js': 'javascript',
+			'ts': 'typescript',
+			'css': 'css',
+			'html': 'html',
+			'htm': 'html',
+			'xml': 'xml',
+			'xsl': 'xml',
+			'xslt': 'xml',
+			'svg': 'xml',
+			'resx': 'xml',
+			'json': 'json',
+			'xap': 'plaintext'
+		};
+
+		return languageMap[ext] ?? null;
 	}
 }

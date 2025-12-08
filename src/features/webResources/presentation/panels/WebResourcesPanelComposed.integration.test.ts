@@ -10,6 +10,8 @@ import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import type { ListWebResourcesUseCase } from '../../application/useCases/ListWebResourcesUseCase';
 import type { PublishWebResourceUseCase } from '../../application/useCases/PublishWebResourceUseCase';
+import type { GetWebResourceContentUseCase } from '../../application/useCases/GetWebResourceContentUseCase';
+import type { UpdateWebResourceUseCase } from '../../application/useCases/UpdateWebResourceUseCase';
 import type { IWebResourceRepository } from '../../domain/interfaces/IWebResourceRepository';
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { IMakerUrlBuilder } from '../../../../shared/domain/interfaces/IMakerUrlBuilder';
@@ -114,6 +116,8 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 	let mockGetEnvironmentById: jest.Mock<Promise<EnvironmentInfo | null>>;
 	let mockListWebResourcesUseCase: jest.Mocked<ListWebResourcesUseCase>;
 	let mockPublishWebResourceUseCase: jest.Mocked<PublishWebResourceUseCase>;
+	let mockGetWebResourceContentUseCase: jest.Mocked<GetWebResourceContentUseCase>;
+	let mockUpdateWebResourceUseCase: jest.Mocked<UpdateWebResourceUseCase>;
 	let mockWebResourceRepository: jest.Mocked<IWebResourceRepository>;
 	let mockSolutionRepository: jest.Mocked<ISolutionRepository>;
 	let mockUrlBuilder: jest.Mocked<IMakerUrlBuilder>;
@@ -184,6 +188,14 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			execute: jest.fn().mockResolvedValue({ success: true })
 		} as unknown as jest.Mocked<PublishWebResourceUseCase>;
 
+		mockGetWebResourceContentUseCase = {
+			execute: jest.fn().mockResolvedValue({ content: '', base64Content: '' })
+		} as unknown as jest.Mocked<GetWebResourceContentUseCase>;
+
+		mockUpdateWebResourceUseCase = {
+			execute: jest.fn().mockResolvedValue({ success: true })
+		} as unknown as jest.Mocked<UpdateWebResourceUseCase>;
+
 		mockWebResourceRepository = {
 			findAll: jest.fn().mockResolvedValue([]),
 			findById: jest.fn().mockResolvedValue(null)
@@ -241,7 +253,9 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			WebResourceType.HTML, // Text-based type
 			false, // isManaged
 			now, // createdOn
-			now  // modifiedOn
+			now, // modifiedOn
+			'Test User', // createdBy
+			'Test User' // modifiedBy
 		);
 	}
 
@@ -284,7 +298,10 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			mockLogger,
 			TEST_ENVIRONMENT_ID,
 			mockPanelStateRepository,
-			undefined // No FileSystemProvider for tests
+			undefined, // No FileSystemProvider for tests
+			undefined, // No connectionRegistry for tests
+			mockGetWebResourceContentUseCase,
+			mockUpdateWebResourceUseCase
 		);
 
 		// Wait for async initialization
@@ -332,7 +349,7 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			// Trigger rapid solution changes:
 			// 1. First: Switch to slow solution (100ms)
 			// 2. Second: Switch to fast solution (10ms) - should win!
-			const slowPromise = messageHandler({
+			messageHandler({
 				command: 'solutionChange',
 				data: { solutionId: SLOW_SOLUTION_ID }
 			});
@@ -340,13 +357,14 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			// Small delay to ensure first request is in flight
 			await delay(5);
 
-			const fastPromise = messageHandler({
+			messageHandler({
 				command: 'solutionChange',
 				data: { solutionId: FAST_SOLUTION_ID }
 			});
 
-			// Wait for both to complete
-			await Promise.all([slowPromise, fastPromise]);
+			// Wait for both mock delays to complete (slow=100ms, fast=10ms)
+			// PanelCoordinator uses void, so we must wait for the actual mock delays
+			await delay(150);
 			await flushPromises();
 
 			// Find the final updateVirtualTable message
@@ -410,19 +428,21 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
 
 			// Fire both changes quickly
-			const slowPromise = messageHandler({
+			messageHandler({
 				command: 'solutionChange',
 				data: { solutionId: SLOW_SOLUTION_ID }
 			});
 
 			await delay(2);
 
-			const fastPromise = messageHandler({
+			messageHandler({
 				command: 'solutionChange',
 				data: { solutionId: FAST_SOLUTION_ID }
 			});
 
-			await Promise.all([slowPromise, fastPromise]);
+			// Wait for both mock delays to complete (slow=50ms, fast=5ms)
+			// PanelCoordinator uses void, so we must wait for the actual mock delays
+			await delay(100);
 			await flushPromises();
 
 			// The stale data ('stale_data_marker') should either:
@@ -490,7 +510,10 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 				mockLogger,
 				TEST_ENVIRONMENT_ID,
 				mockPanelStateRepository,
-				undefined
+				undefined, // No FileSystemProvider for tests
+				undefined, // No connectionRegistry for tests
+				mockGetWebResourceContentUseCase,
+				mockUpdateWebResourceUseCase
 			);
 
 			// Wait a tick for initialization to start
@@ -566,6 +589,287 @@ describe('WebResourcesPanelComposed Integration Tests', () => {
 					selectedSolutionId: FAST_SOLUTION_ID
 				})
 			);
+		});
+	});
+
+	describe('Environment Change', () => {
+		const NEW_ENVIRONMENT_ID = 'new-env-456';
+		const NEW_ENV_SOLUTION_ID = 'new-env-custom-solution';
+
+		beforeEach(() => {
+			// Add a second environment with different solutions
+			mockEnvironments.push({
+				id: NEW_ENVIRONMENT_ID,
+				name: 'New Environment',
+				url: 'https://new.crm.dynamics.com'
+			});
+
+			mockGetEnvironmentById.mockImplementation((envId: string) => {
+				const env = mockEnvironments.find(e => e.id === envId);
+				if (!env) {
+					return Promise.resolve(null);
+				}
+				return Promise.resolve({
+					id: env.id,
+					name: env.name,
+					powerPlatformEnvironmentId: `pp-${env.id}`
+				});
+			});
+		});
+
+		it('should send updateSolutionSelector with new environment solutions when environment changes', async () => {
+			// Setup: Different solutions for each environment
+			const env1Solutions: SolutionOption[] = [
+				{ id: DEFAULT_SOLUTION_ID, name: 'Default Solution', uniqueName: 'Default' },
+				{ id: SLOW_SOLUTION_ID, name: 'Slow Solution', uniqueName: 'slow_solution' }
+			];
+			const env2Solutions: SolutionOption[] = [
+				{ id: DEFAULT_SOLUTION_ID, name: 'Default Solution', uniqueName: 'Default' },
+				{ id: NEW_ENV_SOLUTION_ID, name: 'New Env Custom Solution', uniqueName: 'new_env_custom' }
+			];
+
+			// Return different solutions based on environment
+			mockSolutionRepository.findAllForDropdown.mockImplementation((envId: string) => {
+				if (envId === NEW_ENVIRONMENT_ID) {
+					return Promise.resolve(env2Solutions);
+				}
+				return Promise.resolve(env1Solutions);
+			});
+
+			await createPanelAndWait();
+
+			// Clear postMessage calls from initialization
+			(mockPanel.webview.postMessage as jest.Mock).mockClear();
+
+			// Simulate environment change
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
+			await messageHandler({
+				command: 'environmentChange',
+				data: { environmentId: NEW_ENVIRONMENT_ID }
+			});
+
+			await flushPromises();
+
+			// Verify solutions were fetched for the new environment
+			expect(mockSolutionRepository.findAllForDropdown).toHaveBeenCalledWith(NEW_ENVIRONMENT_ID);
+
+			// CRITICAL: Verify updateSolutionSelector message was sent with new environment's solutions
+			const postMessageMock = mockPanel.webview.postMessage as jest.Mock;
+			const updateSolutionCalls = postMessageMock.mock.calls.filter(
+				(call: unknown[]) => (call[0] as { command: string }).command === 'updateSolutionSelector'
+			);
+
+			expect(updateSolutionCalls.length).toBeGreaterThan(0);
+
+			const lastUpdateCall = updateSolutionCalls[updateSolutionCalls.length - 1]![0] as {
+				command: string;
+				data: { solutions: SolutionOption[]; currentSolutionId: string };
+			};
+			expect(lastUpdateCall.data.solutions).toEqual(env2Solutions);
+			expect(lastUpdateCall.data.solutions).not.toEqual(env1Solutions);
+
+			// Verify the new environment's custom solution is in the list
+			const solutionIds = lastUpdateCall.data.solutions.map((s: SolutionOption) => s.id);
+			expect(solutionIds).toContain(NEW_ENV_SOLUTION_ID);
+			expect(solutionIds).not.toContain(SLOW_SOLUTION_ID);
+		});
+
+		it('should reset solution to default when switching to environment without previously selected solution', async () => {
+			// Setup: First environment has a custom solution selected
+			mockPanelStateRepository.load.mockResolvedValue({
+				selectedSolutionId: SLOW_SOLUTION_ID,
+				lastUpdated: new Date().toISOString()
+			});
+
+			// New environment doesn't have SLOW_SOLUTION_ID
+			const env2Solutions: SolutionOption[] = [
+				{ id: DEFAULT_SOLUTION_ID, name: 'Default Solution', uniqueName: 'Default' },
+				{ id: NEW_ENV_SOLUTION_ID, name: 'New Env Custom Solution', uniqueName: 'new_env_custom' }
+			];
+
+			mockSolutionRepository.findAllForDropdown.mockImplementation((envId: string) => {
+				if (envId === NEW_ENVIRONMENT_ID) {
+					return Promise.resolve(env2Solutions);
+				}
+				return Promise.resolve(mockSolutions);
+			});
+
+			await createPanelAndWait();
+
+			// Clear postMessage calls from initialization
+			(mockPanel.webview.postMessage as jest.Mock).mockClear();
+
+			// Simulate environment change
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
+			await messageHandler({
+				command: 'environmentChange',
+				data: { environmentId: NEW_ENVIRONMENT_ID }
+			});
+
+			await flushPromises();
+
+			// Verify updateSolutionSelector was sent with default solution selected
+			const postMessageMock = mockPanel.webview.postMessage as jest.Mock;
+			const updateSolutionCalls = postMessageMock.mock.calls.filter(
+				(call: unknown[]) => (call[0] as { command: string }).command === 'updateSolutionSelector'
+			);
+
+			expect(updateSolutionCalls.length).toBeGreaterThan(0);
+
+			const lastUpdateCall = updateSolutionCalls[updateSolutionCalls.length - 1]![0] as {
+				command: string;
+				data: { solutions: SolutionOption[]; currentSolutionId: string };
+			};
+			// Should fall back to default solution since SLOW_SOLUTION_ID doesn't exist in new env
+			expect(lastUpdateCall.data.currentSolutionId).toBe(DEFAULT_SOLUTION_ID);
+		});
+	});
+
+	describe('Disposed Panel Bug: postMessage After Disposal', () => {
+		/**
+		 * This test demonstrates the bug where closing a panel during an async operation
+		 * results in "Failed to load web resources: Webview is disposed" error.
+		 *
+		 * Root cause: When panel.dispose() is called, in-flight async operations continue
+		 * running. When they complete and try to call panel.webview.postMessage(), it throws
+		 * because the webview is disposed. The error is not caught, causing an error message.
+		 *
+		 * This bug affects ALL panels in the codebase, not just WebResourcesPanel.
+		 */
+		it('should demonstrate that postMessage is called after panel disposal (BUG)', async () => {
+			// Track postMessage calls and disposal state
+			let panelDisposed = false;
+			const postMessageCallsAfterDispose: unknown[] = [];
+
+			// Setup: Use case takes time to complete
+			let resolveUseCase: ((value: WebResource[]) => void) | null = null;
+			mockListWebResourcesUseCase.execute.mockImplementation(() => {
+				return new Promise<WebResource[]>((resolve) => {
+					resolveUseCase = resolve;
+				});
+			});
+
+			// Track postMessage calls and detect calls after disposal
+			// Note: We don't throw here - we just track the calls to prove the bug
+			// In real VS Code, the webview would throw, but for testing we just track
+			const postMessageMock = mockPanel.webview.postMessage as jest.Mock;
+			postMessageMock.mockImplementation(async (message: unknown) => {
+				if (panelDisposed) {
+					postMessageCallsAfterDispose.push(message);
+					// Don't throw - just track the call to prove it happens
+					// The real bug causes VS Code to throw "Webview is disposed"
+				}
+				return true;
+			});
+
+			// Create panel - this triggers async loading
+			const panelPromise = WebResourcesPanelComposed.createOrShow(
+				mockExtensionUri,
+				mockGetEnvironments,
+				mockGetEnvironmentById,
+				mockListWebResourcesUseCase,
+				mockPublishWebResourceUseCase,
+				mockWebResourceRepository,
+				mockSolutionRepository,
+				mockUrlBuilder,
+				mockViewModelMapper,
+				mockLogger,
+				TEST_ENVIRONMENT_ID,
+				mockPanelStateRepository,
+				undefined,
+				undefined,
+				mockGetWebResourceContentUseCase,
+				mockUpdateWebResourceUseCase
+			);
+
+			// Wait for panel creation but loading is still in progress
+			await panelPromise;
+			await flushPromises();
+
+			// Simulate user closing the panel while loading
+			panelDisposed = true;
+			if (_disposableCallback) {
+				_disposableCallback();
+			}
+
+			// Now resolve the use case (simulates slow API finally responding)
+			const resources = [createMockWebResource('test-1', 'test_resource', 'Test Resource')];
+			resolveUseCase!(resources);
+
+			// Wait for async operation to complete and try to post
+			await flushPromises();
+			await delay(10);
+			await flushPromises();
+
+			// BUG DEMONSTRATION: postMessage was attempted after disposal
+			// This is the root cause of "Failed to load web resources: Webview is disposed"
+			//
+			// With the current code, postMessage IS called after disposal
+			// When we fix this bug, this test will need to be updated to expect 0 calls
+			expect(postMessageCallsAfterDispose.length).toBeGreaterThan(0);
+		});
+
+		it('should handle refresh race with disposal gracefully', async () => {
+			// Track errors that would be shown to user
+			const errorsSpy = jest.spyOn(vscode.window, 'showErrorMessage');
+			let panelDisposed = false;
+			const postMessageCallsAfterDispose: unknown[] = [];
+
+			// Setup: Fast initial load, then slow refresh
+			let refreshResolve: ((value: WebResource[]) => void) | null = null;
+			let callCount = 0;
+			mockListWebResourcesUseCase.execute.mockImplementation(() => {
+				callCount++;
+				if (callCount === 1) {
+					// First call (init) - resolve immediately
+					return Promise.resolve([]);
+				}
+				// Refresh call - wait for manual resolution
+				return new Promise<WebResource[]>((resolve) => {
+					refreshResolve = resolve;
+				});
+			});
+
+			// Track postMessage calls after disposal (without throwing)
+			const postMessageMock = mockPanel.webview.postMessage as jest.Mock;
+			postMessageMock.mockImplementation(async (message: unknown) => {
+				if (panelDisposed) {
+					postMessageCallsAfterDispose.push(message);
+				}
+				return true;
+			});
+
+			// Create panel and wait for initialization
+			await createPanelAndWait();
+
+			// Get message handler and trigger refresh
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
+			const refreshPromise = messageHandler({ command: 'refresh' });
+
+			// Wait a bit for refresh to start
+			await delay(5);
+
+			// Simulate user closing panel during refresh
+			panelDisposed = true;
+			if (_disposableCallback) {
+				_disposableCallback();
+			}
+
+			// Now resolve the refresh (API returns after panel closed)
+			const resources = [createMockWebResource('test-1', 'test_resource', 'Test Resource')];
+			refreshResolve!(resources);
+
+			// Wait for async to complete
+			await refreshPromise;
+			await flushPromises();
+
+			// Verify postMessage was attempted after disposal (documents the bug)
+			// In real VS Code, this would throw "Webview is disposed"
+			expect(postMessageCallsAfterDispose.length).toBeGreaterThan(0);
+
+			// Currently no error shown because mock doesn't throw
+			// But in real VS Code the user sees: "Failed to load web resources: Webview is disposed"
+			expect(errorsSpy).toHaveBeenCalledTimes(0);
 		});
 	});
 });

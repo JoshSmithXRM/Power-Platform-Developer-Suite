@@ -1,4 +1,5 @@
 import {
+	SqlAggregateColumn,
 	SqlColumnRef,
 	SqlComparisonCondition,
 	SqlCondition,
@@ -9,6 +10,7 @@ import {
 	SqlLogicalCondition,
 	SqlNullCondition,
 	SqlOrderByItem,
+	SqlSelectColumn,
 	SqlSelectStatement,
 	SqlTableRef,
 } from '../valueObjects/SqlAst';
@@ -27,24 +29,52 @@ import {
  */
 export class SqlToFetchXmlTranspiler {
 	/**
+	 * Counter for generating unique aliases when needed.
+	 */
+	private aliasCounter: number = 0;
+
+	/**
 	 * Transpiles a SQL AST to FetchXML string.
 	 */
 	public transpile(statement: SqlSelectStatement): string {
+		// Reset alias counter for each transpilation
+		this.aliasCounter = 0;
+
+		// Store entity name for use in aggregate column transpilation (COUNT(*) needs primary key)
+		this.currentEntityName = this.normalizeEntityName(statement.from.tableName);
+
 		const lines: string[] = [];
 
-		// <fetch> element with optional top
+		// Output leading comments first
+		for (const comment of statement.leadingComments) {
+			lines.push(`<!-- ${this.escapeXmlComment(comment)} -->`);
+		}
+
+		const hasAggregates = statement.hasAggregates();
+
+		// <fetch> element with optional attributes
+		const fetchAttrs: string[] = [];
 		if (statement.top !== null) {
-			lines.push(`<fetch top="${statement.top}">`);
+			fetchAttrs.push(`top="${statement.top}"`);
+		}
+		if (statement.distinct) {
+			fetchAttrs.push('distinct="true"');
+		}
+		if (hasAggregates) {
+			fetchAttrs.push('aggregate="true"');
+		}
+
+		if (fetchAttrs.length > 0) {
+			lines.push(`<fetch ${fetchAttrs.join(' ')}>`);
 		} else {
 			lines.push('<fetch>');
 		}
 
 		// <entity> element
-		const entityName = this.normalizeEntityName(statement.from.tableName);
-		lines.push(`  <entity name="${entityName}">`);
+		lines.push(`  <entity name="${this.currentEntityName}">`);
 
-		// Attributes (columns)
-		this.transpileColumns(statement.columns, statement.from, lines);
+		// Attributes (columns) - now handles both regular and aggregate columns
+		this.transpileColumns(statement.columns, statement.from, statement.groupBy, lines);
 
 		// Link entities (JOINs)
 		for (const join of statement.joins) {
@@ -56,9 +86,9 @@ export class SqlToFetchXmlTranspiler {
 			this.transpileCondition(statement.where, lines, '    ');
 		}
 
-		// Order (ORDER BY)
+		// Order (ORDER BY) - pass columns to detect aliases in aggregate queries
 		for (const orderItem of statement.orderBy) {
-			this.transpileOrderBy(orderItem, lines);
+			this.transpileOrderBy(orderItem, statement.columns, hasAggregates, lines);
 		}
 
 		lines.push('  </entity>');
@@ -69,33 +99,157 @@ export class SqlToFetchXmlTranspiler {
 
 	/**
 	 * Transpiles SELECT columns to FetchXML attributes.
-	 * Includes columns that belong to the main entity (unqualified or matching alias).
+	 * Handles regular columns, aggregate columns, and GROUP BY columns.
 	 */
 	private transpileColumns(
-		columns: readonly SqlColumnRef[],
+		columns: readonly SqlSelectColumn[],
 		mainEntity: SqlTableRef,
+		groupBy: readonly SqlColumnRef[],
 		lines: string[]
 	): void {
+		// Create a set of GROUP BY column names for quick lookup
+		const groupByColumns = new Set(
+			groupBy.map((col) => this.normalizeAttributeName(col.columnName))
+		);
+
 		for (const column of columns) {
-			if (column.isWildcard && column.tableName === null) {
-				// SELECT *
-				lines.push('    <all-attributes />');
-			} else if (column.isWildcard && this.isMainEntityColumn(column.tableName, mainEntity)) {
-				// SELECT c.* where c is main entity alias
-				lines.push('    <all-attributes />');
-			} else if (!column.isWildcard) {
-				// Include column if it belongs to the main entity
-				if (this.isMainEntityColumn(column.tableName, mainEntity)) {
-					const attrName = this.normalizeAttributeName(column.columnName);
-					if (column.alias) {
-						lines.push(`    <attribute name="${attrName}" alias="${column.alias}" />`);
-					} else {
-						lines.push(`    <attribute name="${attrName}" />`);
-					}
-				}
+			if (column instanceof SqlAggregateColumn) {
+				// Aggregate column: COUNT(*), SUM(revenue), etc.
+				this.transpileAggregateColumn(column, lines);
+			} else {
+				// Regular column reference
+				this.transpileRegularColumn(column, mainEntity, groupByColumns, lines);
 			}
-			// Columns from link-entities would need to be added inside the link-entity element
 		}
+
+		// Also emit GROUP BY columns that aren't already in SELECT
+		// (FetchXML requires groupby="true" on the attribute)
+		for (const groupByCol of groupBy) {
+			const attrName = this.normalizeAttributeName(groupByCol.columnName);
+			const isInSelect = columns.some(
+				(col) =>
+					col instanceof SqlColumnRef &&
+					this.normalizeAttributeName(col.columnName) === attrName
+			);
+
+			if (!isInSelect) {
+				// Add GROUP BY column that's not in SELECT
+				lines.push(`    <attribute name="${attrName}" groupby="true" />`);
+				this.outputTrailingComment(groupByCol, lines, '    ');
+			} else {
+				// Column is in SELECT, but comment might be on GROUP BY column
+				// Output it after the SELECT column's comment (if any)
+				this.outputTrailingComment(groupByCol, lines, '    ');
+			}
+		}
+	}
+
+	/**
+	 * Transpiles a regular column reference to FetchXML attribute.
+	 */
+	private transpileRegularColumn(
+		column: SqlColumnRef,
+		mainEntity: SqlTableRef,
+		groupByColumns: Set<string>,
+		lines: string[]
+	): void {
+		if (column.isWildcard && column.tableName === null) {
+			// SELECT *
+			lines.push('    <all-attributes />');
+			this.outputTrailingComment(column, lines, '    ');
+		} else if (column.isWildcard && this.isMainEntityColumn(column.tableName, mainEntity)) {
+			// SELECT c.* where c is main entity alias
+			lines.push('    <all-attributes />');
+			this.outputTrailingComment(column, lines, '    ');
+		} else if (!column.isWildcard) {
+			// Include column if it belongs to the main entity
+			if (this.isMainEntityColumn(column.tableName, mainEntity)) {
+				const attrName = this.normalizeAttributeName(column.columnName);
+				const isGroupBy = groupByColumns.has(attrName);
+				const attrs: string[] = [`name="${attrName}"`];
+
+				if (column.alias) {
+					attrs.push(`alias="${column.alias}"`);
+				}
+				if (isGroupBy) {
+					attrs.push('groupby="true"');
+				}
+
+				lines.push(`    <attribute ${attrs.join(' ')} />`);
+				this.outputTrailingComment(column, lines, '    ');
+			}
+		}
+		// Columns from link-entities would need to be added inside the link-entity element
+	}
+
+	/**
+	 * The current entity name being transpiled (set by transpile method).
+	 */
+	private currentEntityName: string = '';
+
+	/**
+	 * Transpiles an aggregate column to FetchXML attribute.
+	 */
+	private transpileAggregateColumn(column: SqlAggregateColumn, lines: string[]): void {
+		const attrs: string[] = [];
+
+		if (column.isCountAll()) {
+			// COUNT(*) - FetchXML requires an actual attribute name
+			// Use the entity's primary key column which follows the convention: {entityname}id
+			const primaryKeyColumn = `${this.currentEntityName}id`;
+			attrs.push(`name="${primaryKeyColumn}"`);
+			attrs.push('aggregate="count"');
+		} else {
+			// COUNT(column), SUM(column), etc.
+			const columnName = column.getColumnName();
+			if (columnName !== null) {
+				attrs.push(`name="${this.normalizeAttributeName(columnName)}"`);
+			}
+
+			// Map SQL aggregate function to FetchXML aggregate type
+			const aggregateType = this.mapAggregateFunction(column.func, column.column !== null);
+			attrs.push(`aggregate="${aggregateType}"`);
+
+			// DISTINCT inside aggregate
+			if (column.isDistinct) {
+				attrs.push('distinct="true"');
+			}
+		}
+
+		// Alias is required for aggregates in FetchXML
+		const alias = column.alias ?? this.generateAlias(column.func);
+		attrs.push(`alias="${alias}"`);
+
+		lines.push(`    <attribute ${attrs.join(' ')} />`);
+		this.outputTrailingComment(column, lines, '    ');
+	}
+
+	/**
+	 * Maps SQL aggregate function to FetchXML aggregate type.
+	 */
+	private mapAggregateFunction(func: string, hasColumn: boolean): string {
+		switch (func) {
+			case 'COUNT':
+				return hasColumn ? 'countcolumn' : 'count';
+			case 'SUM':
+				return 'sum';
+			case 'AVG':
+				return 'avg';
+			case 'MIN':
+				return 'min';
+			case 'MAX':
+				return 'max';
+			default:
+				return 'count';
+		}
+	}
+
+	/**
+	 * Generates a unique alias for aggregate columns that don't have one.
+	 */
+	private generateAlias(func: string): string {
+		this.aliasCounter++;
+		return `${func.toLowerCase()}_${this.aliasCounter}`;
 	}
 
 	/**
@@ -120,7 +274,7 @@ export class SqlToFetchXmlTranspiler {
 	 */
 	private transpileJoin(
 		join: SqlJoin,
-		columns: readonly SqlColumnRef[],
+		columns: readonly SqlSelectColumn[],
 		lines: string[]
 	): void {
 		const linkType = join.type === 'LEFT' ? 'outer' : 'inner';
@@ -154,8 +308,13 @@ export class SqlToFetchXmlTranspiler {
 
 		lines.push(`    <link-entity name="${linkEntityName}" from="${from}" to="${to}" link-type="${linkType}"${aliasAttr}>`);
 
-		// Add columns that belong to this link-entity
+		// Add columns that belong to this link-entity (only regular columns, not aggregates)
 		for (const column of columns) {
+			// Skip aggregate columns - they don't have table references
+			if (column instanceof SqlAggregateColumn) {
+				continue;
+			}
+
 			if (this.isJoinTableColumn(column.tableName, join.table)) {
 				if (column.isWildcard) {
 					lines.push('      <all-attributes />');
@@ -233,6 +392,7 @@ export class SqlToFetchXmlTranspiler {
 				`${indent}</filter>`
 			);
 		}
+		this.outputTrailingComment(condition, lines, indent);
 	}
 
 	/**
@@ -269,6 +429,7 @@ export class SqlToFetchXmlTranspiler {
 			`${indent}  <condition attribute="${attr}" operator="${operator}" value="${this.escapeXml(value)}" />`,
 			`${indent}</filter>`
 		);
+		this.outputTrailingComment(condition, lines, indent);
 	}
 
 	/**
@@ -283,6 +444,7 @@ export class SqlToFetchXmlTranspiler {
 			`${indent}  <condition attribute="${attr}" operator="${operator}" />`,
 			`${indent}</filter>`
 		);
+		this.outputTrailingComment(condition, lines, indent);
 	}
 
 	/**
@@ -301,6 +463,7 @@ export class SqlToFetchXmlTranspiler {
 
 		lines.push(`${indent}  </condition>`);
 		lines.push(`${indent}</filter>`);
+		this.outputTrailingComment(condition, lines, indent);
 	}
 
 	/**
@@ -383,11 +546,60 @@ export class SqlToFetchXmlTranspiler {
 
 	/**
 	 * Transpiles an ORDER BY item.
+	 * In aggregate queries, uses 'alias' attribute when ORDER BY matches a column alias.
 	 */
-	private transpileOrderBy(orderItem: SqlOrderByItem, lines: string[]): void {
+	private transpileOrderBy(
+		orderItem: SqlOrderByItem,
+		columns: readonly SqlSelectColumn[],
+		isAggregateQuery: boolean,
+		lines: string[]
+	): void {
 		const descending = orderItem.direction === 'DESC' ? 'true' : 'false';
+		const orderColumnName = orderItem.column.columnName.toLowerCase();
+
+		// In aggregate queries, check if ORDER BY column matches an alias
+		if (isAggregateQuery) {
+			const matchingAlias = this.findMatchingAlias(orderColumnName, columns);
+			if (matchingAlias) {
+				lines.push(
+					`    <order alias="${matchingAlias}" descending="${descending}" />`
+				);
+				this.outputTrailingComment(orderItem, lines, '    ');
+				return;
+			}
+		}
+
+		// Default: use attribute (for non-aggregate queries or when no alias match)
 		const attr = this.normalizeAttributeName(orderItem.column.columnName);
 		lines.push(`    <order attribute="${attr}" descending="${descending}" />`);
+		this.outputTrailingComment(orderItem, lines, '    ');
+	}
+
+	/**
+	 * Finds a matching alias from columns for the given column name.
+	 * Returns the original alias (case-preserved) if found, null otherwise.
+	 */
+	private findMatchingAlias(
+		columnName: string,
+		columns: readonly SqlSelectColumn[]
+	): string | null {
+		for (const column of columns) {
+			if ('func' in column) {
+				// SqlAggregateColumn
+				if (
+					column.alias &&
+					column.alias.toLowerCase() === columnName
+				) {
+					return column.alias;
+				}
+			} else {
+				// SqlColumnRef
+				if (column.alias && column.alias.toLowerCase() === columnName) {
+					return column.alias;
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -451,5 +663,26 @@ export class SqlToFetchXmlTranspiler {
 	 */
 	private normalizeEntityName(name: string): string {
 		return name.toLowerCase();
+	}
+
+	/**
+	 * Escapes text for use in XML comments.
+	 * XML comments cannot contain -- so we replace it.
+	 */
+	private escapeXmlComment(text: string): string {
+		return text.replace(/--/g, '- -');
+	}
+
+	/**
+	 * Outputs an XML comment if the node has a trailing comment.
+	 */
+	private outputTrailingComment(
+		node: { trailingComment?: string } | null | undefined,
+		lines: string[],
+		indent: string = ''
+	): void {
+		if (node?.trailingComment) {
+			lines.push(`${indent}<!-- ${this.escapeXmlComment(node.trailingComment)} -->`);
+		}
 	}
 }

@@ -37,14 +37,32 @@ export interface IWebResourceRepository {
 	): Promise<WebResource | null>;
 
 	/**
-	 * Gets the content of a web resource (base64 encoded).
+	 * Gets the unpublished content of a web resource (base64 encoded).
+	 * Returns the latest saved content, even if not yet published.
+	 * This ensures developers see their most recent changes when editing.
 	 *
 	 * @param environmentId - Environment ID
 	 * @param webResourceId - Web resource GUID
 	 * @param cancellationToken - Optional token to cancel the operation
-	 * @returns Base64 encoded content string
+	 * @returns Base64 encoded content string (unpublished version)
 	 */
 	getContent(
+		environmentId: string,
+		webResourceId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<string>;
+
+	/**
+	 * Gets the published content of a web resource (base64 encoded).
+	 * Returns the currently published content visible to end users.
+	 * Used to compare with unpublished content to detect pending changes.
+	 *
+	 * @param environmentId - Environment ID
+	 * @param webResourceId - Web resource GUID
+	 * @param cancellationToken - Optional token to cancel the operation
+	 * @returns Base64 encoded content string (published version)
+	 */
+	getPublishedContent(
 		environmentId: string,
 		webResourceId: string,
 		cancellationToken?: ICancellationToken
@@ -138,4 +156,19 @@ export interface IWebResourceRepository {
 		environmentId: string,
 		cancellationToken?: ICancellationToken
 	): Promise<void>;
+
+	/**
+	 * Gets the current modifiedOn timestamp for a web resource.
+	 * Lightweight query for conflict detection (no content fetched).
+	 *
+	 * @param environmentId - Environment ID
+	 * @param webResourceId - Web resource GUID
+	 * @param cancellationToken - Optional token to cancel the operation
+	 * @returns Current modifiedOn timestamp or null if not found
+	 */
+	getModifiedOn(
+		environmentId: string,
+		webResourceId: string,
+		cancellationToken?: ICancellationToken
+	): Promise<Date | null>;
 }

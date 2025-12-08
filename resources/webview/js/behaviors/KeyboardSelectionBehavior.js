@@ -3,7 +3,7 @@
  *
  * Handles keyboard shortcuts for context-aware selection:
  * - Ctrl+A: Select all within the active zone only (prevents cross-zone selection)
- * - Ctrl+C: Copy selected rows to clipboard as TSV
+ * - Ctrl+C: Copy selected cells/rows to clipboard as TSV
  * - Escape: Clear selection
  *
  * Zone Architecture:
@@ -11,7 +11,12 @@
  * - Zones can be nested; closest zone to click/focus wins
  * - Selection never crosses zone boundaries
  *
- * Works with both regular tables (DataTableBehavior) and virtual tables (VirtualTableRenderer).
+ * Selection Priority:
+ * 1. Cell selection (CellSelectionBehavior) - Excel-style cell ranges
+ * 2. Row selection (DataTableBehavior/VirtualTableRenderer) - legacy row selection
+ *
+ * Works with CellSelectionBehavior for cell-level selection,
+ * and falls back to DataTableBehavior/VirtualTableRenderer for row selection.
  */
 
 (function () {
@@ -107,8 +112,8 @@
 		// Layout tables (without .data-table) should fall through to text selection
 		const dataTable = zone.querySelector('table.data-table, .virtual-table-container, #virtualTableBody');
 		if (dataTable && isDirectlyInZone(dataTable, zone)) {
-			// Pass the specific table element to select rows in THIS table, not first in document
-			const handled = selectAllTableRows(dataTable);
+			// Use cell selection for Excel-style select all
+			const handled = selectAllTableCells(dataTable);
 			if (handled) {
 				updateFooter();
 				return;
@@ -134,13 +139,20 @@
 	}
 
 	/**
-	 * Selects all rows in the table.
-	 * Delegates to VirtualTableRenderer or DataTableBehavior based on table type.
-	 * @param {Element} tableElement - The specific table element to select rows in
+	 * Selects all cells in the table using cell selection.
+	 * Delegates to CellSelectionBehavior for Excel-style cell selection.
+	 * Falls back to row selection if cell selection is not available.
+	 * @param {Element} tableElement - The specific table element to select cells in
 	 * @returns {boolean} True if selection was handled
 	 */
-	function selectAllTableRows(tableElement) {
-		// Try VirtualTableRenderer first (most common)
+	function selectAllTableCells(tableElement) {
+		// Try CellSelectionBehavior first (Excel-style cell selection)
+		if (window.CellSelectionBehavior?.selectAll) {
+			window.CellSelectionBehavior.selectAll();
+			return true;
+		}
+
+		// Fall back to VirtualTableRenderer row selection
 		if (window.VirtualTableRenderer?.selectAllRows) {
 			window.VirtualTableRenderer.selectAllRows();
 			return true;
@@ -157,6 +169,23 @@
 	}
 
 	/**
+	 * Checks if focus is in a text input that should use native Ctrl+A.
+	 * @returns {boolean} True if native select-all should be used
+	 */
+	function isInNativeTextInput() {
+		const active = document.activeElement;
+		if (!active) return false;
+
+		// Allow native behavior for inputs and textareas
+		if (active.tagName === 'TEXTAREA') return true;
+		if (active.tagName === 'INPUT') {
+			const type = active.getAttribute('type')?.toLowerCase() || 'text';
+			return ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(type);
+		}
+		return false;
+	}
+
+	/**
 	 * Handles keydown events for selection shortcuts.
 	 * @param {KeyboardEvent} e - The keyboard event
 	 */
@@ -165,6 +194,11 @@
 
 		// Ctrl+A: Zone-aware select all
 		if (isCtrl && (e.key === 'a' || e.key === 'A')) {
+			// Let native inputs handle Ctrl+A themselves
+			if (isInNativeTextInput()) {
+				return; // Don't prevent default - let browser handle it
+			}
+
 			// CRITICAL: Stop ALL event handling - browser AND VS Code webview
 			e.preventDefault();
 			e.stopPropagation();
@@ -200,19 +234,30 @@
 	}
 
 	/**
-	 * Checks if any table rows are currently selected.
+	 * Checks if any table cells or rows are currently selected.
+	 * Prioritizes cell selection over row selection.
 	 * @returns {boolean} True if table selection exists
 	 */
 	function hasTableSelection() {
+		// Check cell selection first (Excel-style)
+		if (window.CellSelectionBehavior?.hasSelection?.()) {
+			return true;
+		}
+
+		// Fall back to row selection
 		const virtualCount = window.VirtualTableRenderer?.getSelectionCount?.() || 0;
 		const dataTableCount = window.DataTableBehavior?.getSelectionCount?.() || 0;
 		return virtualCount > 0 || dataTableCount > 0;
 	}
 
 	/**
-	 * Clears all row selections.
+	 * Clears all cell and row selections.
 	 */
 	function clearSelection() {
+		// Clear cell selection first
+		window.CellSelectionBehavior?.clearSelection?.();
+
+		// Also clear row selections for backward compatibility
 		window.VirtualTableRenderer?.clearSelection?.();
 		window.DataTableBehavior?.clearSelection?.();
 		window.getSelection()?.removeAllRanges();
@@ -220,14 +265,20 @@
 	}
 
 	/**
-	 * Copies selected rows to clipboard as TSV (tab-separated values).
+	 * Copies selected cells/rows to clipboard as TSV (tab-separated values).
 	 * TSV format is compatible with Excel/Google Sheets paste.
+	 * Prioritizes cell selection over row selection.
 	 */
 	function copyToClipboard() {
-		// Get TSV data from the appropriate renderer
-		const data =
-			window.VirtualTableRenderer?.getSelectedDataAsTsv?.() ||
-			window.DataTableBehavior?.getSelectedDataAsTsv?.();
+		// Try cell selection first (Excel-style)
+		let data = window.CellSelectionBehavior?.getSelectedDataAsTsv?.();
+
+		// Fall back to row selection if no cell selection
+		if (!data) {
+			data =
+				window.VirtualTableRenderer?.getSelectedDataAsTsv?.() ||
+				window.DataTableBehavior?.getSelectedDataAsTsv?.();
+		}
 
 		if (!data) {
 			return;
@@ -244,10 +295,16 @@
 	 * Updates the footer to show selection count.
 	 */
 	function updateFooter() {
-		const count =
-			window.VirtualTableRenderer?.getSelectionCount?.() ||
-			window.DataTableBehavior?.getSelectionCount?.() ||
-			0;
+		// Prioritize cell selection count
+		let count = window.CellSelectionBehavior?.getSelectionCount?.() || 0;
+
+		// Fall back to row selection count
+		if (count === 0) {
+			count =
+				window.VirtualTableRenderer?.getSelectionCount?.() ||
+				window.DataTableBehavior?.getSelectionCount?.() ||
+				0;
+		}
 
 		const footer = document.querySelector('.table-footer');
 		if (!footer) {

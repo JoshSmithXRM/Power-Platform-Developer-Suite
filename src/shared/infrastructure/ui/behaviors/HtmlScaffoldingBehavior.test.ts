@@ -3,21 +3,44 @@ import type * as vscode from 'vscode';
 import { HtmlScaffoldingBehavior, type HtmlScaffoldingConfig } from './HtmlScaffoldingBehavior';
 import { SectionCompositionBehavior } from './SectionCompositionBehavior';
 import { PanelLayout } from '../types/PanelLayout';
+import type { ISafePanel } from '../panels/ISafePanel';
 
-// Mock webview
-const createMockWebview = (): vscode.Webview => ({
-	html: '',
-	cspSource: 'https://example.com',
-	asWebviewUri: jest.fn(),
-	onDidReceiveMessage: jest.fn(),
-	postMessage: jest.fn(),
-	options: {}
-} as vscode.Webview);
+// Mock ISafePanel
+interface MockSafePanel {
+	html: string;
+	cspSource: string;
+	webview: vscode.Webview;
+	disposed: boolean;
+	abortSignal: AbortSignal;
+	postMessage: jest.Mock;
+	onDidReceiveMessage: jest.Mock;
+}
+
+const createMockSafePanel = (): MockSafePanel => {
+	const mockWebview = {
+		html: '',
+		cspSource: 'https://example.com',
+		asWebviewUri: jest.fn(),
+		onDidReceiveMessage: jest.fn(),
+		postMessage: jest.fn(),
+		options: {}
+	} as unknown as vscode.Webview;
+
+	return {
+		html: '',
+		cspSource: 'https://example.com',
+		webview: mockWebview,
+		disposed: false,
+		abortSignal: new AbortController().signal,
+		postMessage: jest.fn().mockResolvedValue(true),
+		onDidReceiveMessage: jest.fn()
+	};
+};
 
 describe('HtmlScaffoldingBehavior', () => {
 	describe('initialize', () => {
 		it('should set webview HTML on initialize', async () => {
-			const webview = createMockWebview();
+			const panel = createMockSafePanel();
 			const composer = new SectionCompositionBehavior([], PanelLayout.SingleColumn);
 			const config: HtmlScaffoldingConfig = {
 				cssUris: [],
@@ -26,16 +49,16 @@ describe('HtmlScaffoldingBehavior', () => {
 				title: 'Test Panel'
 			};
 
-			const behavior = new HtmlScaffoldingBehavior(webview, composer, config);
+			const behavior = new HtmlScaffoldingBehavior(panel as unknown as ISafePanel, composer, config);
 			await behavior.initialize();
 
-			expect(webview.html).toContain('<!DOCTYPE html>');
-			expect(webview.html).toContain('<html');
-			expect(webview.html).toContain('</html>');
+			expect(panel.html).toContain('<!DOCTYPE html>');
+			expect(panel.html).toContain('<html');
+			expect(panel.html).toContain('</html>');
 		});
 
 		it('should include title in HTML', async () => {
-			const webview = createMockWebview();
+			const panel = createMockSafePanel();
 			const composer = new SectionCompositionBehavior([], PanelLayout.SingleColumn);
 			const config: HtmlScaffoldingConfig = {
 				cssUris: [],
@@ -44,14 +67,14 @@ describe('HtmlScaffoldingBehavior', () => {
 				title: 'My Test Panel'
 			};
 
-			const behavior = new HtmlScaffoldingBehavior(webview, composer, config);
+			const behavior = new HtmlScaffoldingBehavior(panel as unknown as ISafePanel, composer, config);
 			await behavior.initialize();
 
-			expect(webview.html).toContain('<title>My Test Panel</title>');
+			expect(panel.html).toContain('<title>My Test Panel</title>');
 		});
 
 		it('should include CSP with nonce', async () => {
-			const webview = createMockWebview();
+			const panel = createMockSafePanel();
 			const composer = new SectionCompositionBehavior([], PanelLayout.SingleColumn);
 			const config: HtmlScaffoldingConfig = {
 				cssUris: [],
@@ -60,15 +83,15 @@ describe('HtmlScaffoldingBehavior', () => {
 				title: 'Test'
 			};
 
-			const behavior = new HtmlScaffoldingBehavior(webview, composer, config);
+			const behavior = new HtmlScaffoldingBehavior(panel as unknown as ISafePanel, composer, config);
 			await behavior.initialize();
 
-			expect(webview.html).toContain('Content-Security-Policy');
-			expect(webview.html).toContain("script-src 'nonce-abc123'");
+			expect(panel.html).toContain('Content-Security-Policy');
+			expect(panel.html).toContain("script-src 'nonce-abc123'");
 		});
 
 		it('should inject CSS URIs', async () => {
-			const webview = createMockWebview();
+			const panel = createMockSafePanel();
 			const composer = new SectionCompositionBehavior([], PanelLayout.SingleColumn);
 			const config: HtmlScaffoldingConfig = {
 				cssUris: [
@@ -80,15 +103,15 @@ describe('HtmlScaffoldingBehavior', () => {
 				title: 'Test'
 			};
 
-			const behavior = new HtmlScaffoldingBehavior(webview, composer, config);
+			const behavior = new HtmlScaffoldingBehavior(panel as unknown as ISafePanel, composer, config);
 			await behavior.initialize();
 
-			expect(webview.html).toContain('<link rel="stylesheet" href="https://example.com/style1.css">');
-			expect(webview.html).toContain('<link rel="stylesheet" href="https://example.com/style2.css">');
+			expect(panel.html).toContain('<link rel="stylesheet" href="https://example.com/style1.css">');
+			expect(panel.html).toContain('<link rel="stylesheet" href="https://example.com/style2.css">');
 		});
 
 		it('should inject JS URIs with nonce', async () => {
-			const webview = createMockWebview();
+			const panel = createMockSafePanel();
 			const composer = new SectionCompositionBehavior([], PanelLayout.SingleColumn);
 			const config: HtmlScaffoldingConfig = {
 				cssUris: [],
@@ -100,15 +123,15 @@ describe('HtmlScaffoldingBehavior', () => {
 				title: 'Test'
 			};
 
-			const behavior = new HtmlScaffoldingBehavior(webview, composer, config);
+			const behavior = new HtmlScaffoldingBehavior(panel as unknown as ISafePanel, composer, config);
 			await behavior.initialize();
 
-			expect(webview.html).toContain('<script nonce="nonce123" src="https://example.com/script1.js"></script>');
-			expect(webview.html).toContain('<script nonce="nonce123" src="https://example.com/script2.js"></script>');
+			expect(panel.html).toContain('<script nonce="nonce123" src="https://example.com/script1.js"></script>');
+			expect(panel.html).toContain('<script nonce="nonce123" src="https://example.com/script2.js"></script>');
 		});
 
 		it('should include composed section HTML', async () => {
-			const webview = createMockWebview();
+			const panel = createMockSafePanel();
 			const composer = new SectionCompositionBehavior([], PanelLayout.SingleColumn);
 			const config: HtmlScaffoldingConfig = {
 				cssUris: [],
@@ -117,15 +140,15 @@ describe('HtmlScaffoldingBehavior', () => {
 				title: 'Test'
 			};
 
-			const behavior = new HtmlScaffoldingBehavior(webview, composer, config);
+			const behavior = new HtmlScaffoldingBehavior(panel as unknown as ISafePanel, composer, config);
 			await behavior.initialize();
 
 			// Should contain panel-container from SectionCompositionBehavior
-			expect(webview.html).toContain('<div class="panel-container">');
+			expect(panel.html).toContain('<div class="panel-container">');
 		});
 
 		it('should escape HTML in title', async () => {
-			const webview = createMockWebview();
+			const panel = createMockSafePanel();
 			const composer = new SectionCompositionBehavior([], PanelLayout.SingleColumn);
 			const config: HtmlScaffoldingConfig = {
 				cssUris: [],
@@ -134,17 +157,17 @@ describe('HtmlScaffoldingBehavior', () => {
 				title: '<script>alert("xss")</script>'
 			};
 
-			const behavior = new HtmlScaffoldingBehavior(webview, composer, config);
+			const behavior = new HtmlScaffoldingBehavior(panel as unknown as ISafePanel, composer, config);
 			await behavior.initialize();
 
-			expect(webview.html).toContain('&lt;script&gt;');
-			expect(webview.html).not.toContain('<script>alert');
+			expect(panel.html).toContain('&lt;script&gt;');
+			expect(panel.html).not.toContain('<script>alert');
 		});
 	});
 
 	describe('refresh', () => {
 		it('should update webview HTML on refresh', async () => {
-			const webview = createMockWebview();
+			const panel = createMockSafePanel();
 			const composer = new SectionCompositionBehavior([], PanelLayout.SingleColumn);
 			const config: HtmlScaffoldingConfig = {
 				cssUris: [],
@@ -153,14 +176,14 @@ describe('HtmlScaffoldingBehavior', () => {
 				title: 'Test'
 			};
 
-			const behavior = new HtmlScaffoldingBehavior(webview, composer, config);
+			const behavior = new HtmlScaffoldingBehavior(panel as unknown as ISafePanel, composer, config);
 			await behavior.refresh({ tableData: [{ test: 'data' }] });
 
-			expect(webview.html).toContain('<!DOCTYPE html>');
+			expect(panel.html).toContain('<!DOCTYPE html>');
 		});
 
 		it('should pass data to composer', async () => {
-			const webview = createMockWebview();
+			const panel = createMockSafePanel();
 			const composer = new SectionCompositionBehavior([], PanelLayout.SingleColumn);
 			const composeSpy = jest.spyOn(composer, 'compose');
 
@@ -171,7 +194,7 @@ describe('HtmlScaffoldingBehavior', () => {
 				title: 'Test'
 			};
 
-			const behavior = new HtmlScaffoldingBehavior(webview, composer, config);
+			const behavior = new HtmlScaffoldingBehavior(panel as unknown as ISafePanel, composer, config);
 			const data = { tableData: [{ id: '1', name: 'Test' }] };
 			await behavior.refresh(data);
 

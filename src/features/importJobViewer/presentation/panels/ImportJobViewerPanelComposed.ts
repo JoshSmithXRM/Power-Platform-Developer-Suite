@@ -21,6 +21,7 @@ import type { OpenImportLogUseCase } from '../../application/useCases/OpenImport
 import type { ImportJobViewModelMapper } from '../../application/mappers/ImportJobViewModelMapper';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 
 /**
@@ -45,7 +46,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 	private cacheManager: VirtualTableCacheManager<ImportJob>;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
@@ -78,10 +79,10 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
 
 		// Initialize loading behavior for toolbar buttons
-		// Note: openMaker excluded - it only needs environmentId which is already known
+		// All buttons must be included so they get re-enabled after scaffold renders with isLoading: true
 		this.loadingBehavior = new LoadingStateBehavior(
 			panel,
-			LoadingStateBehavior.createButtonConfigs(['refresh']),
+			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh']),
 			logger
 		);
 
@@ -92,6 +93,10 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 
 	protected reveal(column: vscode.ViewColumn): void {
 		this.panel.reveal(column);
+	}
+
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
 	}
 
 	public static async createOrShow(
@@ -137,16 +142,17 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
 
-		// Initial render - openMaker stays enabled (only needs environmentId)
+		// Initial render with loading state - prevents "No data" flash
+		// isLoading: true renders spinner in HTML immediately (no race condition)
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
-			tableData: []
+			tableData: [],
+			isLoading: true
 		});
 
-		// Disable refresh button during initial load (shows spinner)
+		// Disable refresh button during initial load
 		await this.loadingBehavior.setLoading(true);
-		this.showTableLoading();
 
 		try {
 			// Load initial page of import jobs using cache manager
@@ -162,17 +168,19 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 				totalCount: cacheState.getTotalRecordCount()
 			});
 
-			// Re-render with actual data and pagination state
-			await this.scaffoldingBehavior.refresh({
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				tableData: viewModels,
-				pagination: {
-					cachedCount: cacheState.getCachedRecordCount(),
-					totalCount: cacheState.getTotalRecordCount(),
-					isLoading: cacheState.getIsLoading(),
-					currentPage: cacheState.getCurrentPage(),
-					isFullyCached: cacheState.isFullyCached()
+			// Send data to frontend via message (scaffoldingBehavior.refresh regenerates HTML
+			// which resets the table state; we need to use postMessage instead)
+			await this.panel.postMessage({
+				command: 'updateVirtualTable',
+				data: {
+					rows: viewModels,
+					pagination: {
+						cachedCount: cacheState.getCachedRecordCount(),
+						totalCount: cacheState.getTotalRecordCount(),
+						isLoading: cacheState.getIsLoading(),
+						currentPage: cacheState.getCurrentPage(),
+						isFullyCached: cacheState.isFullyCached()
+					}
 				}
 			});
 		} finally {
@@ -186,7 +194,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 				.map(job => this.viewModelMapper.toViewModel(job));
 
 			// Send updated data to webview (fire-and-forget, errors logged)
-			this.panel.webview.postMessage({
+			this.panel.postMessage({
 				command: 'updateVirtualTable',
 				data: {
 					rows: updatedViewModels,
@@ -246,6 +254,9 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'CellSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
 				).toString(),
 				// Use VirtualTableRenderer instead of DataTableBehavior for virtual scrolling
@@ -264,7 +275,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -360,7 +371,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			});
 
 			// Send data to frontend with pagination state
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateVirtualTable',
 				data: {
 					rows: viewModels,
@@ -428,7 +439,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 			const updatedViewModels = cachedRecords
 				.map(job => this.viewModelMapper.toViewModel(job));
 
-			this.panel.webview.postMessage({
+			this.panel.postMessage({
 				command: 'updateVirtualTable',
 				data: {
 					rows: updatedViewModels,
@@ -463,7 +474,7 @@ export class ImportJobViewerPanelComposed extends EnvironmentScopedPanel<ImportJ
 	 * Provides visual feedback during environment switches.
 	 */
 	private showTableLoading(): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'updateVirtualTable',
 			data: {
 				rows: [],

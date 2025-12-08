@@ -35,7 +35,7 @@
 10. **Type narrowing with explicit checks** - No shortcuts, proper validation
 11. **Domain services for complex logic** - If use case has complex logic, extract to domain service
 12. **Mappers transform only** - No business decisions; sort before/after mapping
-13. **Write tests for domain and application layers** - Domain: 100% target, use cases: 90% target
+13. **Write tests after F5 validation, before PR** - Domain: 80%+, complex orchestration: 70%+
 14. **Test-driven bug fixes** - Write failing test, fix bug, verify test passes
 15. **VS Code panel singleton** - `private static currentPanel` + `createOrShow()` factory
 16. **Explore before implementing** - Search for existing patterns/code before creating new
@@ -277,14 +277,19 @@ git worktree prune             # Clean up stale worktree references
    - **Complex features (7+ files)**: Break into slices, design each slice separately (prevents overwhelming designs)
    - **Uncertain approach**: Use "think harder" to evaluate options before committing to design
 
-2. **Implementation phase** (inside-out)
+2. **Implementation phase** (inside-out, exploration mode)
    - Domain → Application → Infrastructure → Presentation
    - `npm run compile` after EACH layer
-   - Write tests AFTER implementation, BEFORE review
+   - NO tests during exploration (focus on getting to F5 fast)
    - Commit per layer
-   - Manual test (F5) when complete
+   - F5 test and iterate until "feels right"
 
-3. **Review phase** (once per feature)
+3. **Stabilization phase** (tests required before PR)
+   - Write domain tests (business rules, validation)
+   - Write application tests (complex orchestration only)
+   - `npm test` must pass before review
+
+4. **Review phase** (once per feature)
    - Invoke `code-guardian` after all layers complete
    - `npm test` and `npm run compile` must pass
    - Manual testing must be complete

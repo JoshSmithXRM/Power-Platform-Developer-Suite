@@ -6,76 +6,29 @@ Power Platform development tools for plugins and web resources.
 
 ## Implemented
 
-### Web Resources Browser (Slice 1-2)
-**Status**: ✅ Implemented
-**Branch**: `feature/web-resources`
-**Commit**: `5346adc`
+### Web Resources Manager (Complete)
+**Status**: ✅ Fully Implemented (v0.2.3 - v0.2.5)
+**Version**: v0.2.3 (Edit/Save/Publish), v0.2.5 (Managed editing enabled)
 
 **What's Implemented**:
 - ✅ Browse web resources filtered by solution
-- ✅ Display metadata in data table (name, display name, type, size, modified date)
-- ✅ Click row to open in VS Code editor (read-only)
+- ✅ Display metadata in data table (name, display name, type, size, modified date, managed)
+- ✅ Click row to open in VS Code editor with syntax highlighting
 - ✅ Custom URI scheme: `ppds-webresource://`
 - ✅ FileSystemProvider integration with VS Code
 - ✅ Solution filtering (including "Default Solution")
 - ✅ Text-based type filtering (excludes binary images by default)
-- ✅ 60-second content cache
+- ✅ 60-second content cache (user-configurable)
+- ✅ Virtual table integration (65k+ resources)
+- ✅ Edit and save changes to Dataverse (Ctrl+S)
+- ✅ Publish: single resource, publish all, post-save notification
+- ✅ Auto-refresh row after editing
+- ✅ Managed web resources editable (v0.2.5 - supports production hotfixes)
+- ✅ Cross-panel publish coordination (prevents concurrent conflicts)
 
 **Implementation**: `src/features/webResources/`
 
-**Remaining Work** (see Web Resources Edit & Publish below):
-- Edit and save (auto-upload to Dynamics)
-- Publish after edit
-- Conflict detection
-
----
-
 ## High Priority
-
-### Web Resources Edit & Publish (Slices 3-5)
-**Status**: Planned
-**Target Version**: v0.3.0
-**Priority**: High
-**Estimated Effort**: 8-12 hours
-**Value**: Full edit cycle without leaving VS Code
-
-**Description**:
-Extend the existing read-only Web Resources Browser to support editing, saving, and publishing web resources directly from VS Code.
-
-**Slice 3: Edit & Save** (4-6 hours)
-- Implement `writeFile()` in `WebResourceFileSystemProvider` (currently throws read-only)
-- Create `UpdateWebResourceUseCase`
-- Auto-upload to Dataverse on save (Ctrl+S)
-- Status bar "Saving..." indicator
-- Error handling for save failures
-
-**Slice 4: Publish** (2-3 hours)
-- Create `PublishWebResourceUseCase`
-- Call Dataverse `PublishXml` action
-- "Publish" button in panel toolbar
-- Success/error notifications
-
-**Slice 5: Enhanced UX** (2-3 hours)
-- Conflict detection (warn if modified by another user)
-- Disable editing for managed web resources (read-only badge)
-- JavaScript syntax validation before upload
-- Retry logic for transient failures
-
-**Technical Considerations**:
-- FileSystemProvider already implemented - just need `writeFile()`
-- Use optimistic locking with `modifiedon` timestamp for conflict detection
-- `PublishXml` API: `POST /api/data/v9.2/PublishXml` with XML payload
-
-**Success Criteria**:
-- User can edit JavaScript file in VS Code, save, changes appear in Dynamics
-- User can publish web resource after editing
-- Managed web resources show as read-only
-
-**Key Files to Modify**:
-- `src/features/webResources/infrastructure/providers/WebResourceFileSystemProvider.ts` (line 164: currently throws)
-- `src/features/webResources/domain/interfaces/IWebResourceRepository.ts` (add `update()`, `publish()`)
-
----
 
 ### Plugin Registration Tool
 **Status**: Planned
@@ -110,13 +63,48 @@ Port of Microsoft's Plugin Registration Tool (PRT) functionality to VSCode. Regi
 
 ## Medium Priority
 
-### Web Resources Sync (Local Folder Mapping)
+### Web Resources - Enhanced UX
+**Status**: ✅ Implemented (v0.3.0)
+**Priority**: Medium
+
+**What's Implemented**:
+- ✅ Conflict detection (warn if modified by another user since open)
+- ✅ Version selection UX (diff view with "Compare First" option)
+- ✅ Syntax highlighting for custom URI scheme (JS, CSS, HTML, etc.)
+- ✅ Created By / Modified By columns
+- ✅ Retry logic (already in shared DataverseApiService)
+- ✅ JS validation (covered by VS Code's built-in diagnostics with syntax highlighting)
+
+---
+
+### Solution Explorer - Entity Browsing
 **Status**: Planned
-**Target Version**: v0.6.0
+**Target Version**: v0.4.0+
+**Priority**: Medium
+**Estimated Effort**: 4-6 hours
+**Value**: View entities/tables belonging to a specific solution
+
+**Description**:
+Expand Solution Explorer to show entities (tables) that belong to the selected solution, with drill-down to view their metadata.
+
+**Core Features**:
+- Show entities as children of solution node
+- Click entity to view attributes, relationships, keys (like Metadata Browser)
+- Filter to show only solution-owned vs all entities in solution
+
+**Technical Considerations**:
+- Query solution components (type = Entity)
+- Reuse Metadata Browser's entity detail views
+- Consider lazy loading for large solutions
+
+---
+
+### Web Resources Sync (Local Folder Mapping)
+**Status**: Deferred
+**Target Version**: v1.0+
 **Priority**: Medium
 **Estimated Effort**: 16-24 hours
 **Value**: CI/CD integration, version control for web resources
-**Depends On**: Web Resources Edit & Publish (Slices 3-5)
 
 **Description**:
 Map local folder to solution's web resources for two-way sync. Enables version control and CI/CD pipelines.
@@ -147,4 +135,4 @@ Map local folder to solution's web resources for two-way sync. Enables version c
 
 ---
 
-**Last Updated**: 2025-11-30
+**Last Updated**: 2025-12-03

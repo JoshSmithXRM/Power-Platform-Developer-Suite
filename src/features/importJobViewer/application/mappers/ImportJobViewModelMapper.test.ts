@@ -83,7 +83,7 @@ describe('ImportJobViewModelMapper', () => {
 			expect(result.solutionName).toBe('My Solution');
 		});
 
-		it('should create solutionNameHtml with escaped HTML', () => {
+		it('should create solutionNameLink with correct CellLink structure', () => {
 			// Arrange
 			const job = createImportJob('Test', {
 				id: 'job-123',
@@ -93,25 +93,26 @@ describe('ImportJobViewModelMapper', () => {
 			// Act
 			const result = mapper.toViewModel(job);
 
-			// Assert
-			expect(result.solutionNameHtml).toContain('data-import-job-id="job-123"');
-			expect(result.solutionNameHtml).toContain('My Solution');
-			expect(result.solutionNameHtml).toContain('job-link');
+			// Assert - CellLink with id for data-id attribute
+			expect(result.solutionNameLink).toEqual({
+				command: 'viewImportJob',
+				commandData: { id: 'job-123' },
+				className: 'job-link'
+			});
 		});
 
-		it('should escape special characters in solutionNameHtml', () => {
-			// Arrange
+		it('should include job id in solutionNameLink commandData', () => {
+			// Arrange - CellLink is structured data, VirtualTableRenderer handles escaping
 			const job = createImportJob('Test', {
-				id: '<script>',
-				solutionName: '<script>alert("xss")</script>'
+				id: 'special-id-<>&"',
+				solutionName: 'My Solution'
 			});
 
 			// Act
 			const result = mapper.toViewModel(job);
 
-			// Assert
-			expect(result.solutionNameHtml).not.toContain('<script>');
-			expect(result.solutionNameHtml).toContain('&lt;script&gt;');
+			// Assert - id is passed as data, not HTML (bracket notation for index signature)
+			expect(result.solutionNameLink.commandData['id']).toBe('special-id-<>&"');
 		});
 
 		it('should map createdBy', () => {

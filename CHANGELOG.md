@@ -5,7 +5,119 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2025-12-08
+
+### Added
+
+- **Data Explorer - Visual Query Builder** - Point-and-click query building for Dataverse
+  - Entity picker with searchable dropdown (grouped by Standard/Custom)
+  - Column selector with multi-select checkboxes and search
+  - Filter builder with type-aware operators (text, number, date, lookup, optionset)
+  - Sort section with attribute dropdown and direction toggle
+  - Query options: Top N (1-5000) and Distinct
+  - Live FetchXML/SQL preview tabs (read-only)
+  - Execute and Clear buttons in toolbar
+  - Full state persistence per environment
+
+- **Data Explorer - Export/Import Toolbar** - Save and load queries
+  - Export results: CSV, JSON
+  - Export query: FetchXML (.xml), SQL (.sql), Notebook (.ppdsnb)
+  - Import: FetchXML and SQL files populate Visual Query Builder
+  - Uses existing FetchXmlParser for round-trip fidelity
+
+- **Data Explorer - Notebook Integration** - Bidirectional workflow between notebooks and panel
+  - Cell toolbar button "Open in Data Explorer" for SQL/FetchXML cells
+  - Context menu "Open in Data Explorer" (right-click on cell)
+  - Parses query and populates Visual Query Builder with environment from notebook metadata
+  - Panel → Notebook: "Export as Notebook" creates .ppdsnb with current query
+  - Export cell results: CSV and JSON export via cell context menu
+
+- **Data Explorer - IntelliSense** - Context-aware autocomplete in VS Code editor
+  - SQL IntelliSense: entity names after FROM/JOIN, attributes after SELECT/WHERE/ORDER BY
+  - FetchXML IntelliSense: elements, attributes, operators with Dataverse-specific suggestions
+  - Metadata caching per environment for fast completions
+  - Works in standalone .sql files and notebook cells
+
+- **Data Explorer - Notebooks (.ppdsnb)** - SQL/FetchXML notebook format for Dataverse
+  - Combined SQL and FetchXML cells in single notebook
+  - SQL cells transpile to FetchXML before execution
+  - FetchXML cells execute directly against Dataverse
+  - Clickable record links in output (open in browser)
+  - Environment stored in notebook metadata
+  - IntelliSense works in notebook cells
+
+- **Data Explorer - Aggregates & JOINs** - Advanced SQL query support
+  - Aggregate functions: COUNT(*), COUNT(column), COUNT(DISTINCT), SUM, AVG, MIN, MAX
+  - GROUP BY clause (single and multiple columns)
+  - DISTINCT keyword
+  - INNER JOIN and LEFT JOIN with table aliases
+  - Qualified column references (e.g., `a.name` when `FROM account a`)
+
+- **Cell Selection (Excel-style)** - Click-and-drag cell selection across all data tables
+  - Click cell to select, drag for rectangular range, Shift+click to extend
+  - Ctrl+A selects all cells in table, Ctrl+C copies as TSV
+  - Headers included in copy when entire table is selected
+  - Works in all 8 panels: Data Explorer, Solution Explorer, Web Resources, Import Jobs, Plugin Traces, Environment Variables, Connection References, Metadata Browser
+
+- **Web Resources - Conflict Detection** - Prevents accidental overwrites
+  - Detects when server content is newer than your locally opened version
+  - "Compare First" shows side-by-side diff before deciding
+  - "Overwrite" forces save, "Discard" abandons local changes
+
+- **Web Resources - Unpublished Changes Detection** - See draft changes before editing
+  - Automatically detects when a file has unpublished changes on open
+  - Shows diff between published and unpublished versions
+  - Choose which version to edit (published baseline or current draft)
+  - Option to publish unpublished changes immediately
+
+- **Web Resources - Created By / Modified By Columns** - Track authorship in the table
+  - See who created each web resource
+  - See who last modified each web resource
+
+### Removed
+
+- **Plugin Traces - "Open in Maker" Button** - Removed non-functional button
+  - Plugin trace logs are not viewable in Maker Portal (they're in Admin Center/classic Dynamics)
+  - Button was incorrectly navigating to generic Maker home page
+
+### Fixed
+
+- **Panel Loading State Race Condition** - Panels now show loading spinner immediately instead of "No data found" flash
+  - All 6 data table panels affected: Import Jobs, Solutions, Web Resources, Environment Variables, Connection References, Plugin Traces
+  - Root cause: Race condition where webview JavaScript overwrote loading row before data arrived
+  - Fix: HTML-embedded loading state via `isLoading` flag in scaffold refresh
+  - Virtual tables: Added `data-loading` attribute to prevent VirtualTableRenderer from overwriting loading row
+  - Solution selector: Now renders "Loading..." placeholder so postMessage can populate it later
+
+- **Panel Disposal Cancellation** - Closing panels now stops in-flight API requests
+  - Previously: API requests continued after panel closure, wasting server resources
+  - Previously: "Webview is disposed" errors appeared when async operations completed
+  - Now: SafeWebviewPanel wrapper tracks disposal and provides safe messaging
+  - Now: Two-level cancellation stops paginated fetches immediately
+    - Level 1: Panel closes → all operations cancelled
+    - Level 2: User changes solution/environment → previous operation cancelled
+
+- **Environment Switch Loading State** - Panels now show loading immediately when switching environments
+  - Data table clears stale data and shows "Switching environment..." instantly
+  - Solution dropdown shows "Loading solutions..." placeholder while fetching
+  - Previously: stale data from prior environment remained visible during load
+
+- **Solution Dropdown Environment Switching** - Dropdown now updates when switching environments
+  - Previously retained solutions from prior environment
+  - Affects: Web Resources, Environment Variables, Connection References panels
+
+- **Web Resources Syntax Highlighting** - Files now have proper syntax highlighting
+  - JavaScript, CSS, HTML, and XML files opened via custom URI scheme now highlight correctly
+
+- **Infinite Loading Spinner (5 Panels)** - Panels no longer get stuck loading forever
+  - Fixed scaffoldingBehavior.refresh overwriting loading state
+  - Affects: Solutions, Web Resources, Connection References, Environment Variables, Import Jobs
+
+- **Import Job Viewer Clickable Links** - Solution name links now work correctly
+  - Fixed: CellLink pattern required instead of HTML string in mapper
+
+- **Plugin Trace Viewer Ctrl+A Shortcuts** - Keyboard shortcuts now work in search/filter inputs
+  - Added stopPropagation to prevent global handlers from intercepting
 
 ## [0.2.6] - 2025-12-02
 

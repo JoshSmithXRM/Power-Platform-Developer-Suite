@@ -327,7 +327,7 @@ describe('FetchXmlValidator', () => {
 		});
 
 		describe('order element validation', () => {
-			it('should reject order without attribute', () => {
+			it('should reject order without attribute in non-aggregate query', () => {
 				const fetchXml = `
 					<fetch>
 						<entity name="contact">
@@ -340,7 +340,76 @@ describe('FetchXmlValidator', () => {
 				const result = validator.validate(fetchXml);
 
 				expect(result.isValid).toBe(false);
-				expect(result.errors.some((e) => e.message.includes('<order> element must have a "attribute" attribute'))).toBe(true);
+				expect(result.errors.some((e) => e.message.includes('<order> element must have an "attribute" attribute'))).toBe(true);
+			});
+
+			describe('aggregate queries', () => {
+				it('should accept order with alias in aggregate query', () => {
+					const fetchXml = `
+						<fetch aggregate='true'>
+							<entity name='account'>
+								<attribute name='numberofemployees' alias='Total' aggregate='sum' />
+								<attribute name='address1_city' alias='Count' aggregate='count' />
+								<attribute name='address1_city' alias='City' groupby='true' />
+								<order alias='City' />
+							</entity>
+						</fetch>
+					`;
+
+					const result = validator.validate(fetchXml);
+
+					expect(result.isValid).toBe(true);
+					expect(result.errors).toHaveLength(0);
+				});
+
+				it('should reject order with attribute in aggregate query', () => {
+					const fetchXml = `
+						<fetch aggregate="true">
+							<entity name='account'>
+								<attribute name='address1_city' alias='City' groupby='true' />
+								<order attribute="address1_city" />
+							</entity>
+						</fetch>
+					`;
+
+					const result = validator.validate(fetchXml);
+
+					expect(result.isValid).toBe(false);
+					expect(result.errors.some((e) => e.message.includes('aggregate query must use "alias"'))).toBe(true);
+				});
+
+				it('should reject order without alias in aggregate query', () => {
+					const fetchXml = `
+						<fetch aggregate='true'>
+							<entity name='account'>
+								<attribute name='address1_city' alias='City' groupby='true' />
+								<order descending="true" />
+							</entity>
+						</fetch>
+					`;
+
+					const result = validator.validate(fetchXml);
+
+					expect(result.isValid).toBe(false);
+					expect(result.errors.some((e) => e.message.includes('<order> element in aggregate query must have an "alias" attribute'))).toBe(true);
+				});
+
+				it('should accept multiple order elements with aliases in aggregate query', () => {
+					const fetchXml = `
+						<fetch aggregate='true'>
+							<entity name='account'>
+								<attribute name='address1_city' alias='City' groupby='true' />
+								<attribute name='numberofemployees' alias='TotalEmployees' aggregate='sum' />
+								<order alias='City' />
+								<order alias='TotalEmployees' descending='true' />
+							</entity>
+						</fetch>
+					`;
+
+					const result = validator.validate(fetchXml);
+
+					expect(result.isValid).toBe(true);
+				});
 			});
 		});
 
@@ -427,6 +496,88 @@ describe('FetchXmlValidator', () => {
 
 			it('should handle mixed case element names', () => {
 				const fetchXml = `<Fetch><Entity name="contact"><Attribute name="fullname" /></Entity></Fetch>`;
+
+				const result = validator.validate(fetchXml);
+
+				expect(result.isValid).toBe(true);
+			});
+		});
+
+		describe('XML comments', () => {
+			it('should accept FetchXML with comment at the beginning', () => {
+				const fetchXml = `<!-- Account summary query -->
+<fetch>
+  <entity name="account">
+    <attribute name="name" />
+  </entity>
+</fetch>`;
+
+				const result = validator.validate(fetchXml);
+
+				expect(result.isValid).toBe(true);
+				expect(result.errors).toHaveLength(0);
+			});
+
+			it('should accept FetchXML with comment before fetch element', () => {
+				const fetchXml = `
+					<!-- This is a comment -->
+					<fetch>
+						<entity name="contact">
+							<attribute name="fullname" />
+						</entity>
+					</fetch>
+				`;
+
+				const result = validator.validate(fetchXml);
+
+				expect(result.isValid).toBe(true);
+			});
+
+			it('should accept FetchXML with inline comments', () => {
+				const fetchXml = `
+					<fetch>
+						<entity name="account">
+							<attribute name="name" />
+							<attribute name="revenue" />
+							<filter>
+								<condition attribute="statecode" operator="eq" value="0" />
+							</filter>
+							<!-- active accounts only -->
+						</entity>
+					</fetch>
+				`;
+
+				const result = validator.validate(fetchXml);
+
+				expect(result.isValid).toBe(true);
+			});
+
+			it('should accept FetchXML with multiple comments', () => {
+				const fetchXml = `<!-- Query description -->
+<!-- Author: Test -->
+<fetch>
+  <!-- Entity selection -->
+  <entity name="contact">
+    <attribute name="fullname" />
+    <!-- Add more attributes as needed -->
+  </entity>
+</fetch>`;
+
+				const result = validator.validate(fetchXml);
+
+				expect(result.isValid).toBe(true);
+			});
+
+			it('should accept FetchXML with multi-line comment', () => {
+				const fetchXml = `<!--
+  This is a multi-line comment
+  explaining the query purpose
+-->
+<fetch>
+  <entity name="account">
+    <attribute name="name" />
+  </entity>
+</fetch>`;
 
 				const result = validator.validate(fetchXml);
 

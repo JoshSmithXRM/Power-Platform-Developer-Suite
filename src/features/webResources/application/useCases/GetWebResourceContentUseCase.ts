@@ -16,6 +16,8 @@ export interface WebResourceContentResult {
 	displayName: string;
 	/** Web resource name (used for filename) */
 	name: string;
+	/** Last modification timestamp from server (for conflict detection) */
+	modifiedOn: Date;
 }
 
 /**
@@ -78,7 +80,8 @@ export class GetWebResourceContentUseCase {
 				content,
 				fileExtension: webResource.getFileExtension(),
 				displayName: webResource.displayName,
-				name: webResource.name.getValue()
+				name: webResource.name.getValue(),
+				modifiedOn: webResource.modifiedOn
 			};
 		} catch (error) {
 			const normalizedError = normalizeError(error);

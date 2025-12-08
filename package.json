@@ -2,7 +2,7 @@
     "name": "power-platform-developer-suite",
     "displayName": "Power Platform Developer Suite",
     "description": "A comprehensive VSCode extension for Power Platform development and administration - your complete toolkit for Dynamics 365, Dataverse, and Power Platform solutions",
-    "version": "0.2.6",
+    "version": "0.3.0",
     "icon": "images/icon.png",
     "publisher": "JoshSmithXRM",
     "repository": {
@@ -67,10 +67,36 @@
         "onCommand:power-platform-dev-suite.importJobViewer",
         "onCommand:power-platform-dev-suite.connectionReferences",
         "onCommand:power-platform-dev-suite.environmentVariables",
-        "onCommand:power-platform-dev-suite.webResources"
+        "onCommand:power-platform-dev-suite.webResources",
+        "onNotebook:ppdsnb"
     ],
     "main": "./dist/extension.js",
     "contributes": {
+        "notebooks": [
+            {
+                "type": "ppdsnb",
+                "displayName": "Power Platform Developer Suite Notebook",
+                "selector": [
+                    {
+                        "filenamePattern": "*.ppdsnb"
+                    }
+                ]
+            }
+        ],
+        "languages": [
+            {
+                "id": "fetchxml",
+                "aliases": ["FetchXML", "fetchxml"],
+                "extensions": [".fetchxml"]
+            }
+        ],
+        "grammars": [
+            {
+                "language": "fetchxml",
+                "scopeName": "text.xml.fetchxml",
+                "path": "./syntaxes/fetchxml.tmLanguage.json"
+            }
+        ],
         "commands": [
             {
                 "command": "power-platform-dev-suite.openSettings",
@@ -228,6 +254,36 @@
                 "command": "power-platform-dev-suite.webResourcesPickEnvironment",
                 "title": "Web Resources: Choose Environment",
                 "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.newDataverseNotebook",
+                "title": "New Notebook",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(notebook)"
+            },
+            {
+                "command": "power-platform-dev-suite.toggleNotebookCellLanguage",
+                "title": "Toggle SQL/FetchXML",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(arrow-swap)"
+            },
+            {
+                "command": "power-platform-dev-suite.openCellInDataExplorer",
+                "title": "Open in Data Explorer",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(table)"
+            },
+            {
+                "command": "power-platform-dev-suite.exportNotebookCellResultsToCsv",
+                "title": "Export Results to CSV",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(file)"
+            },
+            {
+                "command": "power-platform-dev-suite.exportNotebookCellResultsToJson",
+                "title": "Export Results to JSON",
+                "category": "Power Platform Developer Suite",
+                "icon": "$(json)"
             }
         ],
         "viewsContainers": {
@@ -391,6 +447,28 @@
                     "when": "webviewId == 'powerPlatformDevSuite.webResources'",
                     "group": "1_environment@1"
                 }
+            ],
+            "notebook/cell/title": [
+                {
+                    "command": "power-platform-dev-suite.toggleNotebookCellLanguage",
+                    "when": "notebookType == 'ppdsnb'",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.openCellInDataExplorer",
+                    "when": "notebookType == 'ppdsnb' && notebookCellType == 'code'",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "power-platform-dev-suite.exportNotebookCellResultsToCsv",
+                    "when": "notebookType == 'ppdsnb' && notebookCellType == 'code'",
+                    "group": "export@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.exportNotebookCellResultsToJson",
+                    "when": "notebookType == 'ppdsnb' && notebookCellType == 'code'",
+                    "group": "export@2"
+                }
             ]
         },
         "configuration": {
@@ -517,6 +595,7 @@
         "@playwright/test": "^1.57.0",
         "@types/jest": "^30.0.0",
         "@types/node": "24.x",
+        "@types/sinonjs__fake-timers": "^15.0.1",
         "@types/vscode": "^1.74.0",
         "@typescript-eslint/eslint-plugin": "^8.49.0",
         "@typescript-eslint/parser": "^8.49.0",

@@ -232,6 +232,43 @@
 			// Clear any stored original content since label is explicitly changing
 			buttonOriginalContent.delete(message.buttonId);
 		}
+
+		// Handle solution selector update (on environment change)
+		if (message.command === 'updateSolutionSelector') {
+			const solutionSelect = document.getElementById('solutionSelect');
+			if (!solutionSelect) {
+				// Panel doesn't have a solution selector - that's OK
+				return;
+			}
+
+			const data = message.data || {};
+			const solutions = data.solutions || [];
+			const currentSolutionId = data.currentSolutionId;
+			const disabled = data.disabled === true;
+
+			// Clear existing options
+			solutionSelect.innerHTML = '';
+
+			// Add new options from the new environment's solutions
+			solutions.forEach(solution => {
+				const option = document.createElement('option');
+				option.value = solution.id;
+				option.textContent = solution.name;
+				if (solution.id === currentSolutionId) {
+					option.selected = true;
+				}
+				solutionSelect.appendChild(option);
+			});
+
+			// Enable or disable the selector
+			solutionSelect.disabled = disabled;
+
+			console.debug('Solution selector updated', {
+				count: solutions.length,
+				currentSolutionId: currentSolutionId,
+				disabled: disabled
+			});
+		}
 	});
 
 	// Initialize on DOM ready

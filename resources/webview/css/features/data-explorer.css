@@ -1,324 +1,7 @@
 /**
  * Data Explorer Panel Styles
- * Panel-specific styling for SQL query editor and results
+ * Panel-specific styling for Visual Query Builder and results
  */
-
-/* ============================================
-   QUERY EDITOR SECTION
-   ============================================ */
-
-.query-editor-section {
-	display: flex;
-	flex-direction: column;
-	gap: 16px;
-	padding: 16px;
-	border-bottom: 1px solid var(--vscode-panel-border);
-	flex-shrink: 0; /* Don't shrink - let results section fill remaining space */
-}
-
-.editor-container {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-}
-
-/* ============================================
-   MODE TOGGLE TABS
-   ============================================ */
-
-.query-mode-toggle {
-	display: flex;
-	gap: 0;
-	border-bottom: 1px solid var(--vscode-panel-border);
-	margin-bottom: 4px;
-}
-
-.mode-tab {
-	padding: 8px 16px;
-	font-size: 13px;
-	font-weight: 500;
-	font-family: var(--vscode-font-family);
-	color: var(--vscode-foreground);
-	background: transparent;
-	border: none;
-	border-bottom: 2px solid transparent;
-	cursor: pointer;
-	transition: all 0.15s ease;
-	margin-bottom: -1px;
-}
-
-.mode-tab:hover {
-	color: var(--vscode-textLink-foreground);
-	background: var(--vscode-list-hoverBackground);
-}
-
-.mode-tab.active {
-	color: var(--vscode-textLink-foreground);
-	border-bottom-color: var(--vscode-textLink-foreground);
-}
-
-.mode-tab:focus {
-	outline: 1px solid var(--vscode-focusBorder);
-	outline-offset: -1px;
-}
-
-/* Editor panels - one visible at a time */
-.editor-panel {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-}
-
-.editor-panel[hidden] {
-	display: none;
-}
-
-.sql-editor-wrapper,
-.fetchxml-preview-wrapper,
-.fetchxml-editor-wrapper,
-.sql-preview-wrapper {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-
-.editor-label {
-	font-size: 12px;
-	font-weight: 600;
-	color: var(--vscode-descriptionForeground);
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
-}
-
-/* SQL Editor Textarea */
-.code-editor {
-	width: 100%;
-	min-height: 120px;
-	max-height: 400px; /* Prevent growing too large */
-	padding: 12px;
-	font-family: var(--vscode-editor-font-family);
-	font-size: 13px;
-	line-height: 1.5;
-	color: var(--vscode-editor-foreground);
-	background: var(--vscode-input-background);
-	border: 1px solid var(--vscode-input-border);
-	border-radius: 4px;
-	resize: vertical;
-	outline: none;
-	tab-size: 2;
-	box-sizing: border-box; /* Ensure padding doesn't break resize */
-}
-
-.code-editor:focus {
-	border-color: var(--vscode-focusBorder);
-	outline: 1px solid var(--vscode-focusBorder);
-}
-
-.code-editor::placeholder {
-	color: var(--vscode-input-placeholderForeground);
-}
-
-.sql-editor {
-	min-height: 150px;
-}
-
-/* FetchXML Preview */
-.fetchxml-preview {
-	background: var(--vscode-textCodeBlock-background);
-	border: 1px solid var(--vscode-input-border);
-	border-radius: 4px;
-	overflow: hidden;
-}
-
-.fetchxml-summary {
-	padding: 10px 14px;
-	font-size: 12px;
-	font-weight: 600;
-	color: var(--vscode-descriptionForeground);
-	cursor: pointer;
-	user-select: none;
-	background: var(--vscode-editorWidget-background);
-	border-bottom: 1px solid transparent;
-}
-
-.fetchxml-summary:hover {
-	background: var(--vscode-list-hoverBackground);
-}
-
-.fetchxml-preview[open] .fetchxml-summary {
-	border-bottom-color: var(--vscode-input-border);
-}
-
-.fetchxml-content {
-	margin: 0;
-	padding: 12px 14px;
-	font-family: var(--vscode-editor-font-family);
-	font-size: 12px;
-	line-height: 1.5;
-	color: var(--vscode-editor-foreground);
-	white-space: pre-wrap;
-	word-break: break-word;
-	overflow-x: auto;
-	max-height: 200px;
-	overflow-y: auto;
-}
-
-/* Reset code element styling inside FetchXML preview */
-.fetchxml-content code {
-	background: transparent;
-	padding: 0;
-	border: none;
-	border-radius: 0;
-	font-family: inherit;
-	font-size: inherit;
-}
-
-/* ============================================
-   FETCHXML EDITOR (FetchXML Mode)
-   ============================================ */
-
-.fetchxml-editor {
-	min-height: 200px;
-}
-
-/* FetchXML Editor with highlighting overlay */
-.fetchxml-editor-container {
-	position: relative;
-	width: 100%;
-}
-
-.fetchxml-editor-highlight {
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	padding: 12px;
-	margin: 0;
-	font-family: var(--vscode-editor-font-family);
-	font-size: 13px;
-	line-height: 1.5;
-	white-space: pre-wrap;
-	word-wrap: break-word;
-	overflow: hidden;
-	pointer-events: none;
-	border: 1px solid transparent;
-	border-radius: 4px;
-	box-sizing: border-box;
-	background: var(--vscode-input-background);
-	z-index: 0;
-}
-
-.fetchxml-editor-container .fetchxml-editor {
-	position: relative;
-	background: transparent;
-	caret-color: var(--vscode-editor-foreground);
-	color: transparent;
-	z-index: 1;
-}
-
-.fetchxml-editor-container .fetchxml-editor::selection {
-	background: var(--vscode-editor-selectionBackground);
-}
-
-/* ============================================
-   SQL PREVIEW (FetchXML Mode)
-   ============================================ */
-
-.sql-preview {
-	background: var(--vscode-textCodeBlock-background);
-	border: 1px solid var(--vscode-input-border);
-	border-radius: 4px;
-	overflow: hidden;
-}
-
-.sql-summary {
-	padding: 10px 14px;
-	font-size: 12px;
-	font-weight: 600;
-	color: var(--vscode-descriptionForeground);
-	cursor: pointer;
-	user-select: none;
-	background: var(--vscode-editorWidget-background);
-	border-bottom: 1px solid transparent;
-}
-
-.sql-summary:hover {
-	background: var(--vscode-list-hoverBackground);
-}
-
-.sql-preview[open] .sql-summary {
-	border-bottom-color: var(--vscode-input-border);
-}
-
-.sql-content {
-	margin: 0;
-	padding: 12px 14px;
-	font-family: var(--vscode-editor-font-family);
-	font-size: 12px;
-	line-height: 1.5;
-	color: var(--vscode-editor-foreground);
-	white-space: pre-wrap;
-	word-break: break-word;
-	overflow-x: auto;
-	max-height: 200px;
-	overflow-y: auto;
-}
-
-/* Reset code element styling inside SQL preview */
-.sql-content code {
-	background: transparent;
-	padding: 0;
-	border: none;
-	border-radius: 0;
-	font-family: inherit;
-	font-size: inherit;
-}
-
-/* ============================================
-   TRANSPILATION WARNINGS BANNER
-   ============================================ */
-
-.warnings-banner {
-	padding: 12px 14px;
-	background: var(--vscode-inputValidation-warningBackground);
-	border: 1px solid var(--vscode-inputValidation-warningBorder);
-	border-radius: 4px;
-	margin-bottom: 8px;
-}
-
-.warnings-header {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin-bottom: 8px;
-}
-
-.warning-icon {
-	font-size: 14px;
-}
-
-.warning-title {
-	font-size: 12px;
-	font-weight: 600;
-	color: var(--vscode-editorWarning-foreground);
-}
-
-.warnings-list {
-	margin: 0;
-	padding-left: 24px;
-	font-size: 12px;
-	line-height: 1.5;
-	color: var(--vscode-foreground);
-}
-
-.warnings-list li {
-	margin-bottom: 4px;
-}
-
-.warnings-list li:last-child {
-	margin-bottom: 0;
-}
 
 /* ============================================
    ERROR BANNER
@@ -633,11 +316,1180 @@
 }
 
 /* ============================================
+   VISUAL QUERY BUILDER SECTION
+   Two-pane layout with collapsible query builder
+   ============================================ */
+
+.visual-query-builder-section {
+	display: flex;
+	flex-direction: column;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	flex-shrink: 0;
+}
+
+/* Collapsible toggle for entire query builder */
+.query-builder-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 10px 16px;
+	font-size: 13px;
+	font-weight: 600;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	border: none;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+	flex-shrink: 0;
+}
+
+.query-builder-toggle:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.query-builder-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.query-builder-toggle-icon {
+	font-size: 14px;
+	transition: transform 0.15s ease;
+}
+
+.query-builder-toggle[aria-expanded='false'] .query-builder-toggle-icon {
+	transform: rotate(-90deg);
+}
+
+.query-builder-toggle-title {
+	flex: 1;
+}
+
+/* Main scrollable container for query builder content - SINGLE SCROLL POINT */
+.query-builder-container {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 16px;
+	max-height: 350px; /* Fixed height - vh unreliable in webviews */
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.query-builder-container.collapsed {
+	display: none;
+}
+
+/* When collapsed, remove border from toggle */
+.visual-query-builder-section.collapsed .query-builder-toggle {
+	border-bottom-color: transparent;
+}
+
+/* Spinning animation for loading state */
+.codicon-modifier-spin {
+	animation: codicon-spin 1s linear infinite;
+}
+
+@keyframes codicon-spin {
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+/* Entity Picker Section */
+.entity-picker-section {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.entity-picker-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.entity-picker-label {
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+	white-space: nowrap;
+}
+
+.entity-picker-select {
+	flex: 1;
+	max-width: 400px;
+	padding: 6px 10px;
+	font-size: 13px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-dropdown-foreground);
+	background: var(--vscode-dropdown-background);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 4px;
+	outline: none;
+	cursor: pointer;
+}
+
+.entity-picker-select:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+.entity-picker-select:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.entity-picker-select option {
+	padding: 4px 8px;
+}
+
+.entity-picker-select optgroup {
+	font-weight: 600;
+	font-style: normal;
+	color: var(--vscode-descriptionForeground);
+}
+
+.loading-indicator {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+}
+
+/* ============================================
+   COLUMN PICKER SECTION
+   ============================================ */
+
+.column-picker-section {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+	/* No overflow:hidden - let content flow to parent scroll */
+}
+
+.column-picker-section.column-picker-hidden {
+	display: none;
+}
+
+/* Collapsible Toggle Header */
+.column-picker-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 500;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	border: none;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+}
+
+.column-picker-toggle:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.column-picker-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.column-toggle-icon {
+	transition: transform 0.15s ease;
+}
+
+.column-picker-toggle[aria-expanded='false'] .column-toggle-icon {
+	transform: rotate(-90deg);
+}
+
+.column-picker-title {
+	flex: 1;
+}
+
+#column-count-badge {
+	font-weight: normal;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Collapsible Content */
+.column-picker-content {
+	display: flex;
+	flex-direction: column;
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
+.column-picker-content.collapsed {
+	display: none;
+}
+
+/* Toolbar with Search and Select All */
+.column-picker-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 10px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-editorWidget-background);
+}
+
+/* Column search uses shared .search-container but override padding for toolbar */
+.column-picker-toolbar .search-container {
+	flex: 1;
+	padding: 0;
+}
+
+.select-all-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.select-all-checkbox input[type='checkbox'] {
+	margin: 0;
+	cursor: pointer;
+}
+
+/* Column List - internal scroll for long lists */
+.column-picker-list {
+	display: flex;
+	flex-direction: column;
+	max-height: 200px;
+	overflow-y: auto;
+}
+
+.column-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 12px;
+	font-size: 12px;
+	cursor: pointer;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	transition: background 0.1s ease;
+}
+
+.column-option:last-child {
+	border-bottom: none;
+}
+
+.column-option:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.column-option:has(input:checked) {
+	background: rgba(var(--vscode-list-activeSelectionBackground-rgb, 0, 120, 212), 0.15);
+}
+
+.column-option.hidden {
+	display: none;
+}
+
+.column-checkbox {
+	flex-shrink: 0;
+	margin: 0;
+	cursor: pointer;
+}
+
+.column-logical-name {
+	color: var(--vscode-foreground);
+	flex-shrink: 0;
+	font-family: var(--vscode-editor-font-family), monospace;
+}
+
+.column-display-name {
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+}
+
+.column-type {
+	margin-left: auto;
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+	font-style: italic;
+	flex-shrink: 0;
+}
+
+.column-picker-loading,
+.column-picker-empty {
+	padding: 16px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+	font-size: 12px;
+}
+
+/* Filter Status Bar */
+.column-filter-status {
+	padding: 6px 10px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	background: var(--vscode-editorWidget-background);
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
+/* ============================================
+   FILTER SECTION
+   Visual query builder filter conditions (MVP - AND only)
+   ============================================ */
+
+.filter-section {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+}
+
+.filter-section.filter-section-hidden {
+	display: none;
+}
+
+/* Collapsible Toggle Header */
+.filter-section-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 500;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	border: none;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+}
+
+.filter-section-toggle:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.filter-section-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.filter-toggle-icon {
+	transition: transform 0.15s ease;
+}
+
+.filter-section-toggle[aria-expanded='false'] .filter-toggle-icon {
+	transform: rotate(-90deg);
+}
+
+.filter-section-title {
+	flex: 1;
+}
+
+#filter-count-badge {
+	font-weight: normal;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Collapsible Content */
+.filter-section-content {
+	display: flex;
+	flex-direction: column;
+	border-top: 1px solid var(--vscode-panel-border);
+	padding: 12px;
+	gap: 12px;
+}
+
+.filter-section-content.collapsed {
+	display: none;
+}
+
+/* Filter Conditions List */
+.filter-conditions-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+/* Empty State */
+.filter-empty-state {
+	padding: 16px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+	font-size: 12px;
+}
+
+/* Filter Condition Row */
+.filter-condition-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	transition: background 0.15s ease;
+}
+
+.filter-condition-row:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+/* Logical Label (WHERE/AND) */
+.filter-logical-label {
+	flex: 0 0 50px;
+	font-size: 12px;
+	font-weight: 600;
+	color: #569CD6; /* SQL keyword color */
+	text-transform: uppercase;
+}
+
+/* Field Dropdown */
+.filter-field-select {
+	flex: 1;
+	min-width: 120px;
+	max-width: 200px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-dropdown-foreground);
+	background: var(--vscode-dropdown-background);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 3px;
+	outline: none;
+	cursor: pointer;
+}
+
+.filter-field-select:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+/* Operator Dropdown */
+.filter-operator-select {
+	flex: 0 0 auto;
+	min-width: 100px;
+	max-width: 140px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-dropdown-foreground);
+	background: var(--vscode-dropdown-background);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 3px;
+	outline: none;
+	cursor: pointer;
+}
+
+.filter-operator-select:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+/* Value Input */
+.filter-value-input {
+	flex: 1;
+	min-width: 100px;
+	padding: 6px 8px;
+	font-size: 13px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-input-foreground);
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 3px;
+	outline: none;
+}
+
+.filter-value-input:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+.filter-value-input::placeholder {
+	color: var(--vscode-input-placeholderForeground);
+}
+
+/* Select-type value input */
+select.filter-value-input {
+	background: var(--vscode-dropdown-background);
+	color: var(--vscode-dropdown-foreground);
+	border: 1px solid var(--vscode-dropdown-border);
+	cursor: pointer;
+}
+
+/* Value Placeholder (for null operators) */
+.filter-value-placeholder {
+	flex: 1;
+	min-width: 100px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-style: italic;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Remove Button */
+.remove-filter-btn {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 1px solid var(--vscode-input-border);
+	background: transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	border-radius: 4px;
+	opacity: 0.6;
+	transition: all 0.15s ease;
+}
+
+.remove-filter-btn:hover {
+	opacity: 1;
+	background: var(--vscode-inputValidation-errorBackground);
+	border-color: var(--vscode-inputValidation-errorBorder);
+	color: var(--vscode-errorForeground);
+}
+
+.remove-filter-btn .codicon {
+	font-size: 12px;
+}
+
+/* Filter Actions */
+.filter-actions {
+	display: flex;
+	gap: 8px;
+	padding-top: 4px;
+}
+
+.add-filter-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	font-size: 12px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-button-foreground);
+	background: var(--vscode-button-secondaryBackground);
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.add-filter-btn:hover:not(:disabled) {
+	background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.add-filter-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.add-filter-btn .codicon {
+	font-size: 12px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+	.filter-condition-row {
+		flex-wrap: wrap;
+	}
+
+	.filter-logical-label {
+		flex: 0 0 100%;
+		margin-bottom: 4px;
+	}
+
+	.filter-field-select,
+	.filter-operator-select,
+	.filter-value-input {
+		flex: 1 1 auto;
+		max-width: none;
+		min-width: 80px;
+	}
+}
+
+/* ============================================
+   SORT SECTION
+   Visual query builder sort configuration (MVP - single sort)
+   ============================================ */
+
+.sort-section {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+}
+
+.sort-section.sort-section-hidden {
+	display: none;
+}
+
+/* Collapsible Toggle Header */
+.sort-section-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 500;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	border: none;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+}
+
+.sort-section-toggle:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.sort-section-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.sort-toggle-icon {
+	transition: transform 0.15s ease;
+}
+
+.sort-section-toggle[aria-expanded='false'] .sort-toggle-icon {
+	transform: rotate(-90deg);
+}
+
+.sort-section-title {
+	flex: 1;
+}
+
+#sort-count-badge {
+	font-weight: normal;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Collapsible Content */
+.sort-section-content {
+	display: flex;
+	flex-direction: column;
+	border-top: 1px solid var(--vscode-panel-border);
+	padding: 12px;
+	gap: 12px;
+}
+
+.sort-section-content.collapsed {
+	display: none;
+}
+
+/* Sort Row */
+.sort-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+}
+
+/* Order By Label */
+.sort-order-label {
+	flex: 0 0 70px;
+	font-size: 12px;
+	font-weight: 600;
+	color: #569CD6; /* SQL keyword color */
+	text-transform: uppercase;
+}
+
+/* Attribute Dropdown */
+.sort-attribute-select {
+	flex: 1;
+	min-width: 150px;
+	max-width: 250px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-dropdown-foreground);
+	background: var(--vscode-dropdown-background);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 3px;
+	outline: none;
+	cursor: pointer;
+}
+
+.sort-attribute-select:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+/* Direction Dropdown */
+.sort-direction-select {
+	flex: 0 0 auto;
+	min-width: 100px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-dropdown-foreground);
+	background: var(--vscode-dropdown-background);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 3px;
+	outline: none;
+	cursor: pointer;
+}
+
+.sort-direction-select:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+/* Clear Sort Button */
+.clear-sort-btn {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 1px solid var(--vscode-input-border);
+	background: transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	border-radius: 4px;
+	opacity: 0.6;
+	transition: all 0.15s ease;
+}
+
+.clear-sort-btn:hover {
+	opacity: 1;
+	background: var(--vscode-inputValidation-errorBackground);
+	border-color: var(--vscode-inputValidation-errorBorder);
+	color: var(--vscode-errorForeground);
+}
+
+.clear-sort-btn .codicon {
+	font-size: 12px;
+}
+
+/* Sort Empty State */
+.sort-empty-state {
+	padding: 16px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+	font-size: 12px;
+}
+
+/* ============================================
+   QUERY OPTIONS SECTION
+   Top N and Distinct options
+   ============================================ */
+
+.query-options-section {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+}
+
+.query-options-section.query-options-hidden {
+	display: none;
+}
+
+/* Collapsible Toggle Header */
+.query-options-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 500;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	border: none;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+}
+
+.query-options-toggle:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.query-options-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.query-options-toggle-icon {
+	transition: transform 0.15s ease;
+}
+
+.query-options-toggle[aria-expanded='false'] .query-options-toggle-icon {
+	transform: rotate(-90deg);
+}
+
+.query-options-title {
+	flex: 1;
+}
+
+/* Collapsible Content */
+.query-options-content {
+	display: flex;
+	flex-direction: column;
+	border-top: 1px solid var(--vscode-panel-border);
+	padding: 12px;
+	gap: 12px;
+}
+
+.query-options-content.collapsed {
+	display: none;
+}
+
+/* Options Row - styled like filter-condition-row */
+.query-options-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	background: var(--vscode-editorWidget-background);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	flex-wrap: wrap;
+}
+
+/* Top N Option */
+.top-n-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.top-n-label {
+	flex: 0 0 auto;
+	font-size: 12px;
+	font-weight: 600;
+	color: #569CD6; /* SQL keyword color to match WHERE/ORDER BY */
+	white-space: nowrap;
+}
+
+.top-n-input {
+	width: 80px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-input-foreground);
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 3px;
+	outline: none;
+}
+
+.top-n-input:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+.top-n-input::-webkit-inner-spin-button,
+.top-n-input::-webkit-outer-spin-button {
+	opacity: 1;
+}
+
+.top-n-suffix {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Distinct Option */
+.distinct-option {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.distinct-checkbox {
+	margin: 0;
+	cursor: pointer;
+}
+
+.distinct-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: #569CD6; /* SQL keyword color */
+	cursor: pointer;
+}
+
+/* Query Preview Section */
+.query-preview-section {
+	display: flex;
+	flex-direction: column;
+	background: var(--vscode-textCodeBlock-background);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	/* No overflow:hidden - let content flow to parent scroll */
+}
+
+/* Collapsible Preview Header */
+.preview-section-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	font-size: 12px;
+	font-weight: 600;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	border: none;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+}
+
+.preview-section-header:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.preview-section-header:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.preview-toggle-icon {
+	font-size: 14px;
+	transition: transform 0.2s ease;
+}
+
+.preview-section-header[aria-expanded="false"] .preview-toggle-icon {
+	transform: rotate(-90deg);
+}
+
+.preview-section-title {
+	flex: 1;
+}
+
+/* Collapsible Content Wrapper */
+.preview-content-wrapper {
+	display: flex;
+	flex-direction: column;
+}
+
+.preview-content-wrapper.collapsed {
+	display: none;
+}
+
+/* Remove border-bottom from header when collapsed */
+.preview-section-header[aria-expanded="false"] {
+	border-bottom-color: transparent;
+}
+
+.preview-tabs {
+	display: flex;
+	gap: 0;
+	background: var(--vscode-editorWidget-background);
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.preview-tab {
+	padding: 8px 16px;
+	font-size: 12px;
+	font-weight: 500;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	margin-bottom: -1px;
+}
+
+.preview-tab:hover {
+	color: var(--vscode-textLink-foreground);
+	background: var(--vscode-list-hoverBackground);
+}
+
+.preview-tab.active {
+	color: var(--vscode-textLink-foreground);
+	border-bottom-color: var(--vscode-textLink-foreground);
+}
+
+.preview-tab:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.preview-panel {
+	position: relative;
+	min-height: 60px;
+}
+
+.preview-panel[hidden] {
+	display: none;
+}
+
+.preview-content {
+	margin: 0;
+	padding: 12px 14px;
+	font-family: var(--vscode-editor-font-family);
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--vscode-editor-foreground);
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.preview-content code {
+	background: transparent;
+	padding: 0;
+	border: none;
+	border-radius: 0;
+	font-family: inherit;
+	font-size: inherit;
+}
+
+.preview-empty {
+	padding: 24px 14px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+	font-size: 13px;
+	font-style: italic;
+}
+
+.copy-preview-btn {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	background: var(--vscode-editorWidget-background);
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	border-radius: 4px;
+	opacity: 0.7;
+	transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.copy-preview-btn:hover {
+	opacity: 1;
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.copy-preview-btn:active {
+	background: var(--vscode-toolbar-activeBackground);
+}
+
+.copy-preview-btn.copy-success {
+	color: var(--vscode-testing-iconPassed);
+}
+
+.copy-preview-btn.copy-error {
+	color: var(--vscode-testing-iconFailed);
+}
+
+.copy-preview-btn .codicon {
+	font-size: 14px;
+}
+
+/* ============================================
+   SYNTAX HIGHLIGHTING (SQL & XML)
+   ============================================ */
+
+/* SQL Highlighting */
+.sql-keyword {
+	color: #569CD6;
+	font-weight: 600;
+}
+
+.sql-string {
+	color: #CE9178;
+}
+
+.sql-number {
+	color: #B5CEA8;
+}
+
+.sql-comment {
+	color: #6A9955;
+	font-style: italic;
+}
+
+.sql-operator {
+	color: #D4D4D4;
+}
+
+.sql-identifier {
+	color: #9CDCFE;
+}
+
+.sql-punctuation {
+	color: #D4D4D4;
+}
+
+/* XML/FetchXML Highlighting */
+.xml-tag {
+	color: #569CD6;
+}
+
+.xml-attribute {
+	color: #9CDCFE;
+}
+
+.xml-string {
+	color: #CE9178;
+}
+
+.xml-bracket {
+	color: #808080;
+}
+
+.xml-equals {
+	color: #D4D4D4;
+}
+
+.xml-comment {
+	color: #6A9955;
+	font-style: italic;
+}
+
+.xml-cdata {
+	color: #D7BA7D;
+}
+
+.xml-processing {
+	color: #C586C0;
+}
+
+.xml-text {
+	color: #D4D4D4;
+}
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 
 @media (max-width: 768px) {
-	.query-editor-section {
+	.query-editor-section,
+	.visual-query-builder-section {
 		padding: 12px;
 	}
 
@@ -650,5 +1502,14 @@
 		flex-direction: column;
 		align-items: flex-start;
 		gap: 8px;
+	}
+
+	.entity-picker-row {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.entity-picker-select {
+		max-width: none;
 	}
 }

@@ -1,11 +1,21 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { DataExplorerPanelComposed } from '../panels/DataExplorerPanelComposed';
 import { VSCodePanelStateRepository } from '../../../../shared/infrastructure/ui/VSCodePanelStateRepository';
 
+import { registerDataExplorerIntelliSense } from './registerDataExplorerIntelliSense';
+
 /**
- * Lazy-loads and initializes Data Explorer panel.
+ * Lazy-loads and initializes Data Explorer panel with IntelliSense support.
  * Dynamic imports reduce initial extension activation time by deferring feature-specific code until needed.
+ *
+ * This function:
+ * - Registers IntelliSense components (completion provider for all SQL files)
+ * - Creates the Data Explorer panel
+ * - Wires up IntelliSense context service to panel's environment changes
+ *
+ * @returns The Data Explorer panel instance for further interaction
  */
 export async function initializeDataExplorer(
 	context: vscode.ExtensionContext,
@@ -23,7 +33,7 @@ export async function initializeDataExplorer(
 	},
 	logger: ILogger,
 	initialEnvironmentId?: string
-): Promise<void> {
+): Promise<DataExplorerPanelComposed> {
 	const { DataverseApiService } = await import(
 		'../../../../shared/infrastructure/services/DataverseApiService.js'
 	);
@@ -50,6 +60,13 @@ export async function initializeDataExplorer(
 		logger
 	);
 
+	// Register IntelliSense components (singleton - only registers once)
+	const intelliSenseServices = registerDataExplorerIntelliSense(
+		context,
+		dataverseApiService,
+		logger
+	);
+
 	const queryRepository = new DataverseDataExplorerQueryRepository(
 		dataverseApiService,
 		logger
@@ -61,7 +78,7 @@ export async function initializeDataExplorer(
 	const executeFetchXmlUseCase = new ExecuteFetchXmlQueryUseCase(queryRepository, logger);
 	const resultMapper = new QueryResultViewModelMapper();
 
-	await DataExplorerPanelComposed.createOrShow(
+	const panel = await DataExplorerPanelComposed.createOrShow(
 		context.extensionUri,
 		getEnvironments,
 		getEnvironmentById,
@@ -70,6 +87,9 @@ export async function initializeDataExplorer(
 		resultMapper,
 		panelStateRepository,
 		logger,
+		intelliSenseServices,
 		initialEnvironmentId
 	);
+
+	return panel;
 }

@@ -27,7 +27,9 @@ describe('ListWebResourcesUseCase', () => {
 			getCount: jest.fn(),
 			publish: jest.fn(),
 			publishMultiple: jest.fn(),
-			publishAll: jest.fn()
+			publishAll: jest.fn(),
+			getModifiedOn: jest.fn(),
+			getPublishedContent: jest.fn()
 		};
 
 		mockSolutionComponentRepository = {
@@ -56,7 +58,9 @@ describe('ListWebResourcesUseCase', () => {
 			type,
 			isManaged,
 			new Date('2024-01-01T08:00:00Z'),
-			new Date('2024-01-15T10:30:00Z')
+			new Date('2024-01-15T10:30:00Z'),
+			'Test User',
+			'Test User'
 		);
 	}
 

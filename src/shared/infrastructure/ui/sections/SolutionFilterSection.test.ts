@@ -18,12 +18,15 @@ describe('SolutionFilterSection', () => {
 	});
 
 	describe('render', () => {
-		it('should render empty string when no solutions', () => {
+		it('should render loading state when no solutions', () => {
 			const section = new SolutionFilterSection();
 
 			const html = section.render({ solutions: [] });
 
-			expect(html).toBe('');
+			// Container should always render so updateSolutionSelector postMessage can populate it
+			expect(html).toContain('id="solutionSelect"');
+			expect(html).toContain('Loading...');
+			expect(html).toContain('disabled');
 		});
 
 		it('should render single solution', () => {
@@ -134,7 +137,9 @@ describe('SolutionFilterSection', () => {
 
 			const html = section.render({});
 
-			expect(html).toBe('');
+			// Container should always render so updateSolutionSelector postMessage can populate it
+			expect(html).toContain('id="solutionSelect"');
+			expect(html).toContain('Loading...');
 		});
 	});
 });

@@ -44,6 +44,7 @@ import type { FilterCriteriaViewModel } from '../../application/viewModels/Filte
 import { FilterField } from '../../application/types';
 import { FILTER_ENUM_OPTIONS } from '../constants/FilterFieldConfiguration';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 import { PluginTraceExportBehavior } from '../behaviors/PluginTraceExportBehavior';
 import { PluginTraceDeleteBehavior } from '../behaviors/PluginTraceDeleteBehavior';
@@ -56,7 +57,6 @@ import { PluginTraceFilterManagementBehavior } from '../behaviors/PluginTraceFil
  */
 type PluginTraceViewerCommands =
 	| 'refresh'
-	| 'openMaker'
 	| 'environmentChange'
 	| 'viewDetail'
 	| 'viewTrace'
@@ -117,7 +117,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	private currentTraceLevel: TraceLevel | null = null;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
@@ -150,7 +150,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		this.detailSection = result.detailSection;
 
 		// Initialize loading behavior for toolbar buttons
-		// Note: openMaker excluded - it only needs environmentId which is already known
+		// All buttons must be included so they get re-enabled after scaffold renders with isLoading: true
 		this.loadingBehavior = new LoadingStateBehavior(
 			panel,
 			LoadingStateBehavior.createButtonConfigs(['refresh']),
@@ -204,6 +204,10 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	 */
 	protected reveal(column: vscode.ViewColumn): void {
 		this.panel.reveal(column);
+	}
+
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
 	}
 
 	public static async createOrShow(
@@ -317,11 +321,12 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 
 		// Single scaffold render with all persisted state included
 		// No second render needed - handleRefresh() uses data-driven updateTableData
-		// Note: Don't pass isLoading:true - openMaker should stay enabled
+		// isLoading: true renders spinner in table and disables all buttons
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			tableData: [],
+			isLoading: true,
 			state: {
 				traceLevel: this.currentTraceLevel?.value,
 				autoRefreshInterval: this.autoRefreshBehavior.getInterval(),
@@ -333,21 +338,29 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			}
 		});
 
-		// Build and send OData query preview for loaded filters
-		const loadedFilterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
-		const filterMapper = new FilterCriteriaMapper(this.configService);
-		const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
-		const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
-		await this.panel.webview.postMessage({
-			command: 'updateODataPreview',
-			data: { query: odataQuery }
-		});
+		// Disable all buttons during initial load (scaffold rendered them disabled, this syncs state)
+		await this.loadingBehavior.setLoading(true);
 
-		// Load data - handleRefresh() manages button loading state and shows table loading
-		await this.handleRefresh();
+		try {
+			// Build and send OData query preview for loaded filters
+			const loadedFilterCriteria = this.filterManagementBehavior.getAppliedFilterCriteria();
+			const filterMapper = new FilterCriteriaMapper(this.configService);
+			const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
+			const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
+			await this.panel.postMessage({
+				command: 'updateODataPreview',
+				data: { query: odataQuery }
+			});
 
-		// Load trace level (updates dropdown via message)
-		await this.loadTraceLevel();
+			// Load data - handleRefresh() manages refresh button spinner
+			await this.handleRefresh();
+
+			// Load trace level (updates dropdown via message)
+			await this.loadTraceLevel();
+		} finally {
+			// Re-enable all buttons after load completes
+			await this.loadingBehavior.setLoading(false);
+		}
 	}
 
 	private createCoordinator(): {
@@ -365,7 +378,6 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		const filterPanel = new FilterPanelSection();
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
-				{ id: 'openMaker', label: 'Open in Maker' },
 				{ id: 'refresh', label: 'Refresh' }
 			]
 		}, SectionPosition.Toolbar);
@@ -420,6 +432,9 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'CellSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'components', 'DropdownComponent.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
@@ -444,7 +459,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -462,10 +477,6 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	private registerCommandHandlers(): void {
 		this.coordinator.registerHandler('refresh', async () => {
 			await this.handleRefresh();
-		});
-
-		this.coordinator.registerHandler('openMaker', async () => {
-			await this.handleOpenMaker();
 		});
 
 		this.coordinator.registerHandler('environmentChange', async (data) => {
@@ -628,7 +639,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			const config = this.getTableConfig();
 
 			// Data-driven update: Send ViewModels to frontend
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateTableData',
 				data: {
 					viewModels,
@@ -642,21 +653,6 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			await vscode.window.showErrorMessage('Failed to load plugin traces');
 		} finally {
 			await this.loadingBehavior.setButtonLoading('refresh', false);
-		}
-	}
-
-	private async handleOpenMaker(): Promise<void> {
-		try {
-			const environment = await this.getEnvironmentById(this.currentEnvironmentId);
-			if (environment?.powerPlatformEnvironmentId) {
-				const makerUrl = `https://make.powerapps.com/environments/${environment.powerPlatformEnvironmentId}/home`;
-				await vscode.env.openExternal(vscode.Uri.parse(makerUrl));
-			} else {
-				await vscode.window.showWarningMessage('Environment does not have a Power Platform environment ID');
-			}
-		} catch (error) {
-			this.logger.error('Failed to open Maker portal', error);
-			await vscode.window.showErrorMessage('Failed to open Maker portal');
 		}
 	}
 
@@ -728,7 +724,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		const filterCriteria = this.filterManagementBehavior.getFilterCriteria();
 		const reconstructedQuickFilterIds = this.filterManagementBehavior.getReconstructedQuickFilterIds();
 
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateFilterState',
 			data: {
 				filterCriteria,
@@ -742,7 +738,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		const filterMapper = new FilterCriteriaMapper(this.configService);
 		const domainFilter = filterMapper.toDomain(loadedFilterCriteria);
 		const odataQuery = domainFilter.buildFilterExpression() || 'No filters applied';
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'updateODataPreview',
 			data: { query: odataQuery }
 		});
@@ -777,7 +773,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			await vscode.window.showInformationMessage(`Trace level set to: ${TraceLevelFormatter.getDisplayName(level)}`);
 
 			// Data-driven update: Send dropdown state change to frontend
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateDropdownState',
 				data: {
 					dropdownId: 'traceLevelDropdown',
@@ -801,7 +797,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			this.logger.debug('Trace level loaded', { level: level.value });
 
 			// Update the dropdown in the webview to show current selection
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateDropdownState',
 				data: {
 					dropdownId: 'traceLevelDropdown',
@@ -936,7 +932,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	 * Provides visual feedback during environment switches.
 	 */
 	private showTableLoading(): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels: [],

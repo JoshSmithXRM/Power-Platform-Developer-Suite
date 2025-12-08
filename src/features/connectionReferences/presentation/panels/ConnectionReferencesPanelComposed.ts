@@ -25,6 +25,7 @@ import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/Cs
 import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
 import type { HtmlScaffoldingConfig } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
+import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 import { VsCodeCancellationTokenAdapter } from '../../../../shared/infrastructure/adapters/VsCodeCancellationTokenAdapter';
@@ -62,7 +63,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	private currentCancellationSource: vscode.CancellationTokenSource | null = null;
 
 	private constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
@@ -90,10 +91,10 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		this.scaffoldingBehavior = scaffoldingBehavior;
 
 		// Initialize loading behavior for toolbar buttons
-		// Note: openMaker excluded - it only needs environmentId which is already known
+		// All buttons must be included so they get re-enabled after scaffold renders with isLoading: true
 		this.loadingBehavior = new LoadingStateBehavior(
 			panel,
-			LoadingStateBehavior.createButtonConfigs(['refresh', 'syncDeploymentSettings']),
+			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh', 'syncDeploymentSettings']),
 			logger
 		);
 
@@ -107,6 +108,10 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	 */
 	protected reveal(column: vscode.ViewColumn): void {
 		this.panel.reveal(column);
+	}
+
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
 	}
 
 	public static async createOrShow(
@@ -221,6 +226,9 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 					vscodeImpl.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
+					vscodeImpl.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'CellSelectionBehavior.js')
+				).toString(),
+				this.panel.webview.asWebviewUri(
 					vscodeImpl.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'TableRenderer.js')
 				).toString(),
 				this.panel.webview.asWebviewUri(
@@ -238,7 +246,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(
-			this.panel.webview,
+			this.panel,
 			compositionBehavior,
 			scaffoldingConfig
 		);
@@ -315,17 +323,19 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			}
 		}
 
-		// Initial render - openMaker stays enabled (only needs environmentId)
+		// Initial render with loading state - prevents "No data" flash
+		// isLoading: true renders spinner in HTML immediately (no race condition)
 		const environments = await this.getEnvironments();
 		await this.scaffoldingBehavior.refresh({
 			environments,
 			currentEnvironmentId: this.currentEnvironmentId,
 			solutions: [],
 			currentSolutionId: this.currentSolutionId,
-			tableData: []
+			tableData: [],
+			isLoading: true
 		});
 
-		// Disable refresh button during initial load (shows spinner)
+		// Disable refresh button during initial load
 		await this.loadingBehavior.setLoading(true);
 
 		try {
@@ -352,17 +362,14 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 				}
 			}
 
-			// IMMEDIATELY render solutions (user can interact while data loads)
-			await this.scaffoldingBehavior.refresh({
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				solutions,
-				currentSolutionId: finalSolutionId,
-				tableData: []
+			// Update solutions dropdown via message (avoids full HTML refresh that causes "No data" flash)
+			await this.panel.postMessage({
+				command: 'updateSolutionSelector',
+				data: {
+					solutions,
+					currentSolutionId: finalSolutionId
+				}
 			});
-
-			// Show loading state in table AFTER scaffold refresh (refresh replaces HTML, so loading must come after)
-			this.showTableLoading();
 
 			// Set up cancellation for initial data load (can be cancelled by solution change)
 			const myVersion = ++this.requestVersion;
@@ -385,13 +392,16 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 				return;
 			}
 
-			// Final render with data
-			await this.scaffoldingBehavior.refresh({
-				environments,
-				currentEnvironmentId: this.currentEnvironmentId,
-				solutions,
-				currentSolutionId: finalSolutionId,
-				tableData: data
+			// Send data to frontend via message (scaffoldingBehavior.refresh regenerates HTML
+			// which resets the table state; we need to use postMessage instead)
+			const config = this.getTableConfig();
+			await this.panel.postMessage({
+				command: 'updateTableData',
+				data: {
+					viewModels: data,
+					columns: config.columns,
+					noDataMessage: config.noDataMessage
+				}
 			});
 		} finally {
 			// Re-enable buttons after load completes
@@ -425,7 +435,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 			const config = this.getTableConfig();
 
 			// Data-driven update: Send ViewModels to frontend
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'updateTableData',
 				data: {
 					viewModels: data,
@@ -526,9 +536,26 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	}
 
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
+		this.logger.debug('Environment changed', { environmentId });
+
+		// Immediately show loading state to clear stale data from previous environment
+		await this.panel.postMessage({
+			command: 'showLoading',
+			message: 'Switching environment...'
+		});
+
+		// Show loading placeholder in solution selector to prevent stale selection
+		await this.panel.postMessage({
+			command: 'updateSolutionSelector',
+			data: {
+				solutions: [{ id: '', name: 'Loading solutions...', uniqueName: '' }],
+				currentSolutionId: '',
+				disabled: true
+			}
+		});
+
 		const oldEnvironmentId = this.currentEnvironmentId;
 		this.currentEnvironmentId = environmentId;
-		this.currentSolutionId = DEFAULT_SOLUTION_ID;
 
 		// Re-register panel in map for new environment
 		this.reregisterPanel(ConnectionReferencesPanelComposed.panels, oldEnvironmentId, this.currentEnvironmentId);
@@ -536,26 +563,63 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 		const environment = await this.getEnvironmentById(environmentId);
 		this.panel.title = `Connection References - ${environment?.name || 'Unknown'}`;
 
-		// Load saved solution selection for new environment
+		// Load persisted state for the NEW environment (Option A: Fresh Start)
+		await this.loadPersistedStateForEnvironment(environmentId);
+
+		// Load solutions for the NEW environment
+		this.solutionOptions = await this.loadSolutions();
+
+		// Post-load validation: Check if persisted solution still exists
+		if (this.currentSolutionId !== DEFAULT_SOLUTION_ID) {
+			if (!this.solutionOptions.some(s => s.id === this.currentSolutionId)) {
+				this.logger.warn('Persisted solution no longer exists, falling back to default', {
+					invalidSolutionId: this.currentSolutionId
+				});
+				this.currentSolutionId = DEFAULT_SOLUTION_ID;
+			}
+		}
+
+		// Update solution selector in UI
+		await this.panel.postMessage({
+			command: 'updateSolutionSelector',
+			data: {
+				solutions: this.solutionOptions,
+				currentSolutionId: this.currentSolutionId
+			}
+		});
+
+		// handleRefresh handles loading state
+		await this.handleRefresh();
+	}
+
+	/**
+	 * Loads persisted state for a specific environment.
+	 * Called during environment switch to restore the target environment's saved state.
+	 */
+	private async loadPersistedStateForEnvironment(environmentId: string): Promise<void> {
+		// Reset to defaults first
+		this.currentSolutionId = DEFAULT_SOLUTION_ID;
+
 		if (this.panelStateRepository) {
 			try {
 				const state = await this.panelStateRepository.load({
 					panelType: 'connectionReferences',
-					environmentId: this.currentEnvironmentId
+					environmentId
 				});
 				if (state && typeof state === 'object' && 'selectedSolutionId' in state) {
 					const savedId = state.selectedSolutionId as string | undefined;
 					if (savedId) {
 						this.currentSolutionId = savedId;
+						this.logger.debug('Loaded persisted solution for environment', {
+							environmentId,
+							solutionId: this.currentSolutionId
+						});
 					}
 				}
 			} catch (error) {
-				this.logger.warn('Failed to load panel state for new environment', error);
+				this.logger.warn('Failed to load persisted state for environment', { environmentId, error });
 			}
 		}
-
-		// handleRefresh handles loading state
-		await this.handleRefresh();
 	}
 
 	private async handleSolutionChange(solutionId: string): Promise<void> {
@@ -670,7 +734,7 @@ export class ConnectionReferencesPanelComposed extends EnvironmentScopedPanel<Co
 	 * Provides visual feedback during environment/solution switches.
 	 */
 	private showTableLoading(): void {
-		this.panel.webview.postMessage({
+		void this.panel.postMessage({
 			command: 'updateTableData',
 			data: {
 				viewModels: [],

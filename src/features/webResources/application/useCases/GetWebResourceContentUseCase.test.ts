@@ -24,7 +24,9 @@ describe('GetWebResourceContentUseCase', () => {
 			getCount: jest.fn(),
 			publish: jest.fn(),
 			publishMultiple: jest.fn(),
-			publishAll: jest.fn()
+			publishAll: jest.fn(),
+			getModifiedOn: jest.fn(),
+			getPublishedContent: jest.fn()
 		};
 
 		useCase = new GetWebResourceContentUseCase(
@@ -46,7 +48,9 @@ describe('GetWebResourceContentUseCase', () => {
 			type,
 			false,
 			new Date('2024-01-01T08:00:00Z'),
-			new Date('2024-01-15T10:30:00Z')
+			new Date('2024-01-15T10:30:00Z'),
+			'Test User',
+			'Test User'
 		);
 	}
 

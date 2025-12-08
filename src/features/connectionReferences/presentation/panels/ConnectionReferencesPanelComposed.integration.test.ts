@@ -682,6 +682,62 @@ describe('ConnectionReferencesPanelComposed Integration Tests', () => {
 
 			expect(mockListConnectionReferencesUseCase.execute).toHaveBeenCalled();
 		});
+
+		it('should send updateSolutionSelector with new environment solutions when environment changes', async () => {
+			// Setup: Different solutions for each environment
+			const env1Solutions: SolutionOption[] = [
+				{ id: DEFAULT_SOLUTION_ID, name: 'Default Solution', uniqueName: 'Default' },
+				{ id: 'env1-custom-solution', name: 'Env1 Solution', uniqueName: 'env1_solution' }
+			];
+			const env2Solutions: SolutionOption[] = [
+				{ id: DEFAULT_SOLUTION_ID, name: 'Default Solution', uniqueName: 'Default' },
+				{ id: 'env2-custom-solution', name: 'Env2 Solution', uniqueName: 'env2_solution' }
+			];
+
+			// Return different solutions based on environment
+			mockSolutionRepository.findAllForDropdown.mockImplementation((envId: string) => {
+				if (envId === 'env2') {
+					return Promise.resolve(env2Solutions);
+				}
+				return Promise.resolve(env1Solutions);
+			});
+
+			await createPanelAndWait();
+
+			// Clear postMessage calls from initialization
+			(mockPanel.webview.postMessage as jest.Mock).mockClear();
+
+			// Simulate environment change to env2
+			const [messageHandler] = (mockPanel.webview.onDidReceiveMessage as jest.Mock).mock.calls[0]!;
+			await messageHandler({
+				command: 'environmentChange',
+				data: { environmentId: 'env2' }
+			});
+
+			await flushPromises();
+
+			// Verify solutions were fetched for the new environment
+			expect(mockSolutionRepository.findAllForDropdown).toHaveBeenCalledWith('env2');
+
+			// CRITICAL: Verify updateSolutionSelector message was sent with new environment's solutions
+			const postMessageMock = mockPanel.webview.postMessage as jest.Mock;
+			const updateSolutionCalls = postMessageMock.mock.calls.filter(
+				(call: unknown[]) => (call[0] as { command: string }).command === 'updateSolutionSelector'
+			);
+
+			expect(updateSolutionCalls.length).toBeGreaterThan(0);
+
+			const lastUpdateCall = updateSolutionCalls[updateSolutionCalls.length - 1]![0] as {
+				command: string;
+				data: { solutions: SolutionOption[]; currentSolutionId: string };
+			};
+			expect(lastUpdateCall.data.solutions).toEqual(env2Solutions);
+
+			// Verify the new environment's custom solution is in the list
+			const solutionIds = lastUpdateCall.data.solutions.map((s: SolutionOption) => s.id);
+			expect(solutionIds).toContain('env2-custom-solution');
+			expect(solutionIds).not.toContain('env1-custom-solution');
+		});
 	});
 
 	describe('Maker Portal Integration', () => {

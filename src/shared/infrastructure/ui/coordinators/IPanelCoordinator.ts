@@ -2,6 +2,7 @@ import type * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IPanelBehavior } from '../behaviors/IPanelBehavior';
+import type { SafeWebviewPanel } from '../panels/SafeWebviewPanel';
 import type { WebviewMessage } from '../types/WebviewMessage';
 
 /**
@@ -27,8 +28,8 @@ import type { WebviewMessage } from '../types/WebviewMessage';
  * ```
  */
 export interface PanelCoordinatorConfig<_TCommands extends string = string> {
-	/** VS Code webview panel instance */
-	readonly panel: vscode.WebviewPanel;
+	/** Safe webview panel instance with disposal protection */
+	readonly panel: SafeWebviewPanel;
 
 	/** Extension URI for resolving webview resources */
 	readonly extensionUri: vscode.Uri;

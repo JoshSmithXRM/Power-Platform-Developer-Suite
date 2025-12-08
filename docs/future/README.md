@@ -11,15 +11,15 @@ Track features and improvements that are planned but not actively being worked o
 
 ## Feature Files
 
-| File | Description | Priority Items |
-|------|-------------|----------------|
-| [DATA_MANAGEMENT.md](DATA_MANAGEMENT.md) | Data Explorer, SQL4CDS, Record Cloning, Bulk Operations | High |
-| [DEVELOPMENT_TOOLS.md](DEVELOPMENT_TOOLS.md) | Plugin Registration, Web Resources Manager | High |
-| [ALM_DEVOPS.md](ALM_DEVOPS.md) | Deployment promotion, Solution Diff, Release management | High/Medium |
-| [ADMINISTRATION.md](ADMINISTRATION.md) | Connection Manager, Async Jobs, Security Roles, Workflows | High |
-| [OBSERVABILITY.md](OBSERVABILITY.md) | Flow History, Dependencies, Telemetry | Medium |
-| [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | Testing infrastructure, Multi-environment, UX | Low |
-| [METADATA_BROWSER_ENHANCEMENTS.md](METADATA_BROWSER_ENHANCEMENTS.md) | Metadata export, comparison, global search | Medium/Low |
+| File | Description | Status |
+|------|-------------|--------|
+| [DATA_MANAGEMENT.md](DATA_MANAGEMENT.md) | Data Explorer (✅ IntelliSense, ✅ Aggregates/JOINs), Visual Builder | Visual Builder in progress |
+| [DEVELOPMENT_TOOLS.md](DEVELOPMENT_TOOLS.md) | Web Resources (✅ Complete), Plugin Registration | Plugin Reg planned |
+| [ALM_DEVOPS.md](ALM_DEVOPS.md) | Deployment promotion, Solution Diff | Planned |
+| [ADMINISTRATION.md](ADMINISTRATION.md) | Connection Manager, Async Jobs, Workflows | Planned |
+| [OBSERVABILITY.md](OBSERVABILITY.md) | Flow History, Dependencies, Telemetry | Planned |
+| [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | E2E Testing (✅), Virtual Tables (✅), Config (✅) | Mostly done |
+| [METADATA_BROWSER_ENHANCEMENTS.md](METADATA_BROWSER_ENHANCEMENTS.md) | Core (✅), Solution filtering, export | Enhancements planned |
 
 ## Design Docs (Detailed Technical Designs)
 
@@ -27,9 +27,9 @@ Detailed technical designs for complex features that require significant plannin
 
 | File | Description | Status |
 |------|-------------|--------|
-| [DATA_EXPLORER_INTELLISENSE_DESIGN.md](DATA_EXPLORER_INTELLISENSE_DESIGN.md) | SQL/FetchXML IntelliSense | Planned |
-| [FILTER_PANEL_IMPROVEMENTS_DESIGN.md](FILTER_PANEL_IMPROVEMENTS_DESIGN.md) | Plugin Trace filter enhancements | Planned |
-| [WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md](WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md) | TypeScript webview behaviors | Planned |
+| [DATA_EXPLORER_INTELLISENSE_DESIGN.md](DATA_EXPLORER_INTELLISENSE_DESIGN.md) | SQL/FetchXML IntelliSense | Implemented (v0.3.0) |
+| [FILTER_PANEL_IMPROVEMENTS_DESIGN.md](FILTER_PANEL_IMPROVEMENTS_DESIGN.md) | Plugin Trace filter enhancements | Deferred |
+| [WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md](WEBVIEW_TYPESCRIPT_MIGRATION_DESIGN.md) | TypeScript webview behaviors | Deferred |
 
 ## Lifecycle
 
@@ -93,4 +93,4 @@ Items moved here from feature files with rejection reason.
 
 ---
 
-**Last Reviewed**: 2025-12-01
+**Last Reviewed**: 2025-12-07

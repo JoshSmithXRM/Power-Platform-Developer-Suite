@@ -22,9 +22,8 @@
  * ```
  */
 
-import type * as vscode from 'vscode';
-
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { ISafePanel } from '../panels/ISafePanel';
 
 /**
  * Button configuration for loading state management.
@@ -45,7 +44,7 @@ export class LoadingStateBehavior {
 	private isLoading = false;
 
 	constructor(
-		private readonly panel: vscode.WebviewPanel,
+		private readonly panel: ISafePanel,
 		private readonly buttons: readonly LoadingButtonConfig[],
 		private readonly logger: ILogger
 	) {}
@@ -63,7 +62,7 @@ export class LoadingStateBehavior {
 			const disabled = loading || (button.keepDisabled === true);
 			const showSpinner = loading && (button.showSpinner === true);
 
-			await this.panel.webview.postMessage({
+			await this.panel.postMessage({
 				command: 'setButtonState',
 				buttonId: button.id,
 				disabled,
@@ -83,7 +82,7 @@ export class LoadingStateBehavior {
 		const button = this.buttons.find(b => b.id === buttonId);
 		const showSpinner = button?.showSpinner === true;
 
-		await this.panel.webview.postMessage({
+		await this.panel.postMessage({
 			command: 'setButtonState',
 			buttonId,
 			disabled: loading,

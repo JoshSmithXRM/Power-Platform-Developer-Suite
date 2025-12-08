@@ -57,6 +57,23 @@ const vscode = require('vscode') as {
 };
 
 /**
+ * Helper to flush all pending promises in the event loop.
+ * PanelCoordinator uses `void this.handleMessage()` which runs async handlers
+ * without awaiting. This helper ensures all microtasks complete before assertions.
+ */
+function flushPromises(): Promise<void> {
+	return new Promise((resolve) => {
+		setImmediate(() => {
+			setImmediate(() => {
+				setImmediate(() => {
+					resolve();
+				});
+			});
+		});
+	});
+}
+
+/**
  * Integration test for MetadataBrowserPanel.
  *
  * Tests the complete panel initialization, command handling, state management,
@@ -765,7 +782,8 @@ describe('MetadataBrowserPanel Integration Tests', () => {
 			mockLoadMetadataTreeUseCase.execute.mockClear();
 
 			const handler = messageHandlers.get('messageHandler');
-			await handler!({ command: 'environmentChange', data: { environmentId: 'env2' } });
+			handler!({ command: 'environmentChange', data: { environmentId: 'env2' } });
+			await flushPromises();
 
 			expect(mockEntityMetadataRepository.clearCache).toHaveBeenCalled();
 			expect(mockLoadMetadataTreeUseCase.execute).toHaveBeenCalledWith('env2');
