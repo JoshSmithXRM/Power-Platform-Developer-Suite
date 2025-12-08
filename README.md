@@ -6,146 +6,119 @@
 
 Comprehensive VS Code extension for Power Platform development and administration - your complete toolkit for Dynamics 365, Dataverse, and Power Platform solutions.
 
-## 🚀 Key Features
+## Key Features
 
-**🔌 Environment Management**
-- Connect using 4 authentication methods (Service Principal, Interactive, Username/Password, Device Code)
-- Multi-environment support with easy switching
+**Data Explorer**
+- SQL and FetchXML query execution against Dataverse
+- Visual Query Builder with point-and-click interface
+- IntelliSense autocomplete for entities and attributes
+- Notebooks (.ppdsnb) for saving and sharing queries
+- Export results to CSV, JSON, or query to FetchXML/SQL
 
-**📦 Solution Explorer**
-- Browse, filter, export solutions
+**Web Resources**
+- Browse, edit, and publish web resources directly in VS Code
+- Syntax highlighting for JavaScript, CSS, HTML, and XML
+- Conflict detection prevents accidental overwrites
+- Unpublished changes detection with diff view
+
+**Solution Explorer**
+- Browse, filter, and export solutions
 - Open directly in Maker or Classic interfaces
 - Real-time solution analysis
 
-**🔍 Metadata Browser**
-- Comprehensive three-panel interface for exploring Dataverse entities
-- Browse Tables → Columns, Keys, Relationships, Privileges with detailed properties
-- Smart caching for instant navigation and export to JSON
+**Metadata Browser**
+- Three-panel interface for exploring Dataverse entities
+- Browse Tables, Columns, Keys, Relationships, and Privileges
+- Smart caching for instant navigation
+- Export metadata to JSON
 
-**🔧 Plugin Trace Viewer**
+**Plugin Trace Viewer**
 - Analyze plugin execution with advanced filtering
 - Environment trace level management (Off/Exception/All)
 - Export traces to CSV with syntax-highlighted stack traces
 
-**🔗 Connection References Manager**
+**Connection References Manager**
 - Browse Power Automate flows and connection relationships
 - Solution-based filtering with "Open in Maker" functionality
 - Sync deployment settings for ALM workflows
 
-**⚙️ Environment Variables Manager**
+**Environment Variables Manager**
 - Manage environment-specific configuration
 - View definitions, current values, and defaults
 - Deployment settings sync for automated scenarios
 
-**📥 Import Job Viewer**
+**Import Job Viewer**
 - Monitor solution imports with real-time status
 - View detailed logs and XML configurations
 
-## 🏗️ Architecture
+**Environment Management**
+- Connect using 4 authentication methods (Service Principal, Interactive, Username/Password, Device Code)
+- Multi-environment support with easy switching
+- Set default environment with ordering controls
 
-Built with **Clean Architecture** principles for maintainability and testability:
+## Quick Start
 
-- **Rich Domain Models** - Business logic in domain entities with behavior, not scattered across layers
-- **Dependency Inversion** - All dependencies point inward toward domain (zero external dependencies)
-- **Comprehensive Testing** - 168 test files with 85%+ coverage across domain and application layers
-- **Feature Isolation** - Each feature is self-contained with clear boundaries
+1. **Install** from VS Code Marketplace (search "Power Platform Developer Suite")
+2. **Add Environment** - Click the + icon in the Environments panel or run `Power Platform: Add Environment` from Command Palette
+3. **Configure** - Enter your environment URL (e.g., `https://yourorg.crm.dynamics.com`) and choose authentication method
+4. **Test Connection** - Verify credentials work before saving
+5. **Start Using** - Click any tool in the sidebar to begin
 
-**Project Structure:**
-```
-src/features/{feature}/
-  ├── domain/          # Business logic (zero external dependencies)
-  ├── application/     # Use cases and orchestration
-  ├── infrastructure/  # Dataverse API, authentication, storage
-  └── presentation/    # VS Code panels and webviews
-```
+**Tip:** Service Principal auth is recommended for CI/CD and shared development. Interactive auth is easiest for individual use.
 
-**Learn more:** [Clean Architecture Guide](docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md)
+## Settings
 
-## 📥 Installation
+Configure the extension via VS Code Settings (`Ctrl+,` → search "Power Platform"):
 
-**From VS Code Marketplace (Recommended)**
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `pluginTrace.defaultLimit` | 100 | Number of traces to fetch (1-5000) |
+| `pluginTrace.batchDeleteSize` | 100 | Records deleted per batch (50-1000) |
+| `pluginTrace.defaultDeleteOldDays` | 30 | Default days for "delete old traces" (1-365) |
+| `virtualTable.initialPageSize` | 100 | Records on first page (10-500) |
+| `virtualTable.backgroundPageSize` | 500 | Records per background fetch (100-2000) |
+| `virtualTable.maxCachedRecords` | 10000 | Max records in memory (100-100000) |
+| `webResources.cacheTTL` | 60 | Content cache duration in seconds (10-600) |
+| `metadata.cacheDuration` | 300 | Metadata cache duration in seconds (60-3600) |
+| `api.maxRetries` | 3 | Retry attempts for API failures (0-10) |
+
+## Requirements
+
+**Power Platform Access:**
+- Dataverse environment with Web API enabled
+- User account with appropriate security roles (System Customizer or higher recommended)
+- For Service Principal: Azure AD app registration with Dataverse API permissions
+
+**Authentication Methods:**
+| Method | Best For | Setup Required |
+|--------|----------|----------------|
+| Service Principal | CI/CD, shared dev | Azure AD app registration |
+| Interactive | Individual developers | None (uses browser) |
+| Username/Password | Service accounts | User credentials |
+| Device Code | Headless environments | None |
+
+## Installation
+
+**From VS Code Marketplace:**
 1. Open VS Code
-2. Go to Extensions (Ctrl+Shift+X)
+2. Go to Extensions (`Ctrl+Shift+X`)
 3. Search for "Power Platform Developer Suite"
 4. Click Install
 
-**From VSIX (Development/Testing)**
-```bash
-code --install-extension power-platform-developer-suite-0.0.1.vsix
-```
+## Troubleshooting
 
-## 🛠️ Development
-
-**From Source**
-```bash
-git clone https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite.git
-cd Power-Platform-Developer-Suite
-npm install
-npm run compile  # TypeScript compilation
-npm test         # Run full test suite (168 tests)
-```
-
-**Coverage Targets:**
-- Domain layer: 95-100%
-- Application layer: 85-95%
-- Infrastructure layer: 70-85%
-
-**Requirements:**
-- Node.js 20.x (recommended) or 18.x
-- Note: Node.js 22+ has module resolution issues with vsce packaging tools
-
-**Run in Development**
-- Start watch mode: `npm run watch`
-- Launch Extension Development Host: press **F5**
-
-**Local Extension Installation**
-
-Install your local development version in VS Code (as if published):
-```bash
-npm run local
-```
-This builds, packages, and installs the extension locally. Use it to test your changes in your actual VS Code environment.
-
-Revert to the published marketplace version:
-```bash
-npm run marketplace
-```
-This uninstalls your local version and reinstalls the official published version from the VS Code Marketplace.
-
-**When to Use Each:**
-- **F5 (Extension Development Host)**: Active development with hot reload - fastest iteration
-- **`npm run local`**: Test production-like build in your main VS Code - validate packaging
-- **`npm run marketplace`**: Return to stable published version - when local has issues
-
-## 📚 Documentation
-
-### Architecture & Patterns
-- **[Clean Architecture Guide](docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md)** - Core principles, layer responsibilities, decision framework
-- **[Clean Architecture Examples](docs/architecture/CLEAN_ARCHITECTURE_EXAMPLES.md)** - Real code examples from the codebase
-- **[Value Object Patterns](docs/architecture/VALUE_OBJECT_PATTERNS.md)** - Immutable validated primitives
-- **[Domain Service Patterns](docs/architecture/DOMAIN_SERVICE_PATTERNS.md)** - Complex business logic patterns
-- **[Repository Patterns](docs/architecture/REPOSITORY_PATTERNS.md)** - Data access and API integration
-
-### Testing
-- **[Testing Guide](docs/testing/TESTING_GUIDE.md)** - Unit testing patterns, test factories, mocking
-- **[Integration Testing Guide](docs/testing/INTEGRATION_TESTING_GUIDE.md)** - Panel integration tests, message passing
-
-### Development Workflows
-- **[Workflow Guide](.claude/WORKFLOW.md)** - Feature development, bug fixes, refactoring patterns
-- **[CLAUDE.md](CLAUDE.md)** - Quick reference for AI assistants and development rules
-
-### Changelog & Features
-- **[CHANGELOG.md](CHANGELOG.md)** - Detailed release history and feature documentation
-
-## 🚨 Troubleshooting
-
-- **Extension not visible**: Reload window (Ctrl+Shift+P → "Reload Window")
-- **Authentication issues**: Verify environment URL and app registration permissions
+- **Extension not visible**: Reload window (`Ctrl+Shift+P` → "Reload Window")
+- **Authentication issues**: Verify environment URL format (`https://org.crm.dynamics.com`) and check app registration permissions
 - **Console errors**: Help → Toggle Developer Tools → Console tab
+- **Slow loading**: Adjust `virtualTable.initialPageSize` setting for your connection speed
 
-## 🤝 Contributing
+## Contributing
 
-Follow Clean Architecture patterns in the [Architecture Guides](./docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md). Open PRs against `main` and add entries under `[Unreleased]` in [`CHANGELOG.md`](./CHANGELOG.md).
+We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, coding standards, and pull request guidelines.
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for release history and feature documentation.
 
 ---
 **License:** MIT | **Publisher:** JoshSmithXRM

@@ -1,6 +1,6 @@
 # Technical Debt Inventory
 
-**Total Items:** 10 (6 items resolved/reclassified earlier, 3 low-priority items, 1 scheduled parser refactoring)
+**Total Items:** 11 (6 items resolved/reclassified earlier, 3 low-priority items, 2 scheduled items)
 
 ---
 
@@ -10,7 +10,7 @@
 |----------|-------|-----------------|
 | **Accepted Tradeoffs** | 5 | Keep indefinitely (conscious decisions) |
 | **Will Not Implement** | 1 | Rejected (over-engineering) |
-| **Scheduled** | 1 | Fix in next 2-3 releases |
+| **Scheduled** | 2 | Fix in next 2-3 releases |
 | **Low Priority** | 3 | Fix when naturally touching code |
 
 ---
@@ -62,13 +62,14 @@ Correctly rejected suggestions that would add ceremony without benefit.
 
 ---
 
-## 📅 Scheduled (1 item)
+## 📅 Scheduled (2 items)
 
 Items with clear triggers or timelines for fixing.
 
 | Item | Type | Effort | Timeline |
 |------|------|--------|----------|
 | [Parser Refactoring](scheduled/PARSER_REFACTORING.md) | Architectural (regex → stack-based) | 6-8 hours | Post v0.3.0 (v0.4.0 or v0.5.0) |
+| [README Screenshots](scheduled/readme-screenshots.md) | Documentation (visual examples) | 2-3 hours | Before major promotion or v1.0 |
 
 ### Parser Refactoring Details
 - **Problem**: FetchXmlParser uses regex which cannot handle nested XML structures
@@ -186,7 +187,8 @@ docs/technical-debt/
 │   └── xml-formatter-interface.md
 │
 ├── scheduled/                                   # Has timeline
-│   └── PARSER_REFACTORING.md                    # Regex → stack-based (v0.4.0+)
+│   ├── PARSER_REFACTORING.md                    # Regex → stack-based (v0.4.0+)
+│   └── readme-screenshots.md                    # Visual documentation (pre-v1.0)
 │
 └── low-priority/                                # Opportunistic fix
     ├── notification-service-abstraction.md      # 95+ callsites, defer until refactoring
