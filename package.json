@@ -510,7 +510,7 @@
         "e2e:report": "npx playwright show-report e2e/results/html-report"
     },
     "dependencies": {
-        "@azure/msal-node": "^3.8.3"
+        "@azure/msal-node": "^3.8.4"
     },
     "devDependencies": {
         "@eslint/js": "^9.35.0",
