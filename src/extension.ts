@@ -93,7 +93,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	);
 	vscode.window.registerTreeDataProvider('power-platform-dev-suite-environments', environmentsProvider);
 
-	// Register Dataverse Notebooks (SQL and FetchXML support)
+	// Register Power Platform Developer Suite Notebooks (SQL and FetchXML support)
 	registerDataverseNotebooks(context, {
 		getEnvironments: factories.getEnvironments,
 		dataverseApiServiceFactory: factories.dataverseApiServiceFactory,
@@ -101,7 +101,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	}).then((disposables) => {
 		context.subscriptions.push(...disposables);
 	}).catch((error) => {
-		container.logger.error('Failed to register Dataverse Notebooks', error);
+		container.logger.error('Failed to register Power Platform Developer Suite Notebooks', error);
 	});
 
 	// Register Environment Setup commands

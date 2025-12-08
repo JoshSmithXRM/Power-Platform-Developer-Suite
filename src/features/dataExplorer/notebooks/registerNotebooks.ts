@@ -31,7 +31,7 @@ interface NotebookDependencies {
 }
 
 /**
- * Registers Dataverse Notebook support.
+ * Registers Power Platform Developer Suite Notebook support.
  *
  * This function:
  * - Registers the notebook serializer for .ppdsnb files
@@ -51,7 +51,7 @@ export async function registerDataverseNotebooks(
 ): Promise<vscode.Disposable[]> {
 	const { getEnvironments, dataverseApiServiceFactory, logger } = deps;
 
-	logger.info('Registering Dataverse Notebooks');
+	logger.info('Registering Power Platform Developer Suite Notebooks');
 
 	// Import dependencies lazily
 	const { DataverseApiService } = await import(
@@ -151,7 +151,7 @@ export async function registerDataverseNotebooks(
 		controller.updateStatusBarVisibility(vscode.window.activeNotebookEditor);
 	}
 
-	logger.info('Dataverse Notebooks registered successfully');
+	logger.info('Power Platform Developer Suite Notebooks registered successfully');
 
 	return [
 		serializerDisposable,
@@ -165,7 +165,7 @@ export async function registerDataverseNotebooks(
 }
 
 /**
- * Creates a new Dataverse notebook file.
+ * Creates a new Power Platform Developer Suite notebook file.
  * New cells default to SQL but auto-switch to FetchXML if user types '<'.
  */
 async function createNewDataverseNotebook(logger: ILogger): Promise<void> {
@@ -176,7 +176,7 @@ async function createNewDataverseNotebook(logger: ILogger): Promise<void> {
 			new vscode.NotebookData([
 				new vscode.NotebookCellData(
 					vscode.NotebookCellKind.Markup,
-					'# Dataverse Notebook\n\nSelect an environment using the status bar picker, then write SQL or FetchXML queries in the cells below.\n\n**Tip:** Use the toggle button in the cell toolbar to convert between SQL and FetchXML.',
+					'# Power Platform Developer Suite Notebook\n\nSelect an environment using the status bar picker, then write SQL or FetchXML queries in the cells below.\n\n**Tip:** Use the toggle button in the cell toolbar to convert between SQL and FetchXML.',
 					'markdown'
 				),
 				new vscode.NotebookCellData(
@@ -195,9 +195,9 @@ async function createNewDataverseNotebook(logger: ILogger): Promise<void> {
 		// Show the notebook
 		await vscode.window.showNotebookDocument(notebook);
 
-		logger.info('Created new Dataverse notebook');
+		logger.info('Created new Power Platform Developer Suite notebook');
 	} catch (error) {
-		logger.error('Failed to create new Dataverse notebook', error);
+		logger.error('Failed to create new Power Platform Developer Suite notebook', error);
 		vscode.window.showErrorMessage(
 			`Failed to create notebook: ${error instanceof Error ? error.message : String(error)}`
 		);
@@ -219,7 +219,7 @@ export interface OpenQueryInNotebookOptions {
 }
 
 /**
- * Opens a query in a new Dataverse notebook.
+ * Opens a query in a new Power Platform Developer Suite notebook.
  * Called from Data Explorer panel "Open in Notebook" action.
  * Auto-detects SQL vs FetchXML based on content.
  *
