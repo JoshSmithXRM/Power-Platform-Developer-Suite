@@ -56,33 +56,38 @@ All planned features implemented:
 | 3a | Aggregates (DISTINCT, COUNT, SUM, AVG, MIN, MAX, GROUP BY) | **DONE** (2025-12-06) |
 | 3b | Basic JOINs (INNER JOIN, LEFT JOIN) | **DONE** (2025-12-06) |
 | 5.3 | Visual Query Builder - Core (Entity, Columns, Filters, Sort, Options) | **DONE** (2025-12-08) |
+| 5.4 | Sticky Action Bar (Execute/Clear) | **DONE** (2025-12-08) |
 | - | Cell Selection (Excel-style) - all panels except Data Explorer | **DONE** (2025-12-08) |
 
-### Remaining Phases
+### Remaining Work (v0.3.0)
 
 | Phase | Feature | Effort | Status |
 |-------|---------|--------|--------|
-| 2 | Query History (dual scope) | 6-8h | Planned |
-| 4 | INSERT/UPDATE/DELETE | 12-16h | Planned |
-| 5 | Visual Query Builder + Saved Queries | 16-24h | **IN PROGRESS** |
+| 5.5 | Export/Import Toolbar | 4-6h | **IN PROGRESS** |
+| 5.7 | Notebook ↔ Panel Integration | 4-6h | Planned |
+| 5.9 | Cleanup & Polish | 2-4h | Planned |
 
 **Visual Query Builder Details:** See `DATA_EXPLORER_VISUAL_BUILDER_TODO.md`
 
 ### Deferred (Not v0.3.0)
 
 Moved to `docs/future/DATA_MANAGEMENT.md`:
+- Query History (notebooks serve this purpose)
+- INSERT/UPDATE/DELETE (12-16h)
+- View Management / UserQuery Save (needs layoutxml)
+- Advanced VQB Features (AND/OR groups, Joins, Aggregates in VQB)
 - Advanced Aggregates (HAVING, date grouping)
 - Advanced JOIN types (EXISTS, IN, ANY, ALL)
 
 ---
 
-## Total Remaining: ~26-38 hours
+## Total Remaining: ~10-16 hours
 
 | Item | Effort |
 |------|--------|
-| Query History | 6-8h |
-| INSERT/UPDATE/DELETE | 12-16h |
-| Visual Query Builder (Steps 4-9) | 8-14h |
+| Export/Import Toolbar | 4-6h |
+| Notebook ↔ Panel Integration | 4-6h |
+| Cleanup & Polish | 2-4h |
 
 ---
 
@@ -111,4 +116,4 @@ Before merging this branch:
 
 ---
 
-**Last Updated:** 2025-12-08
+**Last Updated:** 2025-12-08 (scope reduction - deferred Query History, INSERT/UPDATE/DELETE, View Management)

@@ -106,59 +106,56 @@ WHERE a.revenue > 1000000
 
 ## In Progress
 
-### Data Explorer - Visual Query Builder + Saved Queries
+### Data Explorer - Visual Query Builder
 **Status**: In Progress
 **Target Version**: v0.3.0
 **Priority**: High
-**Estimated Effort**: 16-24 hours
 **Tracking**: `docs/work/DATA_EXPLORER_VISUAL_BUILDER_TODO.md`
 
 **Description**:
 Transform the Data Explorer panel from a code-based query editor to a Visual Query Builder (like Advanced Find), while keeping notebooks as the primary code editing experience.
 
-**Core Features**:
-- Visual Query Builder UI (entity, columns, filters, sort)
-- FetchXML parser (populate builder from existing FetchXML)
-- Save as Personal View (UserQuery) in Dataverse
-- Load existing Personal Views
-- Three-way sync: SQL ↔ FetchXML ↔ Visual Builder
+**Completed**:
+- Visual Query Builder UI (entity, columns, filters, sort, options)
+- FetchXML parser (populate builder from FetchXML)
+- Sticky Execute/Clear action bar
+- Query preview (FetchXML/SQL tabs)
+
+**In Progress**:
+- Export dropdown (CSV, JSON, FetchXML, SQL, Notebook)
+- Import dropdown (FetchXML, SQL files → populate VQB)
+
+**Remaining**:
+- Notebook ↔ Panel integration (CodeLens "Open in Data Explorer")
+- Cleanup & polish
 
 **Value**:
 - Not all users are comfortable writing SQL
-- Queries created in VS Code appear as Advanced Find views in Dynamics
-- Bridges VS Code experience with Dynamics UI
+- Point-and-click query building for Dataverse
+- Seamless export/import workflow
 
 ---
 
-## High Priority
+## Deferred (Future Versions)
 
 ### Data Explorer - Query History
-**Status**: Planned
-**Target Version**: v0.3.0
-**Priority**: High
-**Estimated Effort**: 6-8 hours
-**Value**: Quick access to previous queries, dev→prod workflow
+**Status**: Deferred
+**Target Version**: v1.0+
+**Reason**: Notebooks now serve as query history (saved queries with results)
 
-**Description**:
-Remember queries run in each environment and enable cross-environment query reuse.
-
-**Core Features**:
+**Original Plan**:
 - Environment-specific history (last 50 per env)
 - Cross-environment history (last 100 global)
 - History dropdown + "View All" modal UI
-- Persist using VS Code globalState
 
-**Success Criteria**:
-- Run query in Dev → Switch to Prod → Find in global history → Execute
-- Search history for "account" finds all queries with "account"
-- History persists across VS Code restarts
+**Why Deferred**: Notebooks provide better query history - queries are saved to files with results, can be version controlled, shared, and organized by the user.
 
 ---
 
 ### Data Explorer - INSERT/UPDATE/DELETE
-**Status**: Planned
-**Target Version**: v0.3.0
-**Priority**: High
+**Status**: Deferred
+**Target Version**: v1.0+
+**Priority**: Medium
 **Estimated Effort**: 12-16 hours
 **Value**: Full CRUD operations from SQL
 
@@ -180,7 +177,43 @@ Support data modification statements with safety features.
 
 ---
 
-## Deferred (Future Versions)
+### Data Explorer - View Management (UserQuery Save/Load)
+**Status**: Deferred
+**Target Version**: v1.0+
+**Reason**: Requires layoutxml generation (column widths, order, visibility)
+
+**Description**:
+Save Visual Query Builder queries as Personal Views (UserQuery) in Dataverse, and load existing views.
+
+**Core Features**:
+- View selector dropdown (System Views | Personal Views)
+- Save as Personal View (creates userquery record)
+- Load existing Personal Views
+- Views appear in Dynamics Advanced Find
+
+**Technical Complexity**:
+- layoutxml generation required for proper column display in Dynamics
+- Need to calculate column widths, order, visibility
+- System Views require solution context
+
+---
+
+### Data Explorer - Advanced Visual Query Builder Features
+**Status**: Deferred
+**Target Version**: v1.0+
+**Reason**: MVP complete with basic features
+
+**Features**:
+- AND/OR filter groups with nesting
+- Multi-column sort with drag reorder
+- Link entities (joins) in visual builder UI
+- Aggregates in visual builder (GROUP BY, COUNT, SUM, etc.)
+
+**Technical Notes**:
+- FetchXmlParser already supports nested filters
+- Would need significant UI work for join builder
+
+---
 
 ### Advanced Aggregates
 **Status**: Deferred
@@ -269,4 +302,4 @@ Bulk update or delete records with preview and confirmation.
 
 ---
 
-**Last Updated**: 2025-12-07
+**Last Updated**: 2025-12-08

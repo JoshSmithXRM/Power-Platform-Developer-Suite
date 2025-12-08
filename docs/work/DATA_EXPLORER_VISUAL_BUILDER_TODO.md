@@ -22,11 +22,11 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 | 3.3 | → Filter Builder (MVP) | ✅ Complete |
 | 3.4 | → Sort Section | ✅ Complete |
 | 3.5 | → Query Options (Top N, Distinct) | ✅ Complete |
-| 4 | Preview Section & Action Buttons | ⬜ Pending |
-| 5 | Toolbar Redesign | ⬜ Pending |
-| 6 | View Management - Load/Save Views | ⬜ Pending |
+| 4 | Sticky Action Bar (Execute/Clear) | ✅ Complete |
+| 5 | Toolbar Redesign (Export/Import) | 🔄 In Progress |
+| 6 | View Management - Load/Save Views | 📦 Deferred (needs layoutxml) |
 | 7 | Notebook ↔ Panel Integration | ⬜ Pending |
-| 8 | Advanced Features - AND/OR Groups, Joins | ⬜ Pending |
+| 8 | Advanced Features - AND/OR Groups, Joins | 📦 Deferred |
 | 9 | Cleanup & Polish | ⬜ Pending |
 
 ---
@@ -128,12 +128,10 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 - [x] Persist and restore full query state (entity + selected columns)
 - [x] Use consistent search box pattern with 🔍 emoji placeholder
 
-### 3.1 View Selector Section (Placeholder for Step 6)
+### 3.1 View Selector Section 📦 DEFERRED
 
-- [ ] Create view selector dropdown (System Views | Personal Views groups)
-- [ ] On view select: parse FetchXML → populate columns/filters/sort
-- [ ] Show "New Query" option to start fresh
-- [ ] Add refresh button to reload views
+Moved to Step 6 (View Management) which is deferred to future version.
+Requires layoutxml generation for proper view saving.
 
 ### 3.2 Column Selector Section ✅ COMPLETE
 
@@ -202,75 +200,60 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 
 ---
 
-## Step 4: Preview Section & Action Buttons
+## Step 4: Sticky Action Bar (Execute/Clear) ✅ COMPLETE
 
-### 4.1 Preview Section (Read-Only)
-
-- [ ] Tabbed display: [SQL] [FetchXML]
-- [ ] Auto-generate from visual builder state
-- [ ] Copy button for each tab
-- [ ] "Open in Notebook" button moves to Export dropdown
-
-### 4.2 Action Buttons
-
-- [ ] Move Execute button below visual builder (under query area)
-- [ ] Add Clear button (resets visual builder)
-- [ ] Results table stays at bottom
+- [x] Create sticky action bar at bottom of query builder (always visible)
+- [x] Execute button - primary style, runs current query
+- [x] Clear button - secondary style, resets columns/filters/sort/options (keeps entity)
+- [x] Both buttons disabled when no entity selected
+- [x] Execute disabled while query running (show spinner)
+- [x] Preserve Ctrl+Enter keyboard shortcut
 
 ---
 
-## Step 5: Toolbar Redesign
+## Step 5: Toolbar Redesign (Export/Import) 🔄 IN PROGRESS
 
 ### 5.1 Toolbar Layout
 
 - [ ] Keep Environment selector (left side)
-- [ ] Add Export dropdown: CSV, SQL File, FetchXML File, Open in Notebook
-- [ ] Add Save View button (opens save dialog)
-- [ ] Add Import dropdown: SQL File, FetchXML File
+- [ ] Add Export dropdown (right side)
+- [ ] Add Import dropdown (right side)
 
-### 5.2 Export Functionality
+### 5.2 Export Dropdown
 
-- [ ] Export to CSV (existing, move to dropdown)
-- [ ] Export to SQL file (save generated SQL)
-- [ ] Export to FetchXML file (save generated FetchXML)
-- [ ] Open in Notebook (existing, move to dropdown)
+**Results (disabled when no results):**
+- [ ] CSV - use existing CsvExportService
+- [ ] JSON - JSON.stringify with save dialog
 
-### 5.3 Import Functionality
+**Query (disabled when no entity):**
+- [ ] FetchXML (.xml) - save generated FetchXML (default format)
+- [ ] SQL (.sql) - save generated SQL
+- [ ] Notebook (.ppdsnb) - create notebook with current query
 
-- [ ] Import SQL file → parse and populate visual builder (best effort)
-- [ ] Import FetchXML file → parse and populate visual builder
+### 5.3 Import Dropdown
 
-### 5.4 Save View Dialog
+- [ ] FetchXML File (.xml) - parse → populate VQB (uses existing FetchXmlParser)
+- [ ] SQL File (.sql) - transpile to FetchXML → parse → populate VQB
 
-- [ ] Modal dialog: Name input, Description input
-- [ ] Save as Personal View (userquery)
-- [ ] Show success/error message
+### 5.4 Import Behavior
+
+- [ ] After import, VQB updates with parsed query
+- [ ] If entity doesn't exist in environment, show error
+- [ ] If query has unsupported features, show warning and populate what's possible
 
 ---
 
-## Step 6: View Management - Load/Save Views
+## Step 6: View Management - Load/Save Views 📦 DEFERRED
 
-### 6.1 Domain
+**Status:** Deferred to future version
+**Reason:** Requires layoutxml generation which is complex (column widths, order, visibility)
 
-- [ ] Create `SavedView` entity (id, name, entityName, fetchXml, isSystem, isDefault)
-- [ ] Create `ISavedViewRepository` interface
+See `docs/future/DATA_MANAGEMENT.md` for details.
 
-### 6.2 Infrastructure
-
-- [ ] Create `DataverseSavedViewRepository` implementation
-- [ ] Implement `getSystemViews(entityName)` - GET savedqueries
-- [ ] Implement `getPersonalViews(entityName)` - GET userqueries
-- [ ] Implement `savePersonalView(view)` - POST userquery
-- [ ] Implement `updatePersonalView(view)` - PATCH userquery
-- [ ] Implement `deletePersonalView(id)` - DELETE userquery
-
-### 6.3 Application Layer
-
-- [ ] Create `ListSavedViewsUseCase` (combines system + personal views)
-- [ ] Create `LoadSavedViewUseCase` (fetches view details)
-- [ ] Create `SavePersonalViewUseCase` (creates userquery)
-- [ ] Create `UpdatePersonalViewUseCase` (updates userquery)
-- [ ] Create `DeletePersonalViewUseCase` (deletes userquery)
+When implemented:
+- Load System Views and Personal Views
+- Save as Personal View (UserQuery) to Dataverse
+- View selector dropdown in VQB
 
 ---
 
@@ -302,34 +285,18 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 
 ---
 
-## Step 8: Advanced Features - AND/OR Groups, Joins
+## Step 8: Advanced Features - AND/OR Groups, Joins 📦 DEFERRED
 
-### 8.1 AND/OR Filter Groups
+**Status:** Deferred to future version
+**Reason:** MVP complete with basic features; advanced features can come later
 
-- [ ] Allow switching between AND/OR at group level
-- [ ] Create nested filter groups
-- [ ] UI: Indented groups with AND/OR label
-- [ ] Parser support for nested `<filter>` elements
+See `docs/future/DATA_MANAGEMENT.md` for details.
 
-### 8.2 Multi-Column Sort
-
-- [ ] Allow multiple sort criteria
-- [ ] Drag to reorder priority
-- [ ] Add/remove sort rows
-
-### 8.3 Link Entities (Joins)
-
-- [ ] Add "Related Records" section
-- [ ] Select related entity (1:N, N:1 relationships)
-- [ ] Add columns from related entity
-- [ ] Add filters on related entity
-- [ ] Generate `<link-entity>` in FetchXML
-
-### 8.4 Aggregates (Bonus)
-
-- [ ] Group By support
-- [ ] Aggregate functions (count, sum, avg, min, max)
-- [ ] Having clause support
+When implemented:
+- AND/OR filter groups with nesting
+- Multi-column sort
+- Link entities (joins) in visual builder
+- Aggregates in visual builder
 
 ---
 
