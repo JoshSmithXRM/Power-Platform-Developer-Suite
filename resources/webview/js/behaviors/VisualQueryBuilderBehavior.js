@@ -644,17 +644,19 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 		const container = document.getElementById('results-table-container');
 		if (!container) return;
 
-		// Build position text safely - position values are numbers from extension
+		// Build position text safely - escape individual values for CodeQL data flow analysis
 		let positionText = '';
 		if (position && typeof position.line === 'number' && typeof position.column === 'number') {
-			positionText = ` at line ${String(position.line)}, column ${String(position.column)}`;
+			const lineEscaped = escapeHtml(String(position.line));
+			const columnEscaped = escapeHtml(String(position.column));
+			positionText = ` at line ${lineEscaped}, column ${columnEscaped}`;
 		}
 
 		container.innerHTML = `
 			<div class="error-state">
 				<div class="error-banner" role="alert">
 					<span class="error-icon">&#9888;</span>
-					<span class="error-text">${escapeHtml(message + positionText)}</span>
+					<span class="error-text">${escapeHtml(message)}${positionText}</span>
 				</div>
 			</div>
 		`;
