@@ -57,7 +57,6 @@ import { PluginTraceFilterManagementBehavior } from '../behaviors/PluginTraceFil
  */
 type PluginTraceViewerCommands =
 	| 'refresh'
-	| 'openMaker'
 	| 'environmentChange'
 	| 'viewDetail'
 	| 'viewTrace'
@@ -154,7 +153,7 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		// All buttons must be included so they get re-enabled after scaffold renders with isLoading: true
 		this.loadingBehavior = new LoadingStateBehavior(
 			panel,
-			LoadingStateBehavior.createButtonConfigs(['openMaker', 'refresh']),
+			LoadingStateBehavior.createButtonConfigs(['refresh']),
 			logger
 		);
 
@@ -205,6 +204,10 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	 */
 	protected reveal(column: vscode.ViewColumn): void {
 		this.panel.reveal(column);
+	}
+
+	protected getCurrentEnvironmentId(): string {
+		return this.currentEnvironmentId;
 	}
 
 	public static async createOrShow(
@@ -375,7 +378,6 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 		const filterPanel = new FilterPanelSection();
 		const actionButtons = new ActionButtonsSection({
 			buttons: [
-				{ id: 'openMaker', label: 'Open in Maker' },
 				{ id: 'refresh', label: 'Refresh' }
 			]
 		}, SectionPosition.Toolbar);
@@ -475,10 +477,6 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 	private registerCommandHandlers(): void {
 		this.coordinator.registerHandler('refresh', async () => {
 			await this.handleRefresh();
-		});
-
-		this.coordinator.registerHandler('openMaker', async () => {
-			await this.handleOpenMaker();
 		});
 
 		this.coordinator.registerHandler('environmentChange', async (data) => {
@@ -655,21 +653,6 @@ export class PluginTraceViewerPanelComposed extends EnvironmentScopedPanel<Plugi
 			await vscode.window.showErrorMessage('Failed to load plugin traces');
 		} finally {
 			await this.loadingBehavior.setButtonLoading('refresh', false);
-		}
-	}
-
-	private async handleOpenMaker(): Promise<void> {
-		try {
-			const environment = await this.getEnvironmentById(this.currentEnvironmentId);
-			if (environment?.powerPlatformEnvironmentId) {
-				const makerUrl = `https://make.powerapps.com/environments/${environment.powerPlatformEnvironmentId}/home`;
-				await vscode.env.openExternal(vscode.Uri.parse(makerUrl));
-			} else {
-				await vscode.window.showWarningMessage('Environment does not have a Power Platform environment ID');
-			}
-		} catch (error) {
-			this.logger.error('Failed to open Maker portal', error);
-			await vscode.window.showErrorMessage('Failed to open Maker portal');
 		}
 	}
 

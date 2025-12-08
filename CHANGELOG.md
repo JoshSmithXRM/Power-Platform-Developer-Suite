@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cell Selection (Excel-style)** - Click-and-drag cell selection across all data tables
+  - Click cell to select, drag for rectangular range, Shift+click to extend
+  - Ctrl+A selects all cells in table, Ctrl+C copies as TSV
+  - Headers included in copy when entire table is selected
+  - Works in: Solution Explorer, Web Resources, Import Jobs, Plugin Traces, Environment Variables, Connection References, Metadata Browser
+  - Note: Data Explorer cell selection deferred (timing issue with webpack bundle)
+
 - **Web Resources - Conflict Detection** - Prevents accidental overwrites
   - Detects when server content is newer than your locally opened version
   - "Compare First" shows side-by-side diff before deciding
@@ -23,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Web Resources - Created By / Modified By Columns** - Track authorship in the table
   - See who created each web resource
   - See who last modified each web resource
+
+### Removed
+
+- **Plugin Traces - "Open in Maker" Button** - Removed non-functional button
+  - Plugin trace logs are not viewable in Maker Portal (they're in Admin Center/classic Dynamics)
+  - Button was incorrectly navigating to generic Maker home page
 
 ### Fixed
 
@@ -52,6 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Web Resources Syntax Highlighting** - Files now have proper syntax highlighting
   - JavaScript, CSS, HTML, and XML files opened via custom URI scheme now highlight correctly
+
+- **Infinite Loading Spinner (5 Panels)** - Panels no longer get stuck loading forever
+  - Fixed scaffoldingBehavior.refresh overwriting loading state
+  - Affects: Solutions, Web Resources, Connection References, Environment Variables, Import Jobs
+
+- **Import Job Viewer Clickable Links** - Solution name links now work correctly
+  - Fixed: CellLink pattern required instead of HTML string in mapper
+
+- **Plugin Trace Viewer Ctrl+A Shortcuts** - Keyboard shortcuts now work in search/filter inputs
+  - Added stopPropagation to prevent global handlers from intercepting
 
 ## [0.2.6] - 2025-12-02
 
