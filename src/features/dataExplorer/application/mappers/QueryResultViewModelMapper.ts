@@ -128,6 +128,11 @@ export class QueryResultViewModelMapper {
 				// Virtual "name" column shows formatted label
 				viewModelRow[`${column.logicalName}name`] = value.formattedValue || '';
 			}
+			// Handle null optionset columns for consistency
+			else if (column.dataType === 'optionset' && value === null) {
+				viewModelRow[column.logicalName] = '';
+				viewModelRow[`${column.logicalName}name`] = '';
+			}
 			// Handle lookup columns specially - show GUID in column, name in name column
 			else if (column.dataType === 'lookup' && this.isLookupValue(value)) {
 				// Original column shows GUID (column name ends with "id", should show ID)

@@ -52,10 +52,10 @@
  *
  * 7. LOOKUP - Reference to another record
  *    - Dataverse returns: GUID in _xxx_value, name in FormattedValue
- *    - Current: Shows display name ("John Smith")
+ *    - Current: Shows GUID in column, display name in columnname
  *    - Expected: Shows GUID in column, display name in columnname
- *    - Status: BUG - Same issue as optionset was having!
- *    - Example: primarycontactid shows "John Smith" but should show GUID
+ *    - Status: FIXED
+ *    - Example: primarycontactid shows GUID, primarycontactidname shows "John Smith"
  *
  * 8. MONEY - Currency field
  *    - Dataverse returns: 1000000.00 (raw number)
@@ -198,12 +198,27 @@ describe('QueryResultViewModelMapper - All Column Types', () => {
 			// Label in name column
 			expect(viewModel.rows[0]!['accountcategorycodename']).toBe('Preferred Customer');
 		});
+
+		it('should handle null optionset values with empty strings in both columns', () => {
+			const columns = [new QueryResultColumn('accountcategorycode', 'accountcategorycode', 'optionset')];
+			const rows = [QueryResultRow.fromRecord({ accountcategorycode: null })];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have 2 columns: original + name
+			expect(viewModel.columns).toHaveLength(2);
+			expect(viewModel.columns.map(c => c.name)).toContain('accountcategorycode');
+			expect(viewModel.columns.map(c => c.name)).toContain('accountcategorycodename');
+
+			// Both columns should be empty strings for null values (consistent with lookup behavior)
+			expect(viewModel.rows[0]!['accountcategorycode']).toBe('');
+			expect(viewModel.rows[0]!['accountcategorycodename']).toBe('');
+		});
 	});
 
 	describe('LOOKUP columns', () => {
 		it('should show GUID in column and display name in name column', () => {
-			// BUG: Currently shows display name in the column, but column name ends with "id"
-			// suggesting it should show the GUID
 			const lookupValue: QueryLookupValue = {
 				id: '12345678-1234-1234-1234-123456789012',
 				name: 'John Smith',

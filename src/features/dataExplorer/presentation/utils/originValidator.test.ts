@@ -7,8 +7,7 @@
  *
  * Bug introduced in commit 40482c0 (CodeQL security fix) where the origin
  * check incorrectly rejected vscode-webview:// origins.
- *
- * @see https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/issues/XXX
+ * Fixed in v0.3.1 - this test documents expected behavior for regression prevention.
  */
 describe('Webview Origin Validator', () => {
 	/**
