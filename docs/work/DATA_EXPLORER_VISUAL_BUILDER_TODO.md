@@ -23,11 +23,11 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 | 3.4 | → Sort Section | ✅ Complete |
 | 3.5 | → Query Options (Top N, Distinct) | ✅ Complete |
 | 4 | Sticky Action Bar (Execute/Clear) | ✅ Complete |
-| 5 | Toolbar Redesign (Export/Import) | 🔄 In Progress |
+| 5 | Toolbar Redesign (Export/Import) | ✅ Complete |
 | 6 | View Management - Load/Save Views | 📦 Deferred (needs layoutxml) |
 | 7 | Notebook ↔ Panel Integration | ✅ Complete |
 | 8 | Advanced Features - AND/OR Groups, Joins | 📦 Deferred |
-| 9 | Cleanup & Polish | ⬜ Pending |
+| 9 | Cleanup & Polish | ✅ Complete |
 
 ---
 
@@ -211,35 +211,36 @@ Requires layoutxml generation for proper view saving.
 
 ---
 
-## Step 5: Toolbar Redesign (Export/Import) 🔄 IN PROGRESS
+## Step 5: Toolbar Redesign (Export/Import) ✅ COMPLETE
 
-### 5.1 Toolbar Layout
+### 5.1 Toolbar Layout ✅ COMPLETE
 
-- [ ] Keep Environment selector (left side)
-- [ ] Add Export dropdown (right side)
-- [ ] Add Import dropdown (right side)
+- [x] Keep Environment selector (left side)
+- [x] Add Export dropdown (right side)
+- [x] Add Import dropdown (right side)
+- [x] Move Execute/Clear from sticky action bar to toolbar
 
-### 5.2 Export Dropdown
+### 5.2 Export Dropdown ✅ COMPLETE
 
 **Results (disabled when no results):**
-- [ ] CSV - use existing CsvExportService
-- [ ] JSON - JSON.stringify with save dialog
+- [x] CSV - use existing CsvExportService
+- [x] JSON - JSON.stringify with save dialog
 
 **Query (disabled when no entity):**
-- [ ] FetchXML (.xml) - save generated FetchXML (default format)
-- [ ] SQL (.sql) - save generated SQL
-- [ ] Notebook (.ppdsnb) - create notebook with current query
+- [x] FetchXML (.xml) - save generated FetchXML (default format)
+- [x] SQL (.sql) - save generated SQL
+- [x] Notebook (.ppdsnb) - create notebook with current query
 
-### 5.3 Import Dropdown
+### 5.3 Import Dropdown ✅ COMPLETE
 
-- [ ] FetchXML File (.xml) - parse → populate VQB (uses existing FetchXmlParser)
-- [ ] SQL File (.sql) - transpile to FetchXML → parse → populate VQB
+- [x] FetchXML File (.xml) - parse → populate VQB (uses existing FetchXmlParser)
+- [x] SQL File (.sql) - transpile to FetchXML → parse → populate VQB
 
-### 5.4 Import Behavior
+### 5.4 Import Behavior ✅ COMPLETE
 
-- [ ] After import, VQB updates with parsed query
-- [ ] If entity doesn't exist in environment, show error
-- [ ] If query has unsupported features, show warning and populate what's possible
+- [x] After import, VQB updates with parsed query
+- [x] If entity doesn't exist in environment, show error
+- [x] If query has unsupported features, show warning and populate what's possible
 
 ---
 
@@ -309,32 +310,32 @@ When implemented:
 
 ---
 
-## Step 9: Cleanup & Polish
+## Step 9: Cleanup & Polish ✅ COMPLETE
 
-### 9.1 Remove Unused Code
+### 9.1 Remove Unused Code ✅ COMPLETE
 
-- [ ] Remove SqlEditorWatcher (if fully unused)
-- [ ] Remove old query editor view code
-- [ ] Remove old SQL/FetchXML mode tabs
-- [ ] Clean up unused CSS
+- [x] Remove SqlEditorWatcher (if fully unused)
+- [x] Remove old query editor view code
+- [x] Remove old SQL/FetchXML mode tabs
+- [x] Clean up unused CSS
 
-### 9.2 IntelliSense Consideration
+### 9.2 IntelliSense Consideration ✅ N/A
 
-- [ ] Verify IntelliSense still works for standalone SQL files
-- [ ] Document environment behavior for SQL files
-- [ ] Consider: FetchXML IntelliSense (future)
+File-based editing removed in favor of Visual Query Builder + Notebooks.
+IntelliSense works in notebooks (SQL and FetchXML cells).
 
-### 9.3 Environment Isolation Verification
+### 9.3 Environment Isolation Verification ✅ COMPLETE
 
-- [ ] Verify notebook environment isolated from panel
-- [ ] Test: change panel env, notebook env unchanged
-- [ ] Test: notebook → panel transfer preserves env
+- [x] Verify notebook environment isolated from panel
+- [x] Test: change panel env, notebook env unchanged
+- [x] Test: notebook → panel transfer preserves env
+- [x] Environment persists on save/load
 
-### 9.4 Testing
+### 9.4 Testing ✅ COMPLETE
 
-- [ ] Unit tests for view use cases
-- [ ] Integration tests for visual builder panel
-- [ ] Manual E2E testing
+- [x] Unit tests for view use cases
+- [x] Integration tests for visual builder panel
+- [x] Manual E2E testing
 
 ---
 

@@ -14,7 +14,7 @@ This document tracks remaining work to complete three features for v0.3.0.
 |---------|--------|
 | Web Resources | **COMPLETE** |
 | Metadata Browser | **COMPLETE** |
-| Data Explorer | In Progress |
+| Data Explorer | **COMPLETE** |
 
 ---
 
@@ -44,7 +44,7 @@ All planned features implemented:
 
 ---
 
-## 3. Data Explorer - Remaining Work
+## 3. Data Explorer - COMPLETE
 
 ### Completed Phases
 
@@ -59,13 +59,13 @@ All planned features implemented:
 | 5.4 | Sticky Action Bar (Execute/Clear) | **DONE** (2025-12-08) |
 | - | Cell Selection (Excel-style) - all panels except Data Explorer | **DONE** (2025-12-08) |
 
-### Remaining Work (v0.3.0)
+### Final Phases (v0.3.0) - ALL COMPLETE
 
-| Phase | Feature | Effort | Status |
-|-------|---------|--------|--------|
-| 5.5 | Export/Import Toolbar | 4-6h | **IN PROGRESS** |
-| 5.7 | Notebook ↔ Panel Integration | 4-6h | Planned |
-| 5.9 | Cleanup & Polish | 2-4h | Planned |
+| Phase | Feature | Status |
+|-------|---------|--------|
+| 5.5 | Export/Import Toolbar | **DONE** |
+| 5.7 | Notebook ↔ Panel Integration | **DONE** |
+| 5.9 | Cleanup & Polish | **DONE** |
 
 **Visual Query Builder Details:** See `DATA_EXPLORER_VISUAL_BUILDER_TODO.md`
 
@@ -81,13 +81,9 @@ Moved to `docs/future/DATA_MANAGEMENT.md`:
 
 ---
 
-## Total Remaining: ~10-16 hours
+## Total Remaining: ✅ ALL COMPLETE
 
-| Item | Effort |
-|------|--------|
-| Export/Import Toolbar | 4-6h |
-| Notebook ↔ Panel Integration | 4-6h |
-| Cleanup & Polish | 2-4h |
+All features for v0.3.0 are complete. Ready for pre-merge checklist.
 
 ---
 
@@ -116,4 +112,4 @@ Before merging this branch:
 
 ---
 
-**Last Updated:** 2025-12-08 (scope reduction - deferred Query History, INSERT/UPDATE/DELETE, View Management)
+**Last Updated:** 2025-12-08 (ALL FEATURES COMPLETE - ready for v0.3.0 release)
