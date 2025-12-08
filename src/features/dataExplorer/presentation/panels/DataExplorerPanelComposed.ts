@@ -75,6 +75,7 @@ type DataExplorerCommands =
 	| 'updateSort'
 	| 'clearSort'
 	| 'updateQueryOptions'
+	| 'clearQuery'
 	| 'openRecord'
 	| 'copyRecordUrl'
 	| 'warningModalResponse'
@@ -427,10 +428,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		const visualQueryBuilderSection = new VisualQueryBuilderSection();
 
 		// Note: Button IDs must match command names registered in registerCommandHandlers()
+		// Execute button is in the sticky action bar, not the toolbar
 		const actionButtons = new ActionButtonsSection(
 			{
 				buttons: [
-					{ id: 'executeQuery', label: 'Execute Query' },
 					{ id: 'openInNotebook', label: 'Open in Notebook' },
 					{ id: 'exportCsv', label: 'Export CSV' },
 				],
@@ -649,6 +650,11 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.coordinator.registerHandler('updateQueryOptions', async (data) => {
 			const payload = data as { topN?: number | null; distinct?: boolean };
 			await this.handleUpdateQueryOptions(payload);
+		});
+
+		// Clear query (reset columns, filters, sort, options, results - keep entity)
+		this.coordinator.registerHandler('clearQuery', async () => {
+			await this.handleClearQuery();
 		});
 
 		// Open record in browser
@@ -1005,6 +1011,65 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	}
 
 	/**
+	 * Handles clearing the query - resets columns, filters, sort, options, and results.
+	 * Entity selection is preserved.
+	 */
+	private async handleClearQuery(): Promise<void> {
+		if (this.currentVisualQuery === null) {
+			return;
+		}
+
+		this.logger.debug('Clearing query', { entity: this.currentVisualQuery.entityName });
+
+		// Reset to SELECT * (all columns)
+		this.currentVisualQuery = this.currentVisualQuery.withAllColumns();
+
+		// Clear filter conditions
+		this.currentFilterConditions = [];
+		// Note: Don't reset filterConditionCounter to avoid ID collisions
+
+		// Clear sort
+		this.currentSortAttribute = null;
+		this.currentSortDescending = false;
+		this.currentVisualQuery = this.currentVisualQuery.withSorts([]);
+
+		// Clear query options
+		this.currentTopN = null;
+		this.currentDistinct = false;
+		this.currentVisualQuery = this.currentVisualQuery
+			.withTop(null)
+			.withDistinct(false);
+
+		// Clear filter from visual query
+		this.currentVisualQuery = this.currentVisualQuery.withFilter(null);
+
+		// Clear current result
+		this.currentResult = null;
+
+		// Update query preview
+		await this.updateQueryPreview();
+
+		// Map columns for webview (all selected since SELECT *)
+		const isSelectAll = true;
+		const columnViewModels = this.columnMapper.toViewModels(
+			this.currentAvailableColumns,
+			[]
+		);
+
+		// Send consolidated clear message to webview
+		await this.panel.postMessage({
+			command: 'queryCleared',
+			data: {
+				columns: columnViewModels,
+				isSelectAll,
+			},
+		});
+
+		// Persist state
+		void this.saveQueryStateToStorage();
+	}
+
+	/**
 	 * Rebuilds the VisualQuery sort from current sort state.
 	 */
 	private async rebuildVisualQuerySort(): Promise<void> {
@@ -1230,44 +1295,38 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private async handleEnvironmentChange(environmentId: string): Promise<void> {
 		this.logger.debug('Environment changed', { environmentId });
 
-		this.setButtonLoading('executeQuery', true);
+		const oldEnvironmentId = this.currentEnvironmentId;
+		this.currentEnvironmentId = environmentId;
 
-		try {
-			const oldEnvironmentId = this.currentEnvironmentId;
-			this.currentEnvironmentId = environmentId;
+		// Update IntelliSense context for the new environment
+		this.intelliSenseServices.contextService.setActiveEnvironment(environmentId);
 
-			// Update IntelliSense context for the new environment
-			this.intelliSenseServices.contextService.setActiveEnvironment(environmentId);
+		// Re-register panel in map for new environment
+		this.reregisterPanel(
+			DataExplorerPanelComposed.panels,
+			oldEnvironmentId,
+			this.currentEnvironmentId
+		);
 
-			// Re-register panel in map for new environment
-			this.reregisterPanel(
-				DataExplorerPanelComposed.panels,
-				oldEnvironmentId,
-				this.currentEnvironmentId
-			);
-
-			const environment = await this.getEnvironmentById(environmentId);
-			if (environment) {
-				this.panel.title = `Data Explorer - ${environment.name}`;
-			}
-
-			// Clear previous results and reset visual query
-			this.currentResult = null;
-			this.currentVisualQuery = null;
-			this.currentFilterConditions = [];
-			this.filterConditionCounter = 0;
-			await this.panel.postMessage({
-				command: 'clearResults',
-			});
-
-			// Load persisted state for the NEW environment
-			await this.loadPersistedStateForEnvironment(environmentId);
-
-			// Reload entities for the new environment
-			await this.loadEntitiesForEnvironment();
-		} finally {
-			this.setButtonLoading('executeQuery', false);
+		const environment = await this.getEnvironmentById(environmentId);
+		if (environment) {
+			this.panel.title = `Data Explorer - ${environment.name}`;
 		}
+
+		// Clear previous results and reset visual query
+		this.currentResult = null;
+		this.currentVisualQuery = null;
+		this.currentFilterConditions = [];
+		this.filterConditionCounter = 0;
+		await this.panel.postMessage({
+			command: 'clearResults',
+		});
+
+		// Load persisted state for the NEW environment
+		await this.loadPersistedStateForEnvironment(environmentId);
+
+		// Reload entities for the new environment
+		await this.loadEntitiesForEnvironment();
 	}
 
 	/**
@@ -1395,8 +1454,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			queryId,
 		});
 
-		// Show loading state
-		this.setButtonLoading('executeQuery', true);
+		// Show loading state (handled by webview action bar)
 		await this.panel.postMessage({
 			command: 'setLoadingState',
 			data: { isLoading: true },
@@ -1491,7 +1549,6 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		} finally {
 			// Only reset loading state if this is still the current query
 			if (queryId === this.querySequence) {
-				this.setButtonLoading('executeQuery', false);
 				await this.panel.postMessage({
 					command: 'setLoadingState',
 					data: { isLoading: false },

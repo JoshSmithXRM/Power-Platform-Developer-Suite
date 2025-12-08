@@ -780,6 +780,7 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 
 			case 'setLoadingState':
 				setResultsLoadingState(message.data?.isLoading ?? false);
+				setExecuteButtonLoading(message.data?.isLoading ?? false);
 				break;
 
 			case 'queryAborted':
@@ -809,7 +810,40 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 			case 'queryOptionsUpdated':
 				updateQueryOptionsUI(message.data);
 				break;
+
+			// Query cleared - reset UI elements
+			case 'queryCleared':
+				handleQueryClearedUI(message.data);
+				break;
 		}
+	}
+
+	/**
+	 * Handles UI updates when query is cleared.
+	 * Resets column picker, filters, sort, options, and results.
+	 * @param {Object} data - Clear data { columns, isSelectAll }
+	 */
+	function handleQueryClearedUI(data) {
+		// Reset column picker
+		updateColumnPicker(data?.columns ?? [], data?.isSelectAll ?? true);
+
+		// Reset filter count badge
+		updateFilterCountBadge(0);
+
+		// Reset filter list to empty state
+		const filterList = document.getElementById('filter-conditions-list');
+		if (filterList) {
+			filterList.innerHTML = '<div class="filter-empty-state">No filters applied. Click "Add Condition" to filter results.</div>';
+		}
+
+		// Reset sort UI
+		updateSortUI({ sortAttribute: null, sortDescending: false });
+
+		// Reset query options UI
+		updateQueryOptionsUI({ topN: null, distinct: false });
+
+		// Clear results
+		clearResults();
 	}
 
 	/**
@@ -1946,11 +1980,114 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 		initCopyButtons();
 		initPreviewCollapse();
 		initQueryBuilderCollapse();
+		initQueryActionBar();
 		window.addEventListener('message', handleMessage);
 		console.log('VisualQueryBuilderBehavior initialized');
 
 		// Signal to extension that webview is ready to receive data
 		postMessage('webviewReady', {});
+	}
+
+	// ============================================
+	// QUERY ACTION BAR FUNCTIONS
+	// ============================================
+
+	/**
+	 * Initializes the query action bar behavior (Execute and Clear buttons).
+	 */
+	function initQueryActionBar() {
+		// Execute button click
+		document.addEventListener('click', (e) => {
+			if (e.target.closest('#execute-query-btn')) {
+				const btn = document.getElementById('execute-query-btn');
+				if (btn && !btn.disabled) {
+					handleExecuteQuery();
+				}
+			}
+
+			// Clear button click
+			if (e.target.closest('#clear-query-btn')) {
+				const btn = document.getElementById('clear-query-btn');
+				if (btn && !btn.disabled) {
+					handleClearQuery();
+				}
+			}
+		});
+
+		// Ctrl+Enter keyboard shortcut for Execute
+		document.addEventListener('keydown', (e) => {
+			if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+				const btn = document.getElementById('execute-query-btn');
+				if (btn && !btn.disabled) {
+					e.preventDefault();
+					handleExecuteQuery();
+				}
+			}
+		});
+	}
+
+	/**
+	 * Handles the Execute Query button click.
+	 */
+	function handleExecuteQuery() {
+		postMessage('executeQuery', {});
+	}
+
+	/**
+	 * Handles the Clear button click.
+	 * Sends clearQuery command to reset: columns, filters, sort, options, results.
+	 * Entity selection is preserved.
+	 */
+	function handleClearQuery() {
+		postMessage('clearQuery', {});
+	}
+
+	/**
+	 * Sets the Execute button loading state.
+	 * @param {boolean} isLoading - Whether query is executing
+	 */
+	function setExecuteButtonLoading(isLoading) {
+		const btn = document.getElementById('execute-query-btn');
+		if (!btn) return;
+
+		btn.disabled = isLoading;
+
+		// Update button content
+		const iconSpan = btn.querySelector('.codicon');
+		const textSpan = btn.querySelector('span:not(.codicon)');
+
+		if (iconSpan) {
+			if (isLoading) {
+				iconSpan.className = 'codicon codicon-loading codicon-modifier-spin';
+			} else {
+				iconSpan.className = 'codicon codicon-play';
+			}
+		}
+
+		if (textSpan) {
+			textSpan.textContent = isLoading ? 'Executing...' : 'Execute Query';
+		}
+	}
+
+	/**
+	 * Updates the action bar button states based on entity selection.
+	 * @param {boolean} hasEntity - Whether an entity is selected
+	 */
+	function updateActionBarState(hasEntity) {
+		const executeBtn = document.getElementById('execute-query-btn');
+		const clearBtn = document.getElementById('clear-query-btn');
+
+		if (executeBtn) {
+			// Only update disabled if not currently loading
+			const isLoading = executeBtn.querySelector('.codicon-loading');
+			if (!isLoading) {
+				executeBtn.disabled = !hasEntity;
+			}
+		}
+
+		if (clearBtn) {
+			clearBtn.disabled = !hasEntity;
+		}
 	}
 
 	// ============================================
