@@ -10,7 +10,7 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 |----------|-------------|--------|
 | **Full Feature** | New features, 3+ files | All 10 phases |
 | **Simple Feature** | 1-2 files, clear pattern | Discovery → Implementation → F5 → Tests → Review |
-| **Bug Fix** | Standard bugs | Discovery → Fix → Test → Review |
+| **Bug Fix** | Standard bugs | Discovery → Fix → F5 → Test → Review |
 | **Hotfix** | Urgent/critical bugs | Streamlined 5-step |
 | **Refactoring** | Pattern migrations, cleanup | Tests → Refactor → Tests → Review |
 

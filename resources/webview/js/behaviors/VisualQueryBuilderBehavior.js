@@ -644,16 +644,17 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 		const container = document.getElementById('results-table-container');
 		if (!container) return;
 
+		// Build position text safely - position values are numbers from extension
 		let positionText = '';
-		if (position) {
-			positionText = ` at line ${position.line}, column ${position.column}`;
+		if (position && typeof position.line === 'number' && typeof position.column === 'number') {
+			positionText = ` at line ${String(position.line)}, column ${String(position.column)}`;
 		}
 
 		container.innerHTML = `
 			<div class="error-state">
 				<div class="error-banner" role="alert">
 					<span class="error-icon">&#9888;</span>
-					<span class="error-text">${escapeHtml(message)}${positionText}</span>
+					<span class="error-text">${escapeHtml(message + positionText)}</span>
 				</div>
 			</div>
 		`;
@@ -710,11 +711,20 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 
 	/**
 	 * Handles messages from the extension.
+	 * VS Code webview messages come from the extension host with no origin.
 	 * @param {MessageEvent} event
 	 */
 	function handleMessage(event) {
+		// VS Code webview security: messages from extension host have empty origin
+		// Only process messages that have the expected structure
+		if (event.origin !== '' && event.origin !== 'null') {
+			// In VS Code webviews, origin is typically empty string or 'null'
+			// If we get a real origin, it's not from the extension host
+			return;
+		}
+
 		const message = event.data;
-		if (!message || !message.command) return;
+		if (!message || typeof message.command !== 'string') return;
 
 		console.log('VisualQueryBuilder received message:', message.command);
 
@@ -904,10 +914,10 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 			return;
 		}
 
-		// Build summary parts
+		// Build summary parts - values are controlled (number and boolean)
 		const parts = [];
-		if (topN !== null && topN !== undefined) {
-			parts.push(`Top ${topN}`);
+		if (topN !== null && topN !== undefined && typeof topN === 'number') {
+			parts.push(`Top ${String(topN)}`);
 		}
 		if (distinct === true) {
 			parts.push('Distinct');
@@ -915,7 +925,13 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 
 		// Update title with or without summary
 		if (parts.length > 0) {
-			titleEl.innerHTML = `Options <span style="color: var(--vscode-descriptionForeground);">(${parts.join(', ')})</span>`;
+			// Use DOM methods to avoid innerHTML XSS concerns
+			titleEl.textContent = '';
+			titleEl.appendChild(document.createTextNode('Options '));
+			const span = document.createElement('span');
+			span.style.color = 'var(--vscode-descriptionForeground)';
+			span.textContent = `(${parts.join(', ')})`;
+			titleEl.appendChild(span);
 		} else {
 			titleEl.textContent = 'Options';
 		}
@@ -1005,7 +1021,6 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 	 * @param {string} query
 	 */
 	function handleColumnSearch(query) {
-		const searchInput = document.getElementById('column-search-input');
 		const clearBtn = document.getElementById('column-search-clear');
 		const filterStatus = document.getElementById('column-filter-status');
 		const filterCount = document.getElementById('column-filter-count');
@@ -1043,18 +1058,6 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 			} else {
 				filterStatus.style.display = 'none';
 			}
-		}
-	}
-
-	/**
-	 * Clears the column search input.
-	 */
-	function clearColumnSearch() {
-		const searchInput = document.getElementById('column-search-input');
-		if (searchInput) {
-			searchInput.value = '';
-			handleColumnSearch('');
-			searchInput.focus();
 		}
 	}
 
@@ -1172,16 +1175,20 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 
 		container.innerHTML = columns
 			.map(
-				(col) => `
-			<label class="column-option" role="option" aria-selected="${col.isSelected}">
+				(col) => {
+					// Ensure isSelected is a boolean for safe attribute value
+					const isSelected = col.isSelected === true;
+					return `
+			<label class="column-option" role="option" aria-selected="${isSelected ? 'true' : 'false'}">
 				<input type="checkbox" class="column-checkbox"
 					data-column="${escapeHtml(col.logicalName)}"
-					${col.isSelected ? 'checked' : ''} />
+					${isSelected ? 'checked' : ''} />
 				<span class="column-logical-name">${escapeHtml(col.logicalName)}</span>
 				<span class="column-display-name">${escapeHtml(col.displayName)}</span>
 				<span class="column-type">${escapeHtml(col.attributeType)}</span>
 			</label>
-		`
+		`;
+				}
 			)
 			.join('');
 

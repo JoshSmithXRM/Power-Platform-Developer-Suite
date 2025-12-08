@@ -122,11 +122,23 @@ export class FetchXmlValidator {
 	/**
 	 * Strips XML comments from the input string.
 	 * Handles single-line and multi-line comments.
+	 * Uses iterative replacement to handle nested/overlapping patterns.
 	 */
 	private stripXmlComments(xml: string): string {
 		// XML comment pattern: <!-- ... -->
 		// Use non-greedy match and handle multi-line with [\s\S]
-		return xml.replace(/<!--[\s\S]*?-->/g, '');
+		const commentPattern = /<!--[\s\S]*?-->/g;
+
+		// Iteratively remove comments until none remain
+		// This handles edge cases where removal creates new comment patterns
+		let result = xml;
+		let previous: string;
+		do {
+			previous = result;
+			result = result.replace(commentPattern, '');
+		} while (result !== previous && commentPattern.test(result));
+
+		return result;
 	}
 
 	/**
