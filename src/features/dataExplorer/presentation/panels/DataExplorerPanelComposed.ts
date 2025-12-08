@@ -1,3 +1,13 @@
+/* eslint-disable max-lines -- Panel coordinator with 25 command handlers across 4 feature areas:
+ * 1. Query execution (FetchXML/SQL, result handling, abort/discard stale queries)
+ * 2. Environment management (environment change, entity/attribute loading via metadata loader)
+ * 3. Visual Query Builder (entity/column/filter/sort/options via query builder coordinator)
+ * 4. Export/Import operations (CSV, JSON, FetchXML, SQL, notebook via export/import coordinator)
+ *
+ * Delegates most logic to coordinators (DataExplorerMetadataLoader, DataExplorerExportImportCoordinator,
+ * VisualQueryBuilderCoordinator) but requires all command handler registrations in single location.
+ * Splitting further would create artificial boundaries between tightly-coupled command handlers.
+ */
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
