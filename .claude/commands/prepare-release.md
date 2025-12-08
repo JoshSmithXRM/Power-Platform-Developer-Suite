@@ -9,11 +9,12 @@ Prepares all required files for a new version release.
 This command ensures all release artifacts are properly created before merging to main:
 - Version bump in package.json
 - CHANGELOG.md updated with release date
-- Release notes file created in docs/releases/
 - Work tracking documents cleaned up
 - All tests pass
 - Coverage thresholds met
 - Compilation succeeds
+
+**Note:** Release notes live in CHANGELOG.md (single source of truth). GitHub releases should summarize highlights and link to CHANGELOG.
 
 ---
 
@@ -109,45 +110,7 @@ Check `README.md` for version badge:
 
 ---
 
-## STEP 6: CREATE RELEASE NOTES
-
-Check if `docs/releases/vX.Y.Z.md` exists:
-
-1. **If exists:** Show user and ask if they want to regenerate
-2. **If missing:** Create from CHANGELOG content
-
-**Release notes template:**
-```markdown
-# Release vX.Y.Z - [Title from CHANGELOG]
-
-**Release Date:** YYYY-MM-DD
-**Version:** X.Y.Z
-**Type:** [Major/Minor/Patch] Release
-
----
-
-## Overview
-
-[Brief summary extracted from CHANGELOG]
-
----
-
-## Changes
-
-[Copy relevant section from CHANGELOG.md]
-
----
-
-## Upgrade Notes
-
-No breaking changes. Simply update to enjoy the improvements.
-```
-
-Extract the changes from CHANGELOG.md for this version and populate the template.
-
----
-
-## STEP 7: CLEAN UP WORK TRACKING DOCUMENTS
+## STEP 6: CLEAN UP WORK TRACKING DOCUMENTS
 
 Check for work tracking documents in `docs/work/`:
 
@@ -161,9 +124,9 @@ Check for work tracking documents in `docs/work/`:
 
 ---
 
-## STEP 8: COMMIT CHANGES
+## STEP 7: COMMIT CHANGES
 
-If any files were modified (package.json, CHANGELOG.md, README.md, release notes):
+If any files were modified (package.json, CHANGELOG.md):
 
 1. Show user what changed
 2. Ask: "Commit these release preparation changes?"
@@ -173,14 +136,12 @@ If any files were modified (package.json, CHANGELOG.md, README.md, release notes
 
    - Update version in package.json
    - Update CHANGELOG.md date
-   - Update README.md version badge
-   - Add release notes
    - Remove work tracking docs (if any)
    ```
 
 ---
 
-## STEP 9: SUMMARY
+## STEP 8: SUMMARY
 
 Show completion summary:
 
@@ -190,13 +151,15 @@ Show completion summary:
 Files updated:
 - package.json (version: X.Y.Z)
 - CHANGELOG.md (date updated)
-- docs/releases/vX.Y.Z.md (created)
 - docs/work/[FEATURE]_TODO.md (removed, if existed)
 
 Next steps:
 1. Push changes: git push
 2. Create PR to main (if on feature branch)
-3. After merge, create GitHub Release with tag vX.Y.Z
+3. After merge, create GitHub Release:
+   - Tag: vX.Y.Z
+   - Title: vX.Y.Z - [Brief description]
+   - Body: Summary of highlights + "See CHANGELOG.md for full details"
 4. GitHub Actions will auto-publish to marketplace
 ```
 
@@ -216,35 +179,49 @@ Next steps:
 - Fix TypeScript errors first
 - Run `npm run compile` to see errors
 
-**"Release notes already exist"**
-- Ask user if they want to overwrite
-- Show diff if regenerating
-
 ---
 
 ## EXAMPLE USAGE
 
 ```
-User: /prepare-release 0.2.1
+User: /prepare-release 0.4.0
 
 Claude: Checking prerequisites...
 ✅ No uncommitted changes
 ✅ Compilation successful
-✅ All 845 tests pass
+✅ All tests pass
 
 Checking CHANGELOG.md...
-✅ Found version section [0.2.1]
+✅ Found version section [0.4.0]
 ✅ Changes documented
-📝 Updated date to 2025-11-25
+📝 Updated date to 2025-12-15
 
 Checking package.json...
-✅ Version already 0.2.1
+📝 Updated version to 0.4.0
 
-Creating release notes...
-📝 Created docs/releases/v0.2.1.md
+Cleaning up work tracking...
+🗑️ Removed docs/work/DEPLOYMENT_SETTINGS_TODO.md
 
 Commit these changes? (y/n)
 ```
+
+---
+
+## GITHUB RELEASE NOTES
+
+When creating the GitHub release after merge, write a brief summary:
+
+```markdown
+## Highlights
+
+- [Main feature 1]
+- [Main feature 2]
+- [Key bug fixes]
+
+See [CHANGELOG.md](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/blob/main/CHANGELOG.md) for full details.
+```
+
+This avoids duplication while giving users a quick overview on the release page.
 
 ---
 
@@ -259,4 +236,4 @@ Commit these changes? (y/n)
 
 - CLAUDE.md - Release checklist section
 - docs/RELEASE_GUIDE.md - Full release process
-- docs/releases/README.md - Release notes format guide
+- CHANGELOG.md - Single source of truth for release notes
