@@ -715,6 +715,16 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 				setEntityPickerLoading(message.data?.isLoading ?? false);
 				break;
 
+			// Column picker messages
+			case 'attributesLoaded':
+				updateColumnPicker(message.data?.columns, message.data?.isSelectAll ?? true);
+				setColumnPickerLoading(false);
+				break;
+
+			case 'setLoadingColumns':
+				setColumnPickerLoading(message.data?.isLoading ?? false);
+				break;
+
 			case 'showError':
 				showError(message.data?.message ?? null);
 				break;
@@ -746,20 +756,388 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 		}
 	}
 
+	// ============================================
+	// COLUMN PICKER FUNCTIONS
+	// ============================================
+
+	/** Storage key for column picker collapse state */
+	const COLUMN_PICKER_COLLAPSED_KEY = 'dataExplorer.columnPickerCollapsed';
+
+	/**
+	 * Initializes the column picker behavior using event delegation.
+	 */
+	function initColumnPicker() {
+		// Use event delegation since column picker is dynamically rendered
+		document.addEventListener('change', (e) => {
+			// Handle "Select All" checkbox
+			if (e.target.id === 'select-all-columns') {
+				handleSelectAllToggle(e.target.checked);
+				return;
+			}
+
+			// Handle individual column checkboxes
+			if (e.target.classList.contains('column-checkbox')) {
+				handleColumnToggle();
+			}
+		});
+
+		// Collapse toggle
+		document.addEventListener('click', (e) => {
+			if (e.target.closest('#column-picker-toggle')) {
+				toggleColumnPickerCollapse();
+			}
+			// Clear button removed for consistency with data table search
+		});
+
+		// Search input
+		document.addEventListener('input', (e) => {
+			if (e.target.id === 'column-search-input') {
+				handleColumnSearch(e.target.value);
+			}
+		});
+
+		// Restore collapse state
+		const savedState = localStorage.getItem(COLUMN_PICKER_COLLAPSED_KEY);
+		if (savedState === 'true') {
+			setColumnPickerCollapsed(true);
+		}
+	}
+
+	/**
+	 * Toggles the column picker collapse state.
+	 */
+	function toggleColumnPickerCollapse() {
+		const toggleBtn = document.getElementById('column-picker-toggle');
+		if (!toggleBtn) return;
+
+		const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+		setColumnPickerCollapsed(isExpanded);
+	}
+
+	/**
+	 * Sets the column picker collapsed state.
+	 * @param {boolean} collapsed
+	 */
+	function setColumnPickerCollapsed(collapsed) {
+		const toggleBtn = document.getElementById('column-picker-toggle');
+		const content = document.getElementById('column-picker-content');
+
+		if (!toggleBtn || !content) return;
+
+		toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+		if (collapsed) {
+			content.classList.add('collapsed');
+		} else {
+			content.classList.remove('collapsed');
+		}
+
+		localStorage.setItem(COLUMN_PICKER_COLLAPSED_KEY, collapsed.toString());
+	}
+
+	/**
+	 * Handles column search/filter.
+	 * @param {string} query
+	 */
+	function handleColumnSearch(query) {
+		const searchInput = document.getElementById('column-search-input');
+		const clearBtn = document.getElementById('column-search-clear');
+		const filterStatus = document.getElementById('column-filter-status');
+		const filterCount = document.getElementById('column-filter-count');
+		const options = document.querySelectorAll('.column-option');
+
+		const lowerQuery = query.toLowerCase().trim();
+
+		// Show/hide clear button
+		if (clearBtn) {
+			clearBtn.style.display = lowerQuery ? '' : 'none';
+		}
+
+		let visibleCount = 0;
+		options.forEach((option) => {
+			const displayName = option.querySelector('.column-display-name')?.textContent || '';
+			const logicalName = option.querySelector('.column-logical-name')?.textContent || '';
+			const matches =
+				!lowerQuery ||
+				displayName.toLowerCase().includes(lowerQuery) ||
+				logicalName.toLowerCase().includes(lowerQuery);
+
+			if (matches) {
+				option.classList.remove('hidden');
+				visibleCount++;
+			} else {
+				option.classList.add('hidden');
+			}
+		});
+
+		// Show filter status when filtering
+		if (filterStatus && filterCount) {
+			if (lowerQuery && visibleCount < options.length) {
+				filterCount.textContent = visibleCount.toString();
+				filterStatus.style.display = '';
+			} else {
+				filterStatus.style.display = 'none';
+			}
+		}
+	}
+
+	/**
+	 * Clears the column search input.
+	 */
+	function clearColumnSearch() {
+		const searchInput = document.getElementById('column-search-input');
+		if (searchInput) {
+			searchInput.value = '';
+			handleColumnSearch('');
+			searchInput.focus();
+		}
+	}
+
+	/**
+	 * Handles the "Select All" checkbox toggle.
+	 * @param {boolean} isSelectAll - Whether select all is checked
+	 */
+	function handleSelectAllToggle(isSelectAll) {
+		if (isSelectAll) {
+			// SELECT * mode - send empty columns array
+			postMessage('selectColumns', { selectAll: true, columns: [] });
+			// Update all checkboxes visually
+			const checkboxes = document.querySelectorAll('.column-checkbox');
+			checkboxes.forEach((cb) => (cb.checked = true));
+			updateColumnCountBadge(true, 0);
+		} else {
+			// Unchecking select all - clear all columns
+			const checkboxes = document.querySelectorAll('.column-checkbox');
+			checkboxes.forEach((cb) => (cb.checked = false));
+			postMessage('selectColumns', { selectAll: false, columns: [] });
+			updateColumnCountBadge(false, 0);
+		}
+	}
+
+	/**
+	 * Handles individual column checkbox toggle.
+	 * Gathers all selected columns and sends to extension.
+	 */
+	function handleColumnToggle() {
+		// Gather all selected columns
+		const checkboxes = document.querySelectorAll('.column-checkbox:checked');
+		const selectedColumns = Array.from(checkboxes).map((cb) => cb.dataset.column);
+
+		// Uncheck "Select All" when individual columns are selected
+		const selectAllCheckbox = document.getElementById('select-all-columns');
+		if (selectAllCheckbox) {
+			selectAllCheckbox.checked = false;
+		}
+
+		postMessage('selectColumns', { selectAll: false, columns: selectedColumns });
+		updateColumnCountBadge(false, selectedColumns.length);
+	}
+
+	/**
+	 * Updates the column count badge in the header.
+	 * @param {boolean} isSelectAll
+	 * @param {number} selectedCount
+	 */
+	function updateColumnCountBadge(isSelectAll, selectedCount) {
+		const badge = document.getElementById('column-count-badge');
+		const totalColumns = document.querySelectorAll('.column-checkbox').length;
+
+		if (!badge) return;
+
+		if (isSelectAll) {
+			badge.textContent = '(All)';
+		} else if (selectedCount === 0) {
+			badge.textContent = `(0 of ${totalColumns})`;
+		} else {
+			badge.textContent = `(${selectedCount} of ${totalColumns})`;
+		}
+	}
+
+	/**
+	 * Updates the column picker with new column options.
+	 * @param {Array} columns - Array of column option view models
+	 * @param {boolean} isSelectAll - Whether SELECT * mode is active
+	 */
+	function updateColumnPicker(columns, isSelectAll) {
+		const section = document.getElementById('column-picker-section');
+		const container = document.querySelector('.column-picker-list');
+		const selectAllCheckbox = document.getElementById('select-all-columns');
+		const searchInput = document.getElementById('column-search-input');
+		const totalCountEl = document.getElementById('column-total-count');
+
+		// Show the column picker section
+		if (section) {
+			section.classList.remove('column-picker-hidden');
+		}
+
+		if (selectAllCheckbox) {
+			selectAllCheckbox.checked = isSelectAll;
+			selectAllCheckbox.disabled = false;
+		}
+
+		// Clear any existing search
+		if (searchInput) {
+			searchInput.value = '';
+		}
+		const clearBtn = document.getElementById('column-search-clear');
+		if (clearBtn) {
+			clearBtn.style.display = 'none';
+		}
+		const filterStatus = document.getElementById('column-filter-status');
+		if (filterStatus) {
+			filterStatus.style.display = 'none';
+		}
+
+		if (!container) {
+			console.warn('Column picker list not found');
+			return;
+		}
+
+		if (!columns || columns.length === 0) {
+			container.innerHTML =
+				'<div class="column-picker-empty">No columns available</div>';
+			updateColumnCountBadge(true, 0);
+			return;
+		}
+
+		// Update total count
+		if (totalCountEl) {
+			totalCountEl.textContent = columns.length.toString();
+		}
+
+		container.innerHTML = columns
+			.map(
+				(col) => `
+			<label class="column-option" role="option" aria-selected="${col.isSelected}">
+				<input type="checkbox" class="column-checkbox"
+					data-column="${escapeHtml(col.logicalName)}"
+					${col.isSelected ? 'checked' : ''} />
+				<span class="column-display-name">${escapeHtml(col.displayName)}</span>
+				<span class="column-logical-name">(${escapeHtml(col.logicalName)})</span>
+				<span class="column-type">${escapeHtml(col.attributeType)}</span>
+			</label>
+		`
+			)
+			.join('');
+
+		// Update badge
+		const selectedCount = columns.filter((c) => c.isSelected).length;
+		updateColumnCountBadge(isSelectAll, selectedCount);
+	}
+
+	/**
+	 * Sets the loading state for the column picker.
+	 * @param {boolean} isLoading
+	 */
+	function setColumnPickerLoading(isLoading) {
+		const section = document.getElementById('column-picker-section');
+		const container = document.querySelector('.column-picker-list');
+
+		if (!container) return;
+
+		if (isLoading) {
+			// Show the section when loading starts
+			if (section) {
+				section.classList.remove('column-picker-hidden');
+			}
+			container.innerHTML =
+				'<div class="column-picker-loading">Loading columns...</div>';
+			// Disable select all while loading
+			const selectAllCheckbox = document.getElementById('select-all-columns');
+			if (selectAllCheckbox) {
+				selectAllCheckbox.disabled = true;
+			}
+		} else {
+			const selectAllCheckbox = document.getElementById('select-all-columns');
+			if (selectAllCheckbox) {
+				selectAllCheckbox.disabled = false;
+			}
+		}
+	}
+
 	/**
 	 * Initializes the behavior when DOM is ready.
 	 */
 	function init() {
 		console.log('VisualQueryBuilderBehavior initializing...');
 		initEntityPicker();
+		initColumnPicker();
 		initPreviewTabs();
 		initCopyButtons();
 		initPreviewCollapse();
+		initQueryBuilderCollapse();
 		window.addEventListener('message', handleMessage);
 		console.log('VisualQueryBuilderBehavior initialized');
 
 		// Signal to extension that webview is ready to receive data
 		postMessage('webviewReady', {});
+	}
+
+	// ============================================
+	// COLLAPSIBLE QUERY BUILDER SECTION
+	// ============================================
+
+	/** Storage key for query builder collapse state */
+	const QUERY_BUILDER_COLLAPSED_KEY = 'dataExplorer.queryBuilderCollapsed';
+
+	/**
+	 * Initializes the collapsible query builder section.
+	 */
+	function initQueryBuilderCollapse() {
+		const toggleBtn = document.getElementById('query-builder-toggle');
+		const container = document.getElementById('query-builder-container');
+		const section = document.getElementById('query-builder-section');
+
+		if (!toggleBtn || !container || !section) {
+			return;
+		}
+
+		// Restore saved state
+		const savedState = localStorage.getItem(QUERY_BUILDER_COLLAPSED_KEY);
+		if (savedState === 'true') {
+			setQueryBuilderCollapsed(true);
+		}
+
+		// Handle toggle click
+		toggleBtn.addEventListener('click', () => {
+			const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+			setQueryBuilderCollapsed(isExpanded); // Toggle: if expanded, collapse it
+		});
+
+		// Handle keyboard
+		toggleBtn.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				toggleBtn.click();
+			}
+		});
+	}
+
+	/**
+	 * Sets the collapsed state of the query builder section.
+	 * @param {boolean} collapsed - True to collapse, false to expand
+	 */
+	function setQueryBuilderCollapsed(collapsed) {
+		const toggleBtn = document.getElementById('query-builder-toggle');
+		const container = document.getElementById('query-builder-container');
+		const section = document.getElementById('query-builder-section');
+
+		if (!toggleBtn || !container || !section) {
+			return;
+		}
+
+		toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+		if (collapsed) {
+			container.classList.add('collapsed');
+			section.classList.add('collapsed');
+		} else {
+			container.classList.remove('collapsed');
+			section.classList.remove('collapsed');
+		}
+
+		// Persist state
+		localStorage.setItem(QUERY_BUILDER_COLLAPSED_KEY, collapsed.toString());
 	}
 
 	// ============================================

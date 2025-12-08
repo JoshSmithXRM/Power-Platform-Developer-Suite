@@ -1,6 +1,7 @@
 import type { ISection } from '../../../../shared/infrastructure/ui/sections/ISection';
 import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
 import type { SectionRenderData } from '../../../../shared/infrastructure/ui/types/SectionRenderData';
+import type { ColumnOptionViewModel } from '../../application/viewModels/ColumnOptionViewModel';
 import {
 	renderVisualQueryBuilderSection,
 	type EntityOption,
@@ -29,6 +30,10 @@ export class VisualQueryBuilderSection implements ISection {
 		const entities = (customData['entities'] as readonly EntityOption[]) ?? [];
 		const selectedEntity = (customData['selectedEntity'] as string | null) ?? null;
 		const isLoadingEntities = (customData['isLoadingEntities'] as boolean) ?? false;
+		const availableColumns =
+			(customData['availableColumns'] as readonly ColumnOptionViewModel[]) ?? [];
+		const isSelectAllColumns = (customData['isSelectAllColumns'] as boolean) ?? true;
+		const isLoadingColumns = (customData['isLoadingColumns'] as boolean) ?? false;
 		const generatedFetchXml = (customData['generatedFetchXml'] as string) ?? '';
 		const generatedSql = (customData['generatedSql'] as string) ?? '';
 		const errorMessage = customData['errorMessage'] as string | undefined;
@@ -37,6 +42,9 @@ export class VisualQueryBuilderSection implements ISection {
 			entities,
 			selectedEntity,
 			isLoadingEntities,
+			availableColumns,
+			isSelectAllColumns,
+			isLoadingColumns,
 			generatedFetchXml,
 			generatedSql,
 			errorMessage,

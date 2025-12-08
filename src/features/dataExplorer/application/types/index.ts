@@ -3,7 +3,7 @@
  * This allows presentation layer to use domain types without direct import.
  */
 export { VisualQuery } from '../../domain/valueObjects/VisualQuery';
-export type { QueryColumn } from '../../domain/valueObjects/QueryColumn';
+export { QueryColumn } from '../../domain/valueObjects/QueryColumn';
 export type { QueryCondition } from '../../domain/valueObjects/QueryCondition';
 export type { QueryFilterGroup } from '../../domain/valueObjects/QueryFilterGroup';
 export type { QuerySort } from '../../domain/valueObjects/QuerySort';

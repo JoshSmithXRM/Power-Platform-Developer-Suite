@@ -16,7 +16,11 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 |------|-------------|--------|
 | 1 | Foundation - Domain Model & FetchXML Parser/Generator | ✅ Complete |
 | 2 | Panel Restructure - Remove Old Editor, Add Entity Picker | ✅ Complete |
-| 3 | Core Visual Builder - Columns, Filters MVP, Sort | 🔄 Next |
+| 3 | Core Visual Builder - Columns, Filters MVP, Sort | 🔄 In Progress |
+| 3.0 | → Panel Layout & UX Fixes | ✅ Complete |
+| 3.2 | → Column Selector | ✅ Complete |
+| 3.3 | → Filter Builder | ⬜ Pending |
+| 3.4 | → Sort Section | ⬜ Pending |
 | 4 | Preview Section & Action Buttons | ⬜ Pending |
 | 5 | Toolbar Redesign | ⬜ Pending |
 | 6 | View Management - Load/Save Views | ⬜ Pending |
@@ -93,6 +97,31 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 
 ## Step 3: Core Visual Builder - Columns, Filters MVP, Sort
 
+### 3.0 Panel Layout & UX Fixes ✅ COMPLETE
+
+**Problem:** Panel content too tall, no scrolling, poor UX when sections expand.
+
+- [x] Implement two-pane layout:
+  ```
+  ┌─────────────────────────────┐
+  │ Toolbar (fixed)             │  ← Environment + Execute/Export
+  ├─────────────────────────────┤
+  │ Query Builder Area          │  ← Collapsible + internally scrollable
+  │ - Entity picker             │
+  │ - Column picker             │
+  │ - Query preview             │
+  ├─────────────────────────────┤
+  │ Results Table               │  ← Fills remaining, scrolls internally
+  └─────────────────────────────┘
+  ```
+- [x] Make entire Query Builder section collapsible (not just individual parts)
+- [x] Query builder area: `max-height: 50vh; overflow-y: auto`
+- [x] Results table: `flex: 1; overflow-y: auto`
+- [ ] Optional: draggable divider between panes (deferred to future)
+
+**Bug:** Columns don't load when panel restores with saved entity selection.
+- [x] Fix: In state restoration, if `selectedEntity` exists, call `loadAttributesForEntity()`
+
 ### 3.1 View Selector Section (Placeholder for Step 6)
 
 - [ ] Create view selector dropdown (System Views | Personal Views groups)
@@ -100,13 +129,16 @@ Transform the Data Explorer panel from a code-based query editor to a **Visual Q
 - [ ] Show "New Query" option to start fresh
 - [ ] Add refresh button to reload views
 
-### 3.2 Column Selector Section
+### 3.2 Column Selector Section ✅ COMPLETE
 
-- [ ] Create multi-select column picker (checkboxes)
-- [ ] Load available columns from entity metadata
-- [ ] Allow drag-and-drop reordering (or up/down buttons)
-- [ ] Show column display name + logical name
-- [ ] Select all / Deselect all buttons
+- [x] Create multi-select column picker (checkboxes)
+- [x] Load available columns from entity metadata
+- [x] Show column display name + logical name + type
+- [x] Select All checkbox (reverts to SELECT *)
+- [x] Collapsible section with count badge
+- [x] Search box to filter columns
+- [x] Collapse state persisted to localStorage
+- [ ] ~~Allow drag-and-drop reordering~~ (deferred to future)
 
 ### 3.3 Filter Builder Section (MVP)
 

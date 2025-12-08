@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../../../shared/infrastructure/ui/views/htmlHelpers';
+import type { ColumnOptionViewModel } from '../../application/viewModels/ColumnOptionViewModel';
 
 /**
  * Entity option for the entity picker dropdown.
@@ -19,6 +20,12 @@ export interface VisualQueryBuilderRenderData {
 	readonly selectedEntity: string | null;
 	/** Whether entities are currently loading */
 	readonly isLoadingEntities: boolean;
+	/** Available columns for the selected entity */
+	readonly availableColumns: readonly ColumnOptionViewModel[];
+	/** Whether "Select All" is checked (SELECT * mode) */
+	readonly isSelectAllColumns: boolean;
+	/** Whether columns are currently loading */
+	readonly isLoadingColumns: boolean;
 	/** Generated FetchXML from the visual query */
 	readonly generatedFetchXml: string;
 	/** Generated SQL from the visual query */
@@ -30,12 +37,24 @@ export interface VisualQueryBuilderRenderData {
 /**
  * Renders the Visual Query Builder section HTML.
  * Contains entity picker, query preview, and results table.
+ * Uses a two-pane layout with collapsible query builder.
  */
 export function renderVisualQueryBuilderSection(data: VisualQueryBuilderRenderData): string {
 	return `
-		<div class="visual-query-builder-section">
-			<div class="query-builder-container">
+		<div class="visual-query-builder-section" id="query-builder-section">
+			<button
+				class="query-builder-toggle"
+				id="query-builder-toggle"
+				aria-expanded="true"
+				aria-controls="query-builder-container"
+				title="Toggle query builder"
+			>
+				<span class="query-builder-toggle-icon codicon codicon-chevron-down"></span>
+				<span class="query-builder-toggle-title">Query Builder</span>
+			</button>
+			<div class="query-builder-container" id="query-builder-container">
 				${renderEntityPicker(data)}
+				${renderColumnPicker(data)}
 				${renderQueryPreview(data)}
 			</div>
 		</div>
@@ -77,6 +96,107 @@ function renderEntityPicker(data: VisualQueryBuilderRenderData): string {
 			</div>
 			${data.errorMessage ? renderErrorBanner(data.errorMessage) : ''}
 		</div>
+	`;
+}
+
+/**
+ * Renders the column picker section with checkboxes.
+ * Collapsible with search functionality.
+ * Always renders the container structure so dynamic updates work.
+ */
+function renderColumnPicker(data: VisualQueryBuilderRenderData): string {
+	const isHidden = data.selectedEntity === null;
+	const hiddenClass = isHidden ? ' column-picker-hidden' : '';
+
+	// Calculate selected count for header
+	const selectedCount = data.isSelectAllColumns
+		? 'All'
+		: data.availableColumns.filter((c) => c.isSelected).length.toString();
+	const totalCount = data.availableColumns.length;
+	const headerSuffix =
+		data.isSelectAllColumns || totalCount === 0
+			? `(${selectedCount})`
+			: `(${selectedCount} of ${totalCount})`;
+
+	// Build content based on state
+	let listContent: string;
+	if (isHidden) {
+		listContent = '<div class="column-picker-empty">Select an entity to see columns</div>';
+	} else if (data.isLoadingColumns) {
+		listContent = '<div class="column-picker-loading">Loading columns...</div>';
+	} else if (data.availableColumns.length === 0) {
+		listContent = '<div class="column-picker-empty">No columns available</div>';
+	} else {
+		listContent = data.availableColumns.map((col) => renderColumnOption(col)).join('');
+	}
+
+	const selectAllChecked = data.isSelectAllColumns ? 'checked' : '';
+	const selectAllDisabled = data.isLoadingColumns ? 'disabled' : '';
+
+	return `
+		<div class="column-picker-section${hiddenClass}" id="column-picker-section">
+			<button
+				class="column-picker-toggle"
+				id="column-picker-toggle"
+				aria-expanded="true"
+				aria-controls="column-picker-content"
+				title="Toggle column picker"
+			>
+				<span class="column-toggle-icon codicon codicon-chevron-down"></span>
+				<span class="column-picker-title">Columns <span id="column-count-badge">${headerSuffix}</span></span>
+			</button>
+			<div class="column-picker-content" id="column-picker-content">
+				<div class="column-picker-toolbar">
+					<div class="search-container">
+						<input
+							type="text"
+							id="column-search-input"
+							placeholder="🔍 Search columns..."
+						/>
+					</div>
+					<label class="select-all-checkbox">
+						<input
+							type="checkbox"
+							id="select-all-columns"
+							${selectAllChecked}
+							${selectAllDisabled}
+							aria-label="Select all columns"
+						/>
+						<span>All</span>
+					</label>
+				</div>
+				<div class="column-picker-list" role="listbox" aria-label="Available columns">
+					${listContent}
+				</div>
+				<div class="column-filter-status" id="column-filter-status" style="display: none;">
+					<span id="column-filter-count">0</span> of <span id="column-total-count">${totalCount}</span> columns shown
+				</div>
+			</div>
+		</div>
+	`;
+}
+
+/**
+ * Renders a single column option with checkbox.
+ */
+function renderColumnOption(column: ColumnOptionViewModel): string {
+	const escapedLogical = escapeHtml(column.logicalName);
+	const escapedDisplay = escapeHtml(column.displayName);
+	const escapedType = escapeHtml(column.attributeType);
+	const checkedAttr = column.isSelected ? 'checked' : '';
+
+	return `
+		<label class="column-option" role="option" aria-selected="${column.isSelected}">
+			<input
+				type="checkbox"
+				class="column-checkbox"
+				data-column="${escapedLogical}"
+				${checkedAttr}
+			/>
+			<span class="column-display-name">${escapedDisplay}</span>
+			<span class="column-logical-name">(${escapedLogical})</span>
+			<span class="column-type">${escapedType}</span>
+		</label>
 	`;
 }
 

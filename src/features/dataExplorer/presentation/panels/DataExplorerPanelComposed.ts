@@ -32,7 +32,9 @@ import { DataverseRecordUrlService } from '../../../../shared/infrastructure/ser
 import { CsvExportService, type TabularData } from '../../../../shared/infrastructure/services/CsvExportService';
 import type { DataExplorerIntelliSenseServices } from '../initialization/registerDataExplorerIntelliSense';
 import { openQueryInNotebook } from '../../notebooks/registerNotebooks';
-import { VisualQuery, FetchXmlGenerator, FetchXmlToSqlTranspiler } from '../../application/types';
+import { VisualQuery, FetchXmlGenerator, FetchXmlToSqlTranspiler, QueryColumn } from '../../application/types';
+import type { AttributeSuggestion } from '../../domain/valueObjects/AttributeSuggestion';
+import { ColumnOptionViewModelMapper } from '../../application/mappers/ColumnOptionViewModelMapper';
 
 /**
  * Commands supported by Data Explorer panel.
@@ -43,6 +45,7 @@ type DataExplorerCommands =
 	| 'openInNotebook'
 	| 'environmentChange'
 	| 'selectEntity'
+	| 'selectColumns'
 	| 'openRecord'
 	| 'copyRecordUrl'
 	| 'warningModalResponse'
@@ -75,6 +78,9 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 	private currentEntities: readonly EntityOption[] = [];
 	private isLoadingEntities: boolean = false;
 	private currentResult: QueryResult | null = null;
+	private currentAvailableColumns: readonly AttributeSuggestion[] = [];
+	private isLoadingColumns: boolean = false;
+	private readonly columnMapper: ColumnOptionViewModelMapper;
 
 	/** Monotonic counter for query execution to discard stale results. */
 	private querySequence: number = 0;
@@ -106,6 +112,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		this.csvExportService = new CsvExportService(logger);
 		this.fetchXmlGenerator = new FetchXmlGenerator();
 		this.fetchXmlToSqlTranspiler = new FetchXmlToSqlTranspiler();
+		this.columnMapper = new ColumnOptionViewModelMapper();
 		logger.debug('DataExplorerPanel: Initialized with visual query builder');
 
 		// Configure webview
@@ -189,7 +196,7 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Load environments first so they appear on initial render
 		const environments = await this.getEnvironments();
 
-		// Load persisted state (selected entity)
+		// Load persisted state (selected entity and columns)
 		try {
 			const state = await this.panelStateRepository.load({
 				panelType: DataExplorerPanelComposed.viewType,
@@ -198,9 +205,22 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			const savedEntity = state?.['selectedEntity'];
 			if (savedEntity && typeof savedEntity === 'string') {
 				this.currentVisualQuery = new VisualQuery(savedEntity);
-				this.logger.debug('Loaded persisted entity selection', {
+
+				// Restore column selection if not "select all"
+				const isSelectAll = state?.['isSelectAll'];
+				const savedColumns = state?.['selectedColumns'];
+				if (isSelectAll === false && Array.isArray(savedColumns) && savedColumns.length > 0) {
+					const queryColumns = savedColumns
+						.filter((name): name is string => typeof name === 'string')
+						.map(name => new QueryColumn(name));
+					this.currentVisualQuery = this.currentVisualQuery.withSpecificColumns(queryColumns);
+				}
+
+				this.logger.debug('Loaded persisted query state', {
 					environmentId: this.currentEnvironmentId,
 					entity: savedEntity,
+					isSelectAll: this.currentVisualQuery.isSelectAll(),
+					columnCount: this.currentVisualQuery.getColumnCount(),
 				});
 			}
 		} catch (error) {
@@ -454,6 +474,12 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			await this.handleSelectEntity(entityLogicalName ?? null);
 		});
 
+		// Select columns for query
+		this.coordinator.registerHandler('selectColumns', async (data) => {
+			const { selectAll, columns } = data as { selectAll?: boolean; columns?: string[] };
+			await this.handleSelectColumns(selectAll ?? true, columns ?? []);
+		});
+
 		// Open record in browser
 		this.coordinator.registerHandler('openRecord', async (data) => {
 			const { entityType, recordId } = data as { entityType?: string; recordId?: string };
@@ -516,9 +542,10 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Always load entities - this is the single entry point for entity loading
 		await this.loadEntitiesForEnvironment();
 
-		// Also send preview if entity is selected
+		// If entity was restored from persisted state, also load its columns
 		if (this.currentVisualQuery) {
 			await this.updateQueryPreview();
+			await this.loadAttributesForEntity(this.currentVisualQuery.entityName);
 		}
 	}
 
@@ -533,7 +560,13 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 			// Only clear if we had a previous selection
 			if (this.currentVisualQuery !== null) {
 				this.currentVisualQuery = null;
+				this.currentAvailableColumns = [];
 				await this.updateQueryPreview();
+				// Clear column picker
+				await this.panel.postMessage({
+					command: 'attributesLoaded',
+					data: { columns: [], isSelectAll: true },
+				});
 			}
 			return;
 		}
@@ -545,7 +578,84 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 		// Update query preview
 		await this.updateQueryPreview();
 
+		// Load attributes for column picker
+		await this.loadAttributesForEntity(entityLogicalName);
+
 		// Persist selection
+		void this.saveQueryStateToStorage();
+	}
+
+	/**
+	 * Loads attributes for the selected entity and sends to webview.
+	 */
+	private async loadAttributesForEntity(entityLogicalName: string): Promise<void> {
+		this.isLoadingColumns = true;
+		await this.panel.postMessage({
+			command: 'setLoadingColumns',
+			data: { isLoading: true },
+		});
+
+		try {
+			this.currentAvailableColumns =
+				await this.intelliSenseServices.metadataCache.getAttributeSuggestions(
+					this.currentEnvironmentId,
+					entityLogicalName
+				);
+
+			const isSelectAll = this.currentVisualQuery?.isSelectAll() ?? true;
+			const selectedColumnNames = this.currentVisualQuery?.getColumnNames() ?? [];
+
+			const columnViewModels = this.columnMapper.toViewModels(
+				this.currentAvailableColumns,
+				selectedColumnNames
+			);
+
+			await this.panel.postMessage({
+				command: 'attributesLoaded',
+				data: { columns: columnViewModels, isSelectAll },
+			});
+
+			this.logger.debug('Loaded attributes for entity', {
+				entityLogicalName,
+				attributeCount: this.currentAvailableColumns.length,
+			});
+		} catch (error) {
+			this.logger.error('Failed to load attributes', error);
+			await this.panel.postMessage({
+				command: 'showError',
+				data: { message: 'Failed to load columns. Please try again.' },
+			});
+		} finally {
+			this.isLoadingColumns = false;
+			await this.panel.postMessage({
+				command: 'setLoadingColumns',
+				data: { isLoading: false },
+			});
+		}
+	}
+
+	/**
+	 * Handles column selection changes from the webview.
+	 */
+	private async handleSelectColumns(selectAll: boolean, columnNames: string[]): Promise<void> {
+		if (this.currentVisualQuery === null) {
+			return;
+		}
+
+		if (selectAll) {
+			this.currentVisualQuery = this.currentVisualQuery.withAllColumns();
+		} else {
+			const queryColumns = columnNames.map((name) => new QueryColumn(name));
+			this.currentVisualQuery = this.currentVisualQuery.withSpecificColumns(queryColumns);
+		}
+
+		this.logger.debug('Columns updated', {
+			selectAll,
+			columnCount: columnNames.length,
+			isSelectAll: this.currentVisualQuery.isSelectAll(),
+		});
+
+		await this.updateQueryPreview();
 		void this.saveQueryStateToStorage();
 	}
 
@@ -595,6 +705,8 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				{
 					...existingState,
 					selectedEntity: this.currentVisualQuery?.entityName ?? null,
+					isSelectAll: this.currentVisualQuery?.isSelectAll() ?? true,
+					selectedColumns: this.currentVisualQuery?.getColumnNames() ?? [],
 					lastUpdated: new Date().toISOString(),
 				}
 			);
@@ -661,9 +773,22 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 				const savedEntity = state['selectedEntity'];
 				if (savedEntity && typeof savedEntity === 'string') {
 					this.currentVisualQuery = new VisualQuery(savedEntity);
-					this.logger.debug('Loaded persisted entity for environment', {
+
+					// Restore column selection if not "select all"
+					const isSelectAll = state['isSelectAll'];
+					const savedColumns = state['selectedColumns'];
+					if (isSelectAll === false && Array.isArray(savedColumns) && savedColumns.length > 0) {
+						const queryColumns = savedColumns
+							.filter((name): name is string => typeof name === 'string')
+							.map(name => new QueryColumn(name));
+						this.currentVisualQuery = this.currentVisualQuery.withSpecificColumns(queryColumns);
+					}
+
+					this.logger.debug('Loaded persisted state for environment', {
 						environmentId,
 						entity: savedEntity,
+						isSelectAll: this.currentVisualQuery.isSelectAll(),
+						columnCount: this.currentVisualQuery.getColumnCount(),
 					});
 				}
 			}

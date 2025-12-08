@@ -157,6 +157,23 @@
 	}
 
 	/**
+	 * Checks if focus is in a text input that should use native Ctrl+A.
+	 * @returns {boolean} True if native select-all should be used
+	 */
+	function isInNativeTextInput() {
+		const active = document.activeElement;
+		if (!active) return false;
+
+		// Allow native behavior for inputs and textareas
+		if (active.tagName === 'TEXTAREA') return true;
+		if (active.tagName === 'INPUT') {
+			const type = active.getAttribute('type')?.toLowerCase() || 'text';
+			return ['text', 'search', 'email', 'url', 'tel', 'password'].includes(type);
+		}
+		return false;
+	}
+
+	/**
 	 * Handles keydown events for selection shortcuts.
 	 * @param {KeyboardEvent} e - The keyboard event
 	 */
@@ -165,6 +182,11 @@
 
 		// Ctrl+A: Zone-aware select all
 		if (isCtrl && (e.key === 'a' || e.key === 'A')) {
+			// Let native inputs handle Ctrl+A themselves
+			if (isInNativeTextInput()) {
+				return; // Don't prevent default - let browser handle it
+			}
+
 			// CRITICAL: Stop ALL event handling - browser AND VS Code webview
 			e.preventDefault();
 			e.stopPropagation();

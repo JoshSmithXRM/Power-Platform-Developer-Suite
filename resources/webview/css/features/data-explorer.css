@@ -634,21 +634,76 @@
 
 /* ============================================
    VISUAL QUERY BUILDER SECTION
+   Two-pane layout with collapsible query builder
    ============================================ */
 
 .visual-query-builder-section {
 	display: flex;
 	flex-direction: column;
-	gap: 16px;
-	padding: 16px;
 	border-bottom: 1px solid var(--vscode-panel-border);
 	flex-shrink: 0;
 }
 
+/* Collapsible toggle for entire query builder */
+.query-builder-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 10px 16px;
+	font-size: 13px;
+	font-weight: 600;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	border: none;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+	flex-shrink: 0;
+}
+
+.query-builder-toggle:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.query-builder-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.query-builder-toggle-icon {
+	font-size: 14px;
+	transition: transform 0.15s ease;
+}
+
+.query-builder-toggle[aria-expanded='false'] .query-builder-toggle-icon {
+	transform: rotate(-90deg);
+}
+
+.query-builder-toggle-title {
+	flex: 1;
+}
+
+/* Main scrollable container for query builder content - SINGLE SCROLL POINT */
 .query-builder-container {
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
+	padding: 16px;
+	max-height: 350px; /* Fixed height - vh unreliable in webviews */
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.query-builder-container.collapsed {
+	display: none;
+}
+
+/* When collapsed, remove border from toggle */
+.visual-query-builder-section.collapsed .query-builder-toggle {
+	border-bottom-color: transparent;
 }
 
 /* Entity Picker Section */
@@ -710,6 +765,186 @@
 	font-style: italic;
 }
 
+/* ============================================
+   COLUMN PICKER SECTION
+   ============================================ */
+
+.column-picker-section {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+	/* No overflow:hidden - let content flow to parent scroll */
+}
+
+.column-picker-section.column-picker-hidden {
+	display: none;
+}
+
+/* Collapsible Toggle Header */
+.column-picker-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	font-size: 13px;
+	font-weight: 500;
+	font-family: var(--vscode-font-family);
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background);
+	border: none;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+}
+
+.column-picker-toggle:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.column-picker-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.column-toggle-icon {
+	transition: transform 0.15s ease;
+}
+
+.column-picker-toggle[aria-expanded='false'] .column-toggle-icon {
+	transform: rotate(-90deg);
+}
+
+.column-picker-title {
+	flex: 1;
+}
+
+#column-count-badge {
+	font-weight: normal;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Collapsible Content */
+.column-picker-content {
+	display: flex;
+	flex-direction: column;
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
+.column-picker-content.collapsed {
+	display: none;
+}
+
+/* Toolbar with Search and Select All */
+.column-picker-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 10px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-editorWidget-background);
+}
+
+/* Column search uses shared .search-container but override padding for toolbar */
+.column-picker-toolbar .search-container {
+	flex: 1;
+	padding: 0;
+}
+
+.select-all-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.select-all-checkbox input[type='checkbox'] {
+	margin: 0;
+	cursor: pointer;
+}
+
+/* Column List - internal scroll for long lists */
+.column-picker-list {
+	display: flex;
+	flex-direction: column;
+	max-height: 200px;
+	overflow-y: auto;
+}
+
+.column-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 12px;
+	font-size: 12px;
+	cursor: pointer;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	transition: background 0.1s ease;
+}
+
+.column-option:last-child {
+	border-bottom: none;
+}
+
+.column-option:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.column-option:has(input:checked) {
+	background: rgba(var(--vscode-list-activeSelectionBackground-rgb, 0, 120, 212), 0.15);
+}
+
+.column-option.hidden {
+	display: none;
+}
+
+.column-checkbox {
+	flex-shrink: 0;
+	margin: 0;
+	cursor: pointer;
+}
+
+.column-display-name {
+	color: var(--vscode-foreground);
+	flex-shrink: 0;
+}
+
+.column-logical-name {
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+}
+
+.column-type {
+	margin-left: auto;
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+	font-style: italic;
+	flex-shrink: 0;
+}
+
+.column-picker-loading,
+.column-picker-empty {
+	padding: 16px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+	font-size: 12px;
+}
+
+/* Filter Status Bar */
+.column-filter-status {
+	padding: 6px 10px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	background: var(--vscode-editorWidget-background);
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
 /* Query Preview Section */
 .query-preview-section {
 	display: flex;
@@ -717,7 +952,7 @@
 	background: var(--vscode-textCodeBlock-background);
 	border: 1px solid var(--vscode-input-border);
 	border-radius: 4px;
-	overflow: hidden;
+	/* No overflow:hidden - let content flow to parent scroll */
 }
 
 /* Collapsible Preview Header */
@@ -765,15 +1000,10 @@
 .preview-content-wrapper {
 	display: flex;
 	flex-direction: column;
-	overflow: hidden;
-	transition: max-height 0.25s ease-out, opacity 0.2s ease;
-	max-height: 500px; /* Generous max height for expanded state */
 }
 
 .preview-content-wrapper.collapsed {
-	max-height: 0;
-	opacity: 0;
-	pointer-events: none;
+	display: none;
 }
 
 /* Remove border-bottom from header when collapsed */
@@ -819,9 +1049,7 @@
 
 .preview-panel {
 	position: relative;
-	min-height: 80px;
-	max-height: 250px;
-	overflow: auto;
+	min-height: 60px;
 }
 
 .preview-panel[hidden] {
