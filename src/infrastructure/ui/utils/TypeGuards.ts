@@ -405,45 +405,6 @@ export function isEnvironmentChangedMessage(message: unknown): message is Enviro
 	return hasValidEnvironmentId;
 }
 
-export interface EnvironmentChangeMessage {
-	command: 'environmentChange';
-	data: {
-		environmentId: string;
-	};
-}
-
-/**
- * Type guard for EnvironmentChangeMessage with multi-property validation.
- *
- * Validates message structure when user initiates environment change in webview.
- * Signals selection of a different Power Platform environment context.
- *
- * @param message - Unknown message from webview to validate
- * @returns True if message matches EnvironmentChangeMessage structure
- */
-export function isEnvironmentChangeMessage(message: unknown): message is EnvironmentChangeMessage {
-	if (!isWebviewMessage(message)) {
-		return false;
-	}
-
-	if (message.command !== 'environmentChange') {
-		return false;
-	}
-
-	const data = message.data;
-
-	if (typeof data !== 'object' || data === null) {
-		return false;
-	}
-
-	// Validate property exists and has correct type before asserting
-	const hasValidEnvironmentId =
-		'environmentId' in data &&
-		typeof (data as { environmentId: unknown }).environmentId === 'string';
-
-	return hasValidEnvironmentId;
-}
-
 export interface RevealSecretMessage {
 	command: 'revealSecret';
 	key: string;
