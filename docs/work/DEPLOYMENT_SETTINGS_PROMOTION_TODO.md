@@ -76,11 +76,25 @@
 
 ---
 
-## Slice 5-8: PENDING
+## Slice 5: Auto-match + Output Generation - COMPLETE (MVP)
 
-- [ ] Slice 5: Auto-match + Manual Mapping UI (custom sections needed)
+- [x] Wire file loading to parse JSON and extract ConnectorIds
+- [x] Wire environment change to query connections from Power Apps Admin API
+- [x] Run connector matching algorithm
+- [x] Display matching summary (auto-matched vs needs-mapping counts)
+- [x] Generate Output button enabled when all connectors auto-matched
+- [x] Generate promoted deployment settings file
+- [x] Open generated file in editor
+
+**Note:** MVP supports fully auto-matched scenarios only. Manual mapping UI deferred to Slice 5b.
+
+---
+
+## Slice 5b-8: PENDING (Post-MVP)
+
+- [ ] Slice 5b: Manual Mapping UI (for custom connectors with different IDs)
 - [ ] Slice 6: Environment Variable Diff UI
-- [ ] Slice 7: Output File Generation
+- [ ] Slice 7: Profile Save/Load
 - [ ] Slice 8: Polish and Error Handling
 
 ---
@@ -142,3 +156,17 @@ src/shared/infrastructure/
 - Refactored Connection entity to use public readonly properties (lint compliance)
 - Panel ready for F5 testing
 - Next: F5 test, then Slice 5 (mapping UI) or commit checkpoint
+
+### Session 2 (2025-12-09)
+- Fixed button wiring bugs (removed customHandler, fixed command name mismatch)
+- Added PowerAppsAdminApiFactory to SharedFactories for API authentication
+- Wired panel with full dependency injection:
+  - DeploymentSettingsRepository for file loading
+  - PowerPlatformApiConnectionRepository for target connections
+  - ConnectorMappingService for matching algorithm
+- Implemented full MVP flow:
+  - Load source file → parse JSON → extract ConnectorIds
+  - Select target environment → query connections via Admin API
+  - Run matching algorithm → show summary
+  - Generate promoted file (when all auto-matched)
+- Ready for F5 testing

@@ -618,7 +618,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const deploymentSettingsPromotionCommand = vscode.commands.registerCommand('power-platform-dev-suite.deploymentSettingsPromotion', async () => {
 		try {
-			void initializeDeploymentSettingsPromotion(context, factories.getEnvironments, container.logger);
+			void initializeDeploymentSettingsPromotion(context, {
+				getEnvironments: factories.getEnvironments,
+				powerAppsAdminApiFactory: factories.powerAppsAdminApiFactory,
+				logger: container.logger
+			});
 		} catch (error) {
 			container.logger.error('Failed to open Deployment Settings Promotion', error);
 			vscode.window.showErrorMessage(

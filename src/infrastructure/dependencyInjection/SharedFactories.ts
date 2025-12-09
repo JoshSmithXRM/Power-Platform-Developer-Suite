@@ -13,6 +13,10 @@ export class SharedFactories {
 		getAccessToken: (envId: string) => Promise<string>;
 		getDataverseUrl: (envId: string) => Promise<string>;
 	};
+	public readonly powerAppsAdminApiFactory: {
+		getAccessToken: (envId: string) => Promise<string>;
+		getPowerPlatformEnvironmentId: (envId: string) => Promise<string>;
+	};
 
 	constructor(
 		private readonly environmentRepository: IEnvironmentRepository,
@@ -21,6 +25,7 @@ export class SharedFactories {
 		this.getEnvironments = this.createGetEnvironments();
 		this.getEnvironmentById = this.createGetEnvironmentById();
 		this.dataverseApiServiceFactory = this.createDataverseApiServiceFactory();
+		this.powerAppsAdminApiFactory = this.createPowerAppsAdminApiFactory();
 	}
 
 	/**
@@ -96,6 +101,53 @@ export class SharedFactories {
 			getDataverseUrl: async (envId: string): Promise<string> => {
 				const environment = await getEnvironmentByIdInternal(envId);
 				return environment.getDataverseUrl().getValue();
+			}
+		};
+	}
+
+	/**
+	 * Creates factory functions for PowerAppsAdminApiService.
+	 * Uses Power Apps scope (https://service.powerapps.com/) for admin API calls.
+	 */
+	private createPowerAppsAdminApiFactory(): {
+		getAccessToken: (envId: string) => Promise<string>;
+		getPowerPlatformEnvironmentId: (envId: string) => Promise<string>;
+	} {
+		const getEnvironmentByIdInternal = async (envId: string): Promise<Environment> => {
+			const environments = await this.environmentRepository.getAll();
+			const environment = environments.find(env => env.getId().getValue() === envId);
+			if (!environment) {
+				throw new Error(`Cannot access Power Apps Admin API: environment "${envId}" not found`);
+			}
+			return environment;
+		};
+
+		return {
+			getAccessToken: async (envId: string): Promise<string> => {
+				const environment = await getEnvironmentByIdInternal(envId);
+				const authMethod = environment.getAuthenticationMethod();
+				let clientSecret: string | undefined;
+				let password: string | undefined;
+
+				if (authMethod.requiresClientCredentials()) {
+					clientSecret = await this.environmentRepository.getClientSecret(environment.getClientId()?.getValue() || '');
+				}
+
+				if (authMethod.requiresUsernamePassword()) {
+					password = await this.environmentRepository.getPassword(environment.getUsername() || '');
+				}
+
+				// Power Apps Admin API uses service.powerapps.com scope
+				const powerAppsScope = 'https://service.powerapps.com/.default';
+				return this.authService.getAccessTokenForEnvironment(environment, clientSecret, password, powerAppsScope, undefined);
+			},
+			getPowerPlatformEnvironmentId: async (envId: string): Promise<string> => {
+				const environment = await getEnvironmentByIdInternal(envId);
+				const ppEnvId = environment.getPowerPlatformEnvironmentId();
+				if (!ppEnvId) {
+					throw new Error(`Power Platform Environment ID not configured for environment "${environment.getName().getValue()}"`);
+				}
+				return ppEnvId;
 			}
 		};
 	}
