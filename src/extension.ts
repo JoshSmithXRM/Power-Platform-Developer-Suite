@@ -614,12 +614,10 @@ export function activate(context: vscode.ExtensionContext): void {
 					container.environmentRepository,
 					'Select environment to test virtual column behavior',
 					async (envId) => {
+						const { getAccessToken: getToken, getDataverseUrl: getUrl } = factories.dataverseApiServiceFactory;
 						const apiService = new DataverseApiService(
-							(id) => container.authService.getAccessToken(id),
-							async (id) => {
-								const env = await container.environmentRepository.getById(new EnvironmentId(id));
-								return env?.getDataverseUrl().getValue() ?? '';
-							},
+							getToken,
+							getUrl,
 							container.logger
 						);
 

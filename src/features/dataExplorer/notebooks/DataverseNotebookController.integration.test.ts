@@ -97,7 +97,7 @@ describe('DataverseNotebookController - Integration Tests', () => {
 			]);
 
 			// None should be empty (except legitimately empty values)
-			rowData.forEach((value, index) => {
+			rowData.forEach((value) => {
 				expect(value).not.toBe('');
 				expect(typeof value).toBe('string');
 			});
