@@ -7,9 +7,6 @@ import { SourceType } from '../../domain/valueObjects/SourceType';
 
 /**
  * DTO for Dataverse pluginassembly entity.
- *
- * Note: _pluginpackageid_value was removed because the pluginpackageid lookup
- * doesn't exist in most Dataverse environments (plugin packages are a newer feature).
  */
 interface PluginAssemblyDto {
 	pluginassemblyid: string;
@@ -20,6 +17,7 @@ interface PluginAssemblyDto {
 	sourcetype: number;
 	createdon: string;
 	modifiedon: string;
+	_packageid_value: string | null;
 }
 
 /**
@@ -37,7 +35,7 @@ interface PluginAssemblyCollectionResponse {
 export class DataversePluginAssemblyRepository implements IPluginAssemblyRepository {
 	private static readonly ENTITY_SET = 'pluginassemblies';
 	private static readonly SELECT_FIELDS =
-		'pluginassemblyid,name,version,isolationmode,ismanaged,sourcetype,createdon,modifiedon';
+		'pluginassemblyid,name,version,isolationmode,ismanaged,sourcetype,createdon,modifiedon,_packageid_value';
 
 	constructor(
 		private readonly apiService: IDataverseApiService,
@@ -68,6 +66,7 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 
 		this.logger.debug('DataversePluginAssemblyRepository: Fetched assemblies', {
 			count: assemblies.length,
+			withPackage: assemblies.filter((a) => a.getPackageId() !== null).length,
 		});
 
 		return assemblies;
@@ -82,16 +81,25 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 			packageId,
 		});
 
-		// Note: The pluginassembly entity doesn't have _pluginpackageid_value in most
-		// Dataverse environments. Plugin packages are a newer feature. For now, we
-		// cannot query assemblies by package, so return empty array.
-		// TODO: When plugin packages are supported, query using expand or separate lookup.
-		this.logger.debug(
-			'DataversePluginAssemblyRepository: Package lookup not supported - returning empty',
-			{ packageId }
+		const endpoint =
+			`/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}` +
+			`?$select=${DataversePluginAssemblyRepository.SELECT_FIELDS}` +
+			`&$filter=_packageid_value eq ${packageId}` +
+			'&$orderby=name asc';
+
+		const response = await this.apiService.get<PluginAssemblyCollectionResponse>(
+			environmentId,
+			endpoint
 		);
 
-		return [];
+		const assemblies = response.value.map((dto) => this.mapToDomain(dto));
+
+		this.logger.debug('DataversePluginAssemblyRepository: Fetched assemblies by package', {
+			packageId,
+			count: assemblies.length,
+		});
+
+		return assemblies;
 	}
 
 	public async findStandalone(
@@ -102,13 +110,12 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 			environmentId,
 		});
 
-		// Note: Since _pluginpackageid_value doesn't exist in most environments,
-		// we cannot distinguish between standalone and packaged assemblies.
-		// Return all assemblies as "standalone" for now.
-		// Solution filtering is also deferred (requires ISolutionComponentRepository).
+		// Standalone assemblies have no package (packageid is null)
+		// Solution filtering is deferred (requires ISolutionComponentRepository).
 		const endpoint =
 			`/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}` +
 			`?$select=${DataversePluginAssemblyRepository.SELECT_FIELDS}` +
+			`&$filter=_packageid_value eq null` +
 			'&$orderby=name asc';
 
 		const response = await this.apiService.get<PluginAssemblyCollectionResponse>(
@@ -116,7 +123,13 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 			endpoint
 		);
 
-		return response.value.map((dto) => this.mapToDomain(dto));
+		const assemblies = response.value.map((dto) => this.mapToDomain(dto));
+
+		this.logger.debug('DataversePluginAssemblyRepository: Fetched standalone assemblies', {
+			count: assemblies.length,
+		});
+
+		return assemblies;
 	}
 
 	public async findById(
@@ -175,7 +188,7 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 			IsolationMode.fromValue(dto.isolationmode),
 			dto.ismanaged,
 			SourceType.fromValue(dto.sourcetype),
-			null, // packageId - not available in most Dataverse environments
+			dto._packageid_value,
 			new Date(dto.createdon),
 			new Date(dto.modifiedon)
 		);
