@@ -675,8 +675,7 @@ export class DataverseNotebookController {
 			overscan: DataverseNotebookController.OVERSCAN,
 			scrollContainerId: 'scrollContainer',
 			tbodyId: 'tableBody',
-			columnCount,
-			scrollDebounceMs: 10
+			columnCount
 		});
 	}
 

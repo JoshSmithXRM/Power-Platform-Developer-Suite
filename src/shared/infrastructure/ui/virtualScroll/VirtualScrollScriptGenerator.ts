@@ -23,8 +23,6 @@ export interface VirtualScrollConfig {
 	tbodyId: string;
 	/** Number of columns (for spacer row colspan) */
 	columnCount: number;
-	/** Debounce delay for scroll events in ms */
-	scrollDebounceMs?: number;
 }
 
 /**
@@ -45,8 +43,6 @@ export function generateVirtualScrollScript(
 	rowDataJson: string,
 	config: VirtualScrollConfig
 ): string {
-	const scrollDebounceMs = config.scrollDebounceMs ?? 10;
-
 	return `
 (function() {
 	const ROW_HEIGHT = ${config.rowHeight};
@@ -107,11 +103,16 @@ export function generateVirtualScrollScript(
 	// Initial render
 	renderVisibleRows();
 
-	// Re-render on scroll (debounced)
+	// Re-render on scroll (using requestAnimationFrame for smooth rendering)
 	let scrollTimer = null;
 	container.addEventListener('scroll', function() {
-		if (scrollTimer) clearTimeout(scrollTimer);
-		scrollTimer = setTimeout(renderVisibleRows, ${scrollDebounceMs});
+		if (scrollTimer) {
+			cancelAnimationFrame(scrollTimer);
+		}
+		scrollTimer = requestAnimationFrame(function() {
+			renderVisibleRows();
+			scrollTimer = null;
+		});
 	});
 })();
 `;
