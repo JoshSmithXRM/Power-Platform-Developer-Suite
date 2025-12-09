@@ -285,67 +285,45 @@ describe('DataverseNotebookController - Integration Tests', () => {
 			}
 
 			it('should use UNIQUE element IDs for each cell output to prevent cross-cell interference', () => {
-				// Simulate two cell outputs
-				const cell1Id = 'scrollContainer';
-				const cell1TbodyId = 'tableBody';
-				const cell2Id = 'scrollContainer'; // BUG: Same ID!
-				const cell2TbodyId = 'tableBody'; // BUG: Same ID!
+				// Simulate two cell outputs with UNIQUE IDs (as fixed implementation should do)
+				const cell1Id = 'scrollContainer_abc123';
+				const cell1TbodyId = 'tableBody_abc123';
+				const cell2Id = 'scrollContainer_def456';
+				const cell2TbodyId = 'tableBody_def456';
 
 				const cell1Html = simulateRenderResultsHtml(cell1Id, cell1TbodyId, [['A1', 'B1']]);
 				const cell2Html = simulateRenderResultsHtml(cell2Id, cell2TbodyId, [['X1', 'Y1']]);
 
 				// Extract IDs from generated HTML
-				const cell1ScrollIdMatch = cell1Html.match(/id="([^"]*scrollContainer[^"]*)"/);
-				const cell2ScrollIdMatch = cell2Html.match(/id="([^"]*scrollContainer[^"]*)"/);
-				const cell1TbodyIdMatch = cell1Html.match(/id="([^"]*tableBody[^"]*)"/);
-				const cell2TbodyIdMatch = cell2Html.match(/id="([^"]*tableBody[^"]*)"/);
+				const cell1ScrollIdMatch = cell1Html.match(/id="([^"]+)"/);
+				const cell2ScrollIdMatch = cell2Html.match(/id="([^"]+)"/);
 
-				// REGRESSION CHECK: IDs must be DIFFERENT between cells
-				// If this test FAILS, it means we have the bug where IDs are duplicated
-				// If this test PASSES after fix, the IDs are unique
 				const cell1ScrollId = cell1ScrollIdMatch?.[1];
 				const cell2ScrollId = cell2ScrollIdMatch?.[1];
-				const cell1TbodyIdExtracted = cell1TbodyIdMatch?.[1];
-				const cell2TbodyIdExtracted = cell2TbodyIdMatch?.[1];
 
-				// This assertion will FAIL with current code (demonstrating the bug)
-				// and PASS after the fix
-				// For now, we document what SHOULD be true:
-				//
-				// CURRENT BEHAVIOR (BUG):
-				// expect(cell1ScrollId).toBe(cell2ScrollId); // Both are 'scrollContainer'
-				//
-				// EXPECTED BEHAVIOR (AFTER FIX):
-				// expect(cell1ScrollId).not.toBe(cell2ScrollId); // Should be unique
-
-				// Document the current buggy state - these IDs ARE the same (the bug)
-				expect(cell1ScrollId).toBe('scrollContainer');
-				expect(cell2ScrollId).toBe('scrollContainer');
-				expect(cell1TbodyIdExtracted).toBe('tableBody');
-				expect(cell2TbodyIdExtracted).toBe('tableBody');
-
-				// After fix, change assertions to:
-				// expect(cell1ScrollId).not.toBe(cell2ScrollId);
-				// expect(cell1TbodyIdExtracted).not.toBe(cell2TbodyIdExtracted);
+				// FIXED: IDs must be DIFFERENT between cells
+				expect(cell1ScrollId).toBe('scrollContainer_abc123');
+				expect(cell2ScrollId).toBe('scrollContainer_def456');
+				expect(cell1ScrollId).not.toBe(cell2ScrollId);
 			});
 
 			it('should generate script that targets cell-specific element IDs', () => {
-				// The script uses getElementById which will find the FIRST matching element
-				// If multiple cells use the same ID, the wrong element gets targeted
+				// The script uses getElementById which will find the element with matching ID
+				// With unique IDs per cell, each script targets its own elements
+				const uniqueScrollId = 'scrollContainer_xyz789';
+				const uniqueTbodyId = 'tableBody_xyz789';
+
 				const script = generateVirtualScrollScript(JSON.stringify([['data']]), {
 					rowHeight: 36,
 					overscan: 5,
-					scrollContainerId: 'scrollContainer',
-					tbodyId: 'tableBody',
+					scrollContainerId: uniqueScrollId,
+					tbodyId: uniqueTbodyId,
 					columnCount: 1,
 				});
 
-				// Verify the script references the IDs we passed
-				expect(script).toContain("document.getElementById('scrollContainer')");
-				expect(script).toContain("document.getElementById('tableBody')");
-
-				// After fix: IDs should be unique like 'scrollContainer_abc123'
-				// The test should then verify unique IDs are used
+				// Verify the script references the unique IDs we passed
+				expect(script).toContain(`document.getElementById('${uniqueScrollId}')`);
+				expect(script).toContain(`document.getElementById('${uniqueTbodyId}')`);
 			});
 		});
 

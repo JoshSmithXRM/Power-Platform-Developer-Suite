@@ -528,6 +528,12 @@ export class DataverseNotebookController {
 			return this.renderEmptyResults(viewModel.columns.length, executionTime);
 		}
 
+		// Generate unique IDs for this cell's elements to prevent cross-cell interference
+		// When multiple cells have outputs, each needs unique IDs so getElementById finds the right element
+		const uniqueId = this.generateUniqueId();
+		const scrollContainerId = `scrollContainer_${uniqueId}`;
+		const tbodyId = `tableBody_${uniqueId}`;
+
 		// Build header
 		const headerCells = viewModel.columns
 			.map((col, idx) => {
@@ -552,12 +558,12 @@ export class DataverseNotebookController {
 				${this.getNotebookStyles()}
 			</style>
 			<div class="results-container">
-				<div class="virtual-scroll-container" id="scrollContainer">
+				<div class="virtual-scroll-container" id="${scrollContainerId}">
 					<table class="results-table">
 						<thead>
 							<tr>${headerCells}</tr>
 						</thead>
-						<tbody id="tableBody">
+						<tbody id="${tbodyId}">
 							<!-- Rows rendered by JavaScript using spacer row approach -->
 						</tbody>
 					</table>
@@ -565,7 +571,7 @@ export class DataverseNotebookController {
 				${statusBar}
 			</div>
 			<script>
-				${this.getVirtualScrollScript(rowData, viewModel.columns.length)}
+				${this.getVirtualScrollScript(rowData, viewModel.columns.length, scrollContainerId, tbodyId)}
 			</script>
 		`;
 	}
@@ -691,15 +697,36 @@ export class DataverseNotebookController {
 	/**
 	 * Returns inline JavaScript for virtual scrolling.
 	 * Uses shared VirtualScrollScriptGenerator for single source of truth.
+	 *
+	 * @param rowData - Pre-rendered row data
+	 * @param columnCount - Number of columns
+	 * @param scrollContainerId - Unique ID for the scroll container element
+	 * @param tbodyId - Unique ID for the tbody element
 	 */
-	private getVirtualScrollScript(rowData: string[][], columnCount: number): string {
+	private getVirtualScrollScript(
+		rowData: string[][],
+		columnCount: number,
+		scrollContainerId: string,
+		tbodyId: string
+	): string {
 		return generateVirtualScrollScript(JSON.stringify(rowData), {
 			rowHeight: DataverseNotebookController.ROW_HEIGHT,
 			overscan: DataverseNotebookController.OVERSCAN,
-			scrollContainerId: 'scrollContainer',
-			tbodyId: 'tableBody',
+			scrollContainerId,
+			tbodyId,
 			columnCount
 		});
+	}
+
+	/**
+	 * Generates a unique ID for element identification.
+	 * Uses a combination of timestamp and random string to ensure uniqueness
+	 * across multiple cell outputs rendered in the same notebook.
+	 */
+	private generateUniqueId(): string {
+		const timestamp = Date.now().toString(36);
+		const random = Math.random().toString(36).substring(2, 8);
+		return `${timestamp}_${random}`;
 	}
 
 	/**

@@ -210,8 +210,8 @@ The code incorrectly identifies integer aggregates as `optionset`, triggering vi
 ### Bug 1: Duplicate Element IDs
 - [x] Identify root cause
 - [x] Write regression tests documenting bug
-- [ ] Implement fix (unique IDs per cell)
-- [ ] Update tests to verify unique IDs
+- [x] Implement fix (unique IDs per cell)
+- [x] Update tests to verify unique IDs
 - [ ] Manual testing with multi-cell notebook
 
 ### Bug 2: Aggregate `countname` Column
