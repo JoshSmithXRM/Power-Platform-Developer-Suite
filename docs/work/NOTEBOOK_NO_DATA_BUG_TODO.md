@@ -1,99 +1,121 @@
-# Notebook "No Data" Race Condition - Bug Investigation
+# Notebook Cell Output Cross-Contamination Bug
 
 **Branch:** `fix/notebook-no-data-race-condition`
 **Created:** 2025-12-09
-**Status:** Investigation (NOT FIXED)
+**Status:** ROOT CAUSE IDENTIFIED - Ready to Fix
 
 ---
 
 ## Bug Report
 
-**Reported Symptom:**
-- User runs identical SQL query in Data Explorer panel → Works correctly, shows data
-- User runs same query in Notebook panel → Shows "no data" in table cells
+### Original Symptom (Misleading)
+- User runs query in Notebook → Shows "no data" in table cells
 - Reloading VS Code window fixes the issue temporarily
 
-**Customer Query (for reference - do not hardcode):**
-```sql
-SELECT TOP 20
-  et_salesappointmentsid,
-  et_activitynumber,
-  et_mobilestatus,
-  et_salesrepownerid,
-  et_salesrepowneridname,
-  createdon,
-  createdby,
-  createdbyname
-FROM et_salesappointments
+### Actual Symptom (After Repro)
+- **Query 1** runs in Cell 1 → Shows correct data initially
+- **Query 2** runs in Cell 2 → Cell 2 shows headers only, NO DATA
+- **Query 2's DATA appears in Cell 1's output!** (overwrites Cell 1's results)
+
+### Reproduction Steps
+1. Open a `.ppdsnb` notebook with 2 cells
+2. Run Query 1 in Cell 1 (any FetchXML query) → Works correctly
+3. Run Query 2 in Cell 2 (different FetchXML query) → Cell 2 shows headers but no rows
+4. Observe: Cell 1 now shows Query 2's data!
+5. Reload window → Running only Query 2 works correctly
+
+---
+
+## Root Cause: DUPLICATE ELEMENT IDs
+
+### The Bug
+`DataverseNotebookController.renderResultsHtml()` generates HTML with **hardcoded element IDs**:
+- `id="scrollContainer"` (line 555)
+- `id="tableBody"` (line 560)
+
+When multiple cells have outputs, the DOM contains **multiple elements with the same ID**.
+
+### Why This Causes Cross-Cell Data Corruption
+
+```
+DOM after Cell 1 and Cell 2 render:
+
+Cell 1 Output:
+  <div id="scrollContainer">  ← FIRST in DOM
+    <tbody id="tableBody">Cell 1 data</tbody>
+  </div>
+  <script>/* Cell 1's script - already ran, populated correctly */</script>
+
+Cell 2 Output:
+  <div id="scrollContainer">  ← SECOND in DOM, SAME ID!
+    <tbody id="tableBody">EMPTY - never populated!</tbody>
+  </div>
+  <script>
+    // Cell 2's script runs:
+    const container = document.getElementById('scrollContainer');
+    // ↑ Returns Cell 1's container (first match in DOM)!
+
+    const tbody = document.getElementById('tableBody');
+    // ↑ Returns Cell 1's tbody!
+
+    tbody.innerHTML = /* Cell 2's data */;
+    // ↑ Overwrites Cell 1's data with Cell 2's data!
+  </script>
 ```
 
-**Key Observation:** This appears to be a race condition, NOT a logic bug. Reloading the window resets state and temporarily fixes the issue.
+**Result:**
+- Cell 1: Shows Cell 2's data (overwritten by Cell 2's script)
+- Cell 2: Shows headers only (its tbody was never populated)
 
 ---
 
-## Investigation Status
+## The Fix
 
-### Completed Analysis
+Generate **unique element IDs per cell** using a random suffix or cell-specific identifier:
 
-- [x] Reviewed `QueryResultViewModelMapper.ts` - Mapper logic appears correct
-- [x] Reviewed `DataverseNotebookController.ts` - Rendering logic appears correct
-- [x] Compared Data Explorer vs Notebook rendering paths
-- [x] Analyzed column/row key matching logic
-- [x] Verified lookup/name column expansion logic
+```typescript
+// Before (BUG):
+<div id="scrollContainer">
+<tbody id="tableBody">
 
-### Findings
+// After (FIX):
+const uniqueId = crypto.randomUUID().substring(0, 8);
+<div id="scrollContainer_${uniqueId}">
+<tbody id="tableBody_${uniqueId}">
+```
 
-1. **All unit tests pass** - The mapper and rendering logic is correct
-2. **No shared mutable state** - Data Explorer and Notebook have separate mapper instances
-3. **Race condition suspected** - "Works after reload" strongly suggests timing/state issue
-4. **Root cause NOT identified** - Need more runtime data to isolate
-
-### Possible Root Causes (Hypotheses)
-
-1. **Environment state not loaded** - `selectedEnvironmentUrl` might be undefined during render
-2. **Stale notebook controller state** - Controller persists across sessions, might hold corrupt state
-3. **Async initialization timing** - Some component not ready when render executes
-4. **Dataverse response case sensitivity** - Column keys might have different casing in some responses
+### Files to Modify
+1. `DataverseNotebookController.ts` - `renderResultsHtml()` method
+   - Generate unique ID suffix
+   - Pass unique IDs to HTML template
+   - Pass unique IDs to `getVirtualScrollScript()`
 
 ---
 
-## Changes Made (Investigation Only)
+## Regression Tests Added
 
-### Tests Added
+**File:** `DataverseNotebookController.integration.test.ts`
 
-1. **`QueryResultViewModelMapper.columnTypes.test.ts`**
-   - Added "Explicit name column queries - Notebook regression" test section
-   - 3 new tests for customer query pattern scenarios
+| Test | Purpose |
+|------|---------|
+| `should use UNIQUE element IDs for each cell output` | Documents current buggy state (IDs are same) |
+| `should generate script that targets cell-specific element IDs` | Verifies script uses passed IDs |
+| `demonstrates how duplicate IDs cause cross-cell data corruption` | Simulates getElementById behavior |
 
-2. **`DataverseNotebookController.integration.test.ts`** (NEW FILE)
-   - End-to-end integration tests
-   - 5 tests covering column/row key alignment
-
-### Debug Logging Added
-
-**File:** `DataverseNotebookController.ts`
-
-Added diagnostic logging that will capture:
-- Row count, column count, column names
-- First row keys (to compare against column names)
-- Environment URL status
-- **Automatic detection** of column/row key mismatch (logs as ERROR)
-
-**How to use:** When bug occurs, check Output panel → "Power Platform Developer Suite" for:
-- `Notebook cell query completed` - Shows mapping details
-- `REGRESSION BUG: Column/row key mismatch detected` - Identifies exact mismatch
+**Test Strategy:**
+- Tests currently PASS by documenting buggy behavior
+- After fix, update assertions to verify IDs are UNIQUE
 
 ---
 
-## Next Steps
+## Implementation Checklist
 
-- [ ] Reproduce the bug again
-- [ ] Capture debug logs when bug occurs
-- [ ] Analyze logs to identify column/row key mismatch
-- [ ] Identify root cause from log data
-- [ ] Implement fix
-- [ ] Write regression test that catches the specific failure
-- [ ] Verify fix with manual testing
+- [x] Identify root cause
+- [x] Write regression tests documenting bug
+- [ ] Implement fix (unique IDs per cell)
+- [ ] Update tests to verify unique IDs
+- [ ] Manual testing with multi-cell notebook
+- [ ] Commit and create PR
 
 ---
 
@@ -101,30 +123,26 @@ Added diagnostic logging that will capture:
 
 | File | Change Type | Purpose |
 |------|-------------|---------|
-| `src/features/dataExplorer/application/mappers/QueryResultViewModelMapper.columnTypes.test.ts` | Modified | Added regression tests |
-| `src/features/dataExplorer/notebooks/DataverseNotebookController.ts` | Modified | Added debug logging |
-| `src/features/dataExplorer/notebooks/DataverseNotebookController.integration.test.ts` | New | Integration tests |
+| `QueryResultViewModelMapper.columnTypes.test.ts` | Modified | Added initial regression tests (mapper logic) |
+| `DataverseNotebookController.ts` | Modified | Added debug logging |
+| `DataverseNotebookController.integration.test.ts` | Modified | Added duplicate ID regression tests |
 
 ---
 
 ## Session Notes
 
-### Session 1 (2025-12-09)
+### Session 1 (2025-12-09) - Initial Investigation
 
-**What was done:**
-- Investigated the bug report thoroughly
-- Traced through mapper and rendering code paths
-- Compared Data Explorer vs Notebook implementations
-- Concluded this is a race condition, not a logic bug
-- Added debug logging to capture diagnostic data when bug recurs
-- Created regression tests to verify mapper logic is correct
+- Investigated original "no data" report
+- Added debug logging and mapper tests
+- Concluded it was a race condition (partially correct)
 
-**Handoff context:**
-- Bug is NOT fixed - investigation only
-- Debug logging is in place to help identify root cause
-- When bug recurs, check Output panel for diagnostic logs
-- Tests pass, so the issue is runtime state-related
+### Session 2 (2025-12-09) - Root Cause Found
 
-**Blocked on:**
-- Need to reproduce the bug to capture diagnostic logs
-- Once logs are captured, root cause can be identified
+- User reproduced bug with clearer symptoms
+- Identified that Query 2's data appears in Query 1's cell
+- Traced to duplicate element IDs in rendered HTML
+- `document.getElementById()` returns first match in DOM
+- Cell 2's script targets Cell 1's elements by mistake
+- Wrote regression tests documenting the bug
+- **Ready to implement fix**
