@@ -47,7 +47,7 @@ Add/edit/delete step images.
 - [x] Environment switching
 - [x] Tree search/filtering with ancestor/descendant visibility
 - [x] Disabled step visual differentiation
-- [ ] Expand All / Collapse All buttons
+- [x] Expand All / Collapse All buttons
 - [ ] Solution filtering (deferred)
 - [ ] Node selection shows detail panel (deferred)
 
@@ -56,7 +56,7 @@ Add/edit/delete step images.
 - [x] Tree displays hierarchy correctly
 - [x] Package → Assembly relationship works
 - [x] Filter shows complete hierarchy chain
-- [ ] Expand/Collapse All works with filter
+- [x] Expand/Collapse All works with filter
 
 ---
 
@@ -128,7 +128,7 @@ Add/edit/delete step images.
 ## Remaining Work - Slice 1
 
 ### Next Up
-1. [ ] **Expand All / Collapse All buttons** - Toolbar buttons to expand/collapse all visible nodes (respects filter)
+1. [x] **Expand All / Collapse All buttons** - Toolbar buttons to expand/collapse all visible nodes (respects filter) ✅
 
 ### Medium Priority (Can defer)
 2. [ ] **Unit tests** - Domain and application layer tests

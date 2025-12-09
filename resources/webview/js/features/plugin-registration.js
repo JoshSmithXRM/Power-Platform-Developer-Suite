@@ -49,6 +49,7 @@ function handleTreeUpdate(data) {
 	const loadingProgress = document.getElementById('loadingProgress');
 	const pluginTree = document.getElementById('pluginTree');
 	const treeEmpty = document.getElementById('treeEmpty');
+	const treeToolbar = document.getElementById('treeToolbar');
 
 	const { treeItems, isEmpty } = data;
 	treeData = treeItems || [];
@@ -65,6 +66,9 @@ function handleTreeUpdate(data) {
 		if (treeEmpty) {
 			treeEmpty.style.display = 'flex';
 		}
+		if (treeToolbar) {
+			treeToolbar.style.display = 'none';
+		}
 	} else {
 		if (treeEmpty) {
 			treeEmpty.style.display = 'none';
@@ -72,6 +76,9 @@ function handleTreeUpdate(data) {
 		if (pluginTree) {
 			pluginTree.style.display = 'block';
 			renderTree(treeData);
+		}
+		if (treeToolbar) {
+			treeToolbar.style.display = 'flex';
 		}
 	}
 }
@@ -305,6 +312,86 @@ function filterTree(searchTerm) {
 	});
 }
 
+/**
+ * Get IDs of all visible nodes that have children.
+ * Respects the current filter - only returns nodes that would be visible.
+ */
+function getVisibleExpandableNodeIds() {
+	const visibleIds = new Set();
+	const term = currentFilter.toLowerCase().trim();
+
+	// Helper to check if a node matches the filter term
+	function nodeMatches(item) {
+		return item.displayName.toLowerCase().includes(term);
+	}
+
+	// Helper to check if any descendant matches
+	function hasMatchingDescendant(item) {
+		if (!item.children || item.children.length === 0) return false;
+		for (const child of item.children) {
+			if (nodeMatches(child) || hasMatchingDescendant(child)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// Recursive function to collect expandable node IDs
+	function collectExpandableNodes(item, isAncestorVisible) {
+		const hasChildren = item.children && item.children.length > 0;
+		const matches = nodeMatches(item);
+		const hasMatchingChild = hasMatchingDescendant(item);
+
+		// Node is visible if: no filter, it matches, ancestor of match, or descendant of match
+		const isVisible = term === '' || matches || hasMatchingChild || isAncestorVisible;
+
+		if (isVisible && hasChildren) {
+			visibleIds.add(item.id);
+		}
+
+		// Recurse into children
+		if (hasChildren) {
+			// Children are visible if this node matches (they're descendants of a match)
+			const childrenAncestorVisible = isAncestorVisible || matches;
+			for (const child of item.children) {
+				collectExpandableNodes(child, childrenAncestorVisible);
+			}
+		}
+	}
+
+	for (const item of treeData) {
+		collectExpandableNodes(item, false);
+	}
+
+	return visibleIds;
+}
+
+/**
+ * Expand all visible nodes
+ */
+function expandAll() {
+	const visibleExpandableIds = getVisibleExpandableNodeIds();
+	for (const id of visibleExpandableIds) {
+		expandedNodes.add(id);
+	}
+	renderTree(treeData);
+	if (currentFilter) {
+		filterTree(currentFilter);
+	}
+}
+
+/**
+ * Collapse all visible nodes
+ */
+function collapseAll() {
+	// Clear all expanded nodes (simple approach - works well regardless of filter)
+	expandedNodes.clear();
+	renderTree(treeData);
+	if (currentFilter) {
+		filterTree(currentFilter);
+	}
+}
+
 // Use createBehavior pattern (from messaging.js) for proper integration
 window.createBehavior({
 	initialize() {
@@ -312,6 +399,9 @@ window.createBehavior({
 		const pluginTree = document.getElementById('pluginTree');
 		const treeEmpty = document.getElementById('treeEmpty');
 		const treeSearch = document.getElementById('treeSearch');
+		const treeToolbar = document.getElementById('treeToolbar');
+		const expandAllBtn = document.getElementById('expandAllBtn');
+		const collapseAllBtn = document.getElementById('collapseAllBtn');
 
 		// Initial state: show loading
 		if (loadingProgress) {
@@ -323,6 +413,9 @@ window.createBehavior({
 		if (treeEmpty) {
 			treeEmpty.style.display = 'none';
 		}
+		if (treeToolbar) {
+			treeToolbar.style.display = 'none';
+		}
 
 		// Wire up search handler
 		if (treeSearch) {
@@ -330,6 +423,14 @@ window.createBehavior({
 				const value = event.target.value || '';
 				filterTree(value);
 			});
+		}
+
+		// Wire up expand/collapse all handlers
+		if (expandAllBtn) {
+			expandAllBtn.addEventListener('click', expandAll);
+		}
+		if (collapseAllBtn) {
+			collapseAllBtn.addEventListener('click', collapseAll);
 		}
 	},
 
