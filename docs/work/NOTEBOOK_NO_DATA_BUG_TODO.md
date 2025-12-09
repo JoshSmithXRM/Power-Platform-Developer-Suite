@@ -1,8 +1,8 @@
-# Notebook Cell Output Cross-Contamination Bug
+# Notebook Bug Fixes
 
 **Branch:** `fix/notebook-no-data-race-condition`
 **Created:** 2025-12-09
-**Status:** ROOT CAUSE IDENTIFIED - Ready to Fix
+**Status:** Multiple bugs in progress
 
 ---
 
@@ -207,20 +207,32 @@ The code incorrectly identifies integer aggregates as `optionset`, triggering vi
 
 ## Implementation Checklist (Updated)
 
-### Bug 1: Duplicate Element IDs
+### Bug 1: Duplicate Element IDs - FIXED
 - [x] Identify root cause
 - [x] Write regression tests documenting bug
 - [x] Implement fix (unique IDs per cell)
 - [x] Update tests to verify unique IDs
-- [ ] Manual testing with multi-cell notebook
+- [x] Manual testing with multi-cell notebook
 
-### Bug 2: Aggregate `countname` Column
-- [x] Identify root cause
+### Bug 2: Aggregate `countname` Column - OPEN
+- [x] Identify root cause (inferDataType returns 'optionset' for integer aggregates)
 - [ ] Write regression test
 - [ ] Fix data type inference for aggregates
 - [ ] Manual testing
 
-### Issue 3: Virtual Column Behavior
+### Bug 3: Single Column Text Alignment - OPEN (NEW)
+**Symptom:** When query returns only 1 column, cell text is right-aligned but header is left-aligned.
+
+**Screenshot:** Single column query shows misaligned text - headers left, data right.
+
+**Root Cause:** TBD - likely CSS issue in notebook styles or virtual scroll renderer.
+
+- [ ] Identify root cause
+- [ ] Write regression test
+- [ ] Fix CSS alignment
+- [ ] Manual testing
+
+### Issue 4: Virtual Column Behavior - INVESTIGATING
 - [x] Add debug command for API testing
 - [ ] Run debug command to capture raw API response
 - [ ] Determine if Dataverse behavior or our bug
