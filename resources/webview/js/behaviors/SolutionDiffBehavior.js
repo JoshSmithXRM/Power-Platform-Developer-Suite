@@ -1,13 +1,14 @@
 /**
  * Solution Diff Behavior
  * Handles client-side interactions for the Solution Diff panel.
+ *
+ * Uses event delegation to handle elements that get replaced on scaffold refresh.
  */
 
 window.createBehavior({
   initialize() {
-    // Set up event listeners for environment and solution selection
-    this.setupEnvironmentListeners();
-    this.setupSolutionListener();
+    // Use event delegation on document so listeners survive HTML replacement
+    this.setupEventDelegation();
   },
 
   handleMessage(message) {
@@ -17,44 +18,38 @@ window.createBehavior({
     }
   },
 
-  setupEnvironmentListeners() {
-    // Source environment change
-    const sourceSelect = document.getElementById('sourceEnvironmentSelect');
-    if (sourceSelect) {
-      sourceSelect.addEventListener('change', (e) => {
-        const environmentId = e.target.value;
-        window.postMessage({
+  setupEventDelegation() {
+    // Single delegated change listener for all dropdowns
+    document.addEventListener('change', (e) => {
+      const target = e.target;
+
+      // Source environment change
+      if (target.id === 'sourceEnvironmentSelect') {
+        window.vscode.postMessage({
           command: 'sourceEnvironmentChange',
-          environmentId: environmentId
+          data: { environmentId: target.value }
         });
-      });
-    }
+        return;
+      }
 
-    // Target environment change
-    const targetSelect = document.getElementById('targetEnvironmentSelect');
-    if (targetSelect) {
-      targetSelect.addEventListener('change', (e) => {
-        const environmentId = e.target.value;
-        window.postMessage({
+      // Target environment change
+      if (target.id === 'targetEnvironmentSelect') {
+        window.vscode.postMessage({
           command: 'targetEnvironmentChange',
-          environmentId: environmentId
+          data: { environmentId: target.value }
         });
-      });
-    }
-  },
+        return;
+      }
 
-  setupSolutionListener() {
-    // Solution selection change
-    const solutionSelect = document.getElementById('solutionSelect');
-    if (solutionSelect) {
-      solutionSelect.addEventListener('change', (e) => {
-        const uniqueName = e.target.value;
-        window.postMessage({
+      // Solution selection change
+      if (target.id === 'solutionSelect') {
+        window.vscode.postMessage({
           command: 'solutionSelect',
-          uniqueName: uniqueName
+          data: { uniqueName: target.value }
         });
-      });
-    }
+        return;
+      }
+    });
   },
 
   setButtonState(buttonId, disabled) {
