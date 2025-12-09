@@ -31,7 +31,6 @@ export class ConnectorMappingService {
 	): ConnectorMatchResult {
 		// Group target connections by ConnectorId
 		const targetByConnectorId = this.groupByConnectorId(targetConnections);
-		const targetConnectorIds = new Set(targetByConnectorId.keys());
 
 		// Find auto-matched and unmatched source
 		const autoMatched = new Map<string, Connection[]>();
@@ -82,12 +81,11 @@ export class ConnectorMappingService {
 		const grouped = new Map<string, Connection[]>();
 
 		for (const conn of connections) {
-			const connectorId = conn.getConnectorId();
-			const existing = grouped.get(connectorId);
+			const existing = grouped.get(conn.connectorId);
 			if (existing !== undefined) {
 				existing.push(conn);
 			} else {
-				grouped.set(connectorId, [conn]);
+				grouped.set(conn.connectorId, [conn]);
 			}
 		}
 

@@ -23,6 +23,7 @@ import { initializePersistenceInspector } from './features/persistenceInspector/
 import { initializeDevTools } from './features/devTools/initializeDevTools.js';
 import { initializeDataExplorer } from './features/dataExplorer/presentation/initialization/initializeDataExplorer.js';
 import { initializeWebResources } from './features/webResources/presentation/initialization/initializeWebResources.js';
+import { initializeDeploymentSettingsPromotion } from './features/deploymentSettingsPromotion/presentation/initialization/initializeDeploymentSettingsPromotion.js';
 import { registerDataverseNotebooks } from './features/dataExplorer/notebooks/registerNotebooks.js';
 import { registerDataExplorerIntelliSense } from './features/dataExplorer/presentation/initialization/registerDataExplorerIntelliSense.js';
 import { DataverseApiService } from './shared/infrastructure/services/DataverseApiService.js';
@@ -615,6 +616,17 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	const deploymentSettingsPromotionCommand = vscode.commands.registerCommand('power-platform-dev-suite.deploymentSettingsPromotion', async () => {
+		try {
+			void initializeDeploymentSettingsPromotion(context, factories.getEnvironments, container.logger);
+		} catch (error) {
+			container.logger.error('Failed to open Deployment Settings Promotion', error);
+			vscode.window.showErrorMessage(
+				`Failed to open Deployment Settings Promotion: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
 	// Register all disposables with VS Code's extension context.
 	// When the extension deactivates, VS Code automatically calls .dispose() on each
 	// registered disposable in reverse order, ensuring proper cleanup of:
@@ -647,6 +659,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		openCellInDataExplorerCommand,
 		webResourcesCommand,
 		webResourcesPickEnvironmentCommand,
+		deploymentSettingsPromotionCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,

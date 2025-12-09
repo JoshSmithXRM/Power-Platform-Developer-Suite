@@ -11,13 +11,13 @@ describe('Connection', () => {
 				'Admin User'
 			);
 
-			expect(connection.getId()).toBe('conn-123');
-			expect(connection.getDisplayName()).toBe('Dataverse Production');
-			expect(connection.getConnectorId()).toBe(
+			expect(connection.id).toBe('conn-123');
+			expect(connection.displayName).toBe('Dataverse Production');
+			expect(connection.connectorId).toBe(
 				'/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps'
 			);
-			expect(connection.getStatus()).toBe('Connected');
-			expect(connection.getCreatedBy()).toBe('Admin User');
+			expect(connection.status).toBe('Connected');
+			expect(connection.createdBy).toBe('Admin User');
 		});
 	});
 
@@ -109,7 +109,7 @@ describe('Connection', () => {
 		statuses.forEach((status) => {
 			it(`should accept status '${status}'`, () => {
 				const connection = Connection.create('conn-1', 'Test', '/apis/test', status, 'User');
-				expect(connection.getStatus()).toBe(status);
+				expect(connection.status).toBe(status);
 			});
 		});
 	});

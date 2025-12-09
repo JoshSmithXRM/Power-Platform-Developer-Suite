@@ -15,6 +15,9 @@ export {
 // Dataverse API service setup
 export { createMockDataverseApiService } from './dataverseApiServiceSetup';
 
+// Power Apps Admin API service setup
+export { createMockPowerAppsAdminApiService } from './powerAppsAdminApiServiceSetup';
+
 // Repository setup
 export {
 	createMockEnvironmentRepository,

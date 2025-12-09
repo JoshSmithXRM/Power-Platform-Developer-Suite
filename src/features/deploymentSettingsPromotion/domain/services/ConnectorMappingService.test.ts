@@ -153,7 +153,7 @@ describe('ConnectorMappingService', () => {
 			const defaultConn = service.selectDefaultConnection(connections);
 
 			expect(defaultConn).not.toBeNull();
-			expect(defaultConn?.getId()).toBe('conn-1');
+			expect(defaultConn?.id).toBe('conn-1');
 		});
 
 		it('should skip inactive connections and return first active', () => {
@@ -167,7 +167,7 @@ describe('ConnectorMappingService', () => {
 			const defaultConn = service.selectDefaultConnection(connections);
 
 			expect(defaultConn).not.toBeNull();
-			expect(defaultConn?.getId()).toBe('conn-3');
+			expect(defaultConn?.id).toBe('conn-3');
 		});
 
 		it('should return null when no active connections', () => {
@@ -192,7 +192,7 @@ describe('ConnectorMappingService', () => {
 
 			const defaultConn = service.selectDefaultConnection(connections);
 
-			expect(defaultConn?.getId()).toBe('conn-only');
+			expect(defaultConn?.id).toBe('conn-only');
 		});
 	});
 

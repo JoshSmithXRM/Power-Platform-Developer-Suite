@@ -200,6 +200,11 @@
                 "category": "Power Platform Developer Suite"
             },
             {
+                "command": "power-platform-dev-suite.deploymentSettingsPromotion",
+                "title": "Promote Deployment Settings",
+                "category": "Power Platform Developer Suite"
+            },
+            {
                 "command": "power-platform-dev-suite.environmentVariables",
                 "title": "Environment Variables",
                 "category": "Power Platform Developer Suite"

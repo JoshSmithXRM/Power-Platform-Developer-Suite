@@ -13,11 +13,11 @@
  */
 export class Connection {
 	private constructor(
-		private readonly _id: string,
-		private readonly _displayName: string,
-		private readonly _connectorId: string,
-		private readonly _status: ConnectionStatus,
-		private readonly _createdBy: string
+		public readonly id: string,
+		public readonly displayName: string,
+		public readonly connectorId: string,
+		public readonly status: ConnectionStatus,
+		public readonly createdBy: string
 	) {}
 
 	/**
@@ -44,7 +44,7 @@ export class Connection {
 	 * Only connections with 'Connected' status can be used in deployment settings.
 	 */
 	public isActive(): boolean {
-		return this._status === 'Connected';
+		return this.status === 'Connected';
 	}
 
 	/**
@@ -54,27 +54,7 @@ export class Connection {
 	 * @param connectorId - The connector ID to check against
 	 */
 	public belongsToConnector(connectorId: string): boolean {
-		return this._connectorId === connectorId;
-	}
-
-	public getId(): string {
-		return this._id;
-	}
-
-	public getDisplayName(): string {
-		return this._displayName;
-	}
-
-	public getConnectorId(): string {
-		return this._connectorId;
-	}
-
-	public getStatus(): ConnectionStatus {
-		return this._status;
-	}
-
-	public getCreatedBy(): string {
-		return this._createdBy;
+		return this.connectorId === connectorId;
 	}
 }
 

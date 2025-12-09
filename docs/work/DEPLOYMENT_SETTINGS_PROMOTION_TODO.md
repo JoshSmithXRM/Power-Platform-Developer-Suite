@@ -2,7 +2,7 @@
 
 **Branch:** `feature/deployment-settings-promotion`
 **Created:** 2025-12-08
-**Status:** Implementation
+**Status:** Implementation (F5 Ready)
 
 ---
 
@@ -20,7 +20,7 @@
 
 #### Entities
 - [x] `Connection.ts` - Power Platform connection entity
-  - Properties: id, displayName, connectorId, status, createdBy
+  - Properties: id, displayName, connectorId, status, createdBy (public readonly)
   - Methods: isActive(), belongsToConnector()
   - Factory: Connection.create()
 
@@ -36,7 +36,6 @@
 - [x] `ConnectorMappingService.ts` - Connector matching algorithm
   - matchConnectors() - Compare ConnectorId sets
   - selectDefaultConnection() - Pick first active connection
-  - groupByConnectorId() - Internal helper
 
 #### Repository Interfaces
 - [x] `IPowerPlatformConnectionRepository.ts` - Contract for fetching connections
@@ -47,26 +46,46 @@
 - [x] `ConnectorMapping.test.ts` - 8 tests passing
 - [x] `ConnectorMappingService.test.ts` - 14 tests passing
 
-#### Verification
-- [x] `npx tsc --noEmit` passes (no errors in new code)
-- [x] `npm test` passes (46 tests, all passing)
-- [ ] Committed: "feat(domain): add Connection entity and connector matching"
+---
+
+## Slice 2: Infrastructure - Power Platform API - COMPLETE (Untested)
+
+- [x] `IPowerAppsAdminApiService.ts` - Interface for Power Apps Admin API
+- [x] `PowerAppsAdminApiService.ts` - HTTP client for api.powerapps.com
+- [x] `PowerPlatformApiConnectionRepository.ts` - Implements IPowerPlatformConnectionRepository
+- [x] `createMockPowerAppsAdminApiService` - Test utility added
+- [ ] Integration tests (deferred - will write after F5 validation)
 
 ---
 
-## Slice 2: Infrastructure - Power Platform API - PENDING
+## Slice 3: Panel Skeleton + File Loading - COMPLETE
 
-- [ ] `PowerPlatformApiConnectionRepository.ts` - Implements IPowerPlatformConnectionRepository
-- [ ] Authentication integration with existing auth service
-- [ ] Integration tests with mock HTTP responses
-
-## Slice 3-8: PENDING
-
-See design document for full slice breakdown.
+- [x] `DeploymentSettingsPromotionPanel.ts` - Singleton panel
+- [x] `initializeDeploymentSettingsPromotion.ts` - Lazy initialization
+- [x] Command registered: `power-platform-dev-suite.deploymentSettingsPromotion`
+- [x] File picker for source deployment settings JSON
+- [x] Basic toolbar with action buttons
 
 ---
 
-## File Structure Created
+## Slice 4: Target Environment Selection - COMPLETE
+
+- [x] Environment selector dropdown (reused EnvironmentSelectorSection)
+- [x] `environmentChanged` command handler
+- [x] Environments loaded from getEnvironments factory
+
+---
+
+## Slice 5-8: PENDING
+
+- [ ] Slice 5: Auto-match + Manual Mapping UI (custom sections needed)
+- [ ] Slice 6: Environment Variable Diff UI
+- [ ] Slice 7: Output File Generation
+- [ ] Slice 8: Polish and Error Handling
+
+---
+
+## File Structure
 
 ```
 src/features/deploymentSettingsPromotion/
@@ -84,17 +103,42 @@ src/features/deploymentSettingsPromotion/
 │   │   └── ConnectorMappingService.test.ts
 │   └── interfaces/
 │       └── IPowerPlatformConnectionRepository.ts
+├── infrastructure/
+│   └── repositories/
+│       └── PowerPlatformApiConnectionRepository.ts
+└── presentation/
+    ├── panels/
+    │   └── DeploymentSettingsPromotionPanel.ts
+    └── initialization/
+        └── initializeDeploymentSettingsPromotion.ts
+
+src/shared/infrastructure/
+├── interfaces/
+│   └── IPowerAppsAdminApiService.ts
+├── services/
+│   └── PowerAppsAdminApiService.ts
+└── testing/setup/
+    └── powerAppsAdminApiServiceSetup.ts
 ```
+
+---
+
+## Verification Status
+
+- [x] `npm run compile` - 0 errors, 25 warnings (pre-existing)
+- [x] `npm test deploymentSettingsPromotion` - 46 tests passing
+- [x] Command registered in package.json
+- [ ] F5 manual testing
 
 ---
 
 ## Session Notes
 
-### Session 1 (2025-12-08)
-- Completed Slice 1: Domain Foundation
-- Following Clean Architecture - domain has ZERO external dependencies
-- Using factory methods (Connection.create()) per design doc
-- Fixed type error: `selectDefaultConnection` undefined vs null handling
-- Fixed immutability: Added defensive copies to ConnectorMatchResult.create()
-- All 46 tests passing
-- Ready for Slice 2: Infrastructure layer
+### Session 1 (2025-12-09)
+- Completed Slice 1: Domain Foundation (46 tests)
+- Completed Slice 2: Infrastructure (untested, deferred)
+- Completed Slice 3: Panel skeleton with file loading
+- Completed Slice 4: Target environment selection
+- Refactored Connection entity to use public readonly properties (lint compliance)
+- Panel ready for F5 testing
+- Next: F5 test, then Slice 5 (mapping UI) or commit checkpoint

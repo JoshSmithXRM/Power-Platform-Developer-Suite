@@ -13,6 +13,7 @@ export {
 	createMockCancellationToken,
 	createDynamicCancellationToken,
 	createMockDataverseApiService,
+	createMockPowerAppsAdminApiService,
 	createMockEnvironmentRepository,
 	createMockSolutionRepository,
 	createMockPluginTraceRepository,
