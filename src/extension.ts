@@ -18,6 +18,7 @@ import { initializeImportJobViewer } from './features/importJobViewer/presentati
 import { initializeConnectionReferences } from './features/connectionReferences/presentation/initialization/initializeConnectionReferences.js';
 import { initializeEnvironmentVariables } from './features/environmentVariables/presentation/initialization/initializeEnvironmentVariables.js';
 import { initializePluginTraceViewer } from './features/pluginTraceViewer/presentation/initialization/initializePluginTraceViewer.js';
+import { initializePluginRegistration } from './features/pluginRegistration/presentation/initialization/initializePluginRegistration.js';
 import { initializeMetadataBrowser } from './features/metadataBrowser/presentation/initialization/initializeMetadataBrowser.js';
 import { initializePersistenceInspector } from './features/persistenceInspector/presentation/initialization/initializePersistenceInspector.js';
 import { initializeDevTools } from './features/devTools/initializeDevTools.js';
@@ -479,6 +480,32 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	const pluginRegistrationCommand = vscode.commands.registerCommand('power-platform-dev-suite.pluginRegistration', async (environmentItem?: { envId: string }) => {
+		try {
+			void initializePluginRegistration(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, environmentItem?.envId);
+		} catch (error) {
+			container.logger.error('Failed to open Plugin Registration', error);
+			vscode.window.showErrorMessage(
+				`Failed to open Plugin Registration: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	const pluginRegistrationPickEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.pluginRegistrationPickEnvironment', async () => {
+		try {
+			await showEnvironmentPickerAndExecute(
+				container.environmentRepository,
+				'Select an environment to view Plugin Registration',
+				async (envId) => initializePluginRegistration(context, factories.getEnvironments, factories.getEnvironmentById, factories.dataverseApiServiceFactory, container.logger, envId)
+			);
+		} catch (error) {
+			container.logger.error('Failed to open Plugin Registration with environment picker', error);
+			vscode.window.showErrorMessage(
+				`Failed to open Plugin Registration: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
 	const metadataBrowserCommand = vscode.commands.registerCommand('power-platform-dev-suite.metadataBrowser', async (environmentItem?: { envId: string }) => {
 		try {
 			void initializeMetadataBrowser(context, factories.getEnvironments, factories.dataverseApiServiceFactory, container.environmentRepository, container.logger, environmentItem?.envId);
@@ -640,6 +667,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		environmentVariablesPickEnvironmentCommand,
 		pluginTraceViewerCommand,
 		pluginTraceViewerPickEnvironmentCommand,
+		pluginRegistrationCommand,
+		pluginRegistrationPickEnvironmentCommand,
 		metadataBrowserCommand,
 		metadataBrowserPickEnvironmentCommand,
 		dataExplorerCommand,
