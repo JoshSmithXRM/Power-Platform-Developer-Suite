@@ -25,6 +25,7 @@ export class ToolsTreeProvider implements vscode.TreeDataProvider<ToolItem> {
 			new ToolItem('Import Jobs', 'Monitor solution imports', 'importJobViewer', 'power-platform-dev-suite.importJobViewer', 'cloud-download'),
 			new ToolItem('Connection References', 'View connection references and flows', 'connectionReferences', 'power-platform-dev-suite.connectionReferences', 'plug'),
 			new ToolItem('Environment Variables', 'View environment variables', 'environmentVariables', 'power-platform-dev-suite.environmentVariables', 'symbol-variable'),
+			new ToolItem('Deployment Settings', 'Create, load, and promote deployment settings', 'deploymentSettings', 'power-platform-dev-suite.deploymentSettingsPromotion', 'rocket'),
 			new ToolItem('Plugin Traces', 'View and manage plugin trace logs', 'pluginTraceViewer', 'power-platform-dev-suite.pluginTraceViewer', 'bug'),
 			new ToolItem('Metadata Browser', 'Browse entity metadata and attributes', 'metadataBrowser', 'power-platform-dev-suite.metadataBrowser', 'database'),
 			new ToolItem('Data Explorer', 'Query data with SQL syntax', 'dataExplorer', 'power-platform-dev-suite.dataExplorer', 'search'),

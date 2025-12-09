@@ -1,0 +1,153 @@
+/**
+ * Deployment Settings Promotion Panel Styles
+ */
+
+.status-container {
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	padding: 32px;
+	min-height: 200px;
+}
+
+.status-instructions,
+.status-loaded,
+.status-matching {
+	max-width: 600px;
+	padding: 24px;
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+}
+
+.status-instructions h2,
+.status-loaded h3,
+.status-matching h3 {
+	margin: 0 0 16px 0;
+	color: var(--vscode-foreground);
+	font-weight: 600;
+}
+
+.status-instructions p {
+	margin: 0 0 16px 0;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.5;
+}
+
+.instructions-list {
+	margin: 0;
+	padding-left: 24px;
+	color: var(--vscode-foreground);
+}
+
+.instructions-list li {
+	margin-bottom: 8px;
+	line-height: 1.5;
+}
+
+.instructions-list strong {
+	color: var(--vscode-textLink-foreground);
+}
+
+/* File loaded status */
+.file-name {
+	font-family: var(--vscode-editor-font-family);
+	font-size: 13px;
+	color: var(--vscode-textPreformat-foreground);
+	background: var(--vscode-textBlockQuote-background);
+	padding: 8px 12px;
+	border-radius: 4px;
+	margin: 0 0 16px 0;
+	word-break: break-all;
+}
+
+.status-counts {
+	display: flex;
+	gap: 24px;
+	margin-bottom: 16px;
+}
+
+.count-item {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 12px 16px;
+	background: var(--vscode-sideBar-background);
+	border-radius: 4px;
+	min-width: 120px;
+}
+
+.count-value {
+	font-size: 24px;
+	font-weight: 600;
+	color: var(--vscode-textLink-foreground);
+}
+
+.count-label {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 4px;
+}
+
+.status-hint {
+	margin: 0;
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+}
+
+/* Matching results */
+.status-success {
+	border-left: 3px solid var(--vscode-testing-iconPassed);
+}
+
+.status-warning {
+	border-left: 3px solid var(--vscode-testing-iconQueued);
+}
+
+.matching-summary {
+	display: flex;
+	gap: 16px;
+	margin-bottom: 16px;
+	flex-wrap: wrap;
+}
+
+.match-item {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 12px 16px;
+	border-radius: 4px;
+	min-width: 100px;
+}
+
+.match-success {
+	background: color-mix(in srgb, var(--vscode-testing-iconPassed) 15%, transparent);
+}
+
+.match-warning {
+	background: color-mix(in srgb, var(--vscode-testing-iconQueued) 15%, transparent);
+}
+
+.match-total {
+	background: var(--vscode-sideBar-background);
+}
+
+.match-count {
+	font-size: 20px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+
+.match-label {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 4px;
+}
+
+.status-action {
+	margin: 0;
+	padding: 12px;
+	background: var(--vscode-sideBar-background);
+	border-radius: 4px;
+	color: var(--vscode-foreground);
+}

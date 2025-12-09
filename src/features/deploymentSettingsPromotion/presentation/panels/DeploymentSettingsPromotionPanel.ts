@@ -1,3 +1,5 @@
+import path from 'path';
+
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
@@ -19,6 +21,7 @@ import type { IDeploymentSettingsRepository } from '../../../../shared/domain/in
 import type { Connection } from '../../domain/entities/Connection';
 import type { ConnectorMappingService } from '../../domain/services/ConnectorMappingService';
 import type { ConnectorMatchResult } from '../../domain/valueObjects/ConnectorMatchResult';
+import { DeploymentSettingsStatusSection, type DeploymentSettingsStatus } from '../sections/DeploymentSettingsStatusSection';
 
 /**
  * Commands supported by Deployment Settings Promotion panel.
@@ -54,6 +57,8 @@ export class DeploymentSettingsPromotionPanel {
 	private targetEnvironmentId: string | undefined;
 	private targetConnections: readonly Connection[] = [];
 	private matchResult: ConnectorMatchResult | undefined;
+	private status: DeploymentSettingsStatus = { fileLoaded: false, matchingComplete: false };
+	private environments: Array<{ id: string; name: string }> = [];
 
 	private constructor(
 		private readonly panel: SafeWebviewPanel,
@@ -100,8 +105,8 @@ export class DeploymentSettingsPromotionPanel {
 		}
 
 		const rawPanel = vscode.window.createWebviewPanel(
-			'deploymentSettingsPromotion',
-			'Promote Deployment Settings',
+			'deploymentSettings',
+			'Deployment Settings',
 			column,
 			{
 				enableScripts: true,
@@ -129,10 +134,21 @@ export class DeploymentSettingsPromotionPanel {
 
 	private async initializePanel(): Promise<void> {
 		// Load environments for dropdown
-		const environments = await this.getEnvironments();
+		const envData = await this.getEnvironments();
+		this.environments = envData.map((e) => ({ id: e.id, name: e.name }));
 
+		await this.refreshPanel();
+	}
+
+	/**
+	 * Refreshes the panel HTML with current state.
+	 */
+	private async refreshPanel(): Promise<void> {
 		await this.scaffoldingBehavior.refresh({
-			environments: environments.map((e) => ({ id: e.id, name: e.name }))
+			environments: this.environments,
+			customData: {
+				deploymentSettingsStatus: this.status
+			}
 		});
 	}
 
@@ -145,7 +161,7 @@ export class DeploymentSettingsPromotionPanel {
 			label: 'Target Environment:'
 		});
 
-		// Action buttons at top
+		// Action buttons at top (left side of toolbar)
 		const actionButtons = new ActionButtonsSection(
 			{
 				buttons: [
@@ -157,8 +173,11 @@ export class DeploymentSettingsPromotionPanel {
 			SectionPosition.Toolbar
 		);
 
+		// Status section in main content area
+		const statusSection = new DeploymentSettingsStatusSection();
+
 		const compositionBehavior = new SectionCompositionBehavior(
-			[environmentSelector, actionButtons],
+			[actionButtons, environmentSelector, statusSection],
 			PanelLayout.SingleColumn
 		);
 
@@ -166,22 +185,27 @@ export class DeploymentSettingsPromotionPanel {
 		const cssUris = resolveCssModules(
 			{
 				base: true,
-				components: ['buttons', 'inputs', 'dropdowns'],
+				components: ['buttons', 'inputs', 'dropdown'],
 				sections: ['action-buttons', 'environment-selector']
 			},
 			this.extensionUri,
 			this.panel.webview
 		);
 
+		// Add feature-specific CSS
+		const featureCssUri = this.panel.webview
+			.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'css', 'features', 'deployment-settings.css'))
+			.toString();
+
 		const scaffoldingConfig: HtmlScaffoldingConfig = {
-			cssUris: [...cssUris],
+			cssUris: [...cssUris, featureCssUri],
 			jsUris: [
 				this.panel.webview
 					.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js'))
 					.toString()
 			],
 			cspNonce: getNonce(),
-			title: 'Promote Deployment Settings'
+			title: 'Deployment Settings'
 		};
 
 		const scaffoldingBehavior = new HtmlScaffoldingBehavior(this.panel, compositionBehavior, scaffoldingConfig);
@@ -227,7 +251,10 @@ export class DeploymentSettingsPromotionPanel {
 	private async handleLoadSourceFile(): Promise<void> {
 		this.logger.debug('Opening file picker for source deployment settings');
 
-		const fileUri = await vscode.window.showOpenDialog({
+		// Start in workspace folder if available
+		const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+
+		const dialogOptions: vscode.OpenDialogOptions = {
 			canSelectFiles: true,
 			canSelectFolders: false,
 			canSelectMany: false,
@@ -236,7 +263,14 @@ export class DeploymentSettingsPromotionPanel {
 				'All Files': ['*']
 			},
 			title: 'Select Source Deployment Settings File'
-		});
+		};
+
+		// Only set defaultUri if we have a workspace folder
+		if (workspaceFolder) {
+			dialogOptions.defaultUri = workspaceFolder;
+		}
+
+		const fileUri = await vscode.window.showOpenDialog(dialogOptions);
 
 		if (fileUri === undefined || fileUri.length === 0) {
 			this.logger.debug('File selection cancelled');
@@ -264,6 +298,16 @@ export class DeploymentSettingsPromotionPanel {
 				connectionReferences: crCount,
 				environmentVariables: evCount
 			});
+
+			// Update status and refresh panel
+			this.status = {
+				fileLoaded: true,
+				sourceFileName: path.basename(filePath),
+				connectionReferenceCount: crCount,
+				environmentVariableCount: evCount,
+				matchingComplete: false
+			};
+			await this.refreshPanel();
 
 			void vscode.window.showInformationMessage(
 				`Loaded: ${crCount} connection references, ${evCount} environment variables`
@@ -326,10 +370,19 @@ export class DeploymentSettingsPromotionPanel {
 			needsMapping: unmatchedCount
 		});
 
+		// Update status with matching results
+		this.status = {
+			...this.status,
+			matchingComplete: true,
+			autoMatchedCount,
+			unmatchedCount
+		};
+		await this.refreshPanel();
+
 		// Show results summary
 		if (unmatchedCount === 0) {
 			void vscode.window.showInformationMessage(
-				`✓ All ${autoMatchedCount} connectors auto-matched! Ready to generate output.`
+				`All ${autoMatchedCount} connectors auto-matched! Ready to generate output.`
 			);
 		} else {
 			void vscode.window.showWarningMessage(
