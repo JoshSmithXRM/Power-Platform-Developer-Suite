@@ -290,6 +290,11 @@
                 "title": "Export Results to JSON",
                 "category": "Power Platform Developer Suite",
                 "icon": "$(json)"
+            },
+            {
+                "command": "power-platform-dev-suite.solutionDiff",
+                "title": "Solution Diff",
+                "category": "Power Platform Developer Suite"
             }
         ],
         "viewsContainers": {

@@ -26,6 +26,7 @@ import { initializeWebResources } from './features/webResources/presentation/ini
 import { registerDataverseNotebooks } from './features/dataExplorer/notebooks/registerNotebooks.js';
 import { registerDataExplorerIntelliSense } from './features/dataExplorer/presentation/initialization/registerDataExplorerIntelliSense.js';
 import { DataverseApiService } from './shared/infrastructure/services/DataverseApiService.js';
+import { initializeSolutionDiff } from './features/solutionDiff/presentation/initialization/initializeSolutionDiff.js';
 
 /**
  * Shows environment picker and executes callback with selected environment ID.
@@ -615,6 +616,52 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	// Solution Diff command (dual-environment feature)
+	const solutionDiffCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionDiff', async () => {
+		try {
+			const environments = await container.environmentRepository.getAll();
+
+			if (environments.length < 2) {
+				vscode.window.showErrorMessage('At least 2 environments required for Solution Diff. Please add more environments.');
+				return;
+			}
+
+			const quickPickItems: QuickPickItemWithEnvId[] = environments.map(env => ({
+				label: env.getName().getValue(),
+				description: env.getDataverseUrl().getValue(),
+				envId: env.getId().getValue()
+			}));
+
+			// Pick source environment
+			const sourceEnv = await vscode.window.showQuickPick(quickPickItems, {
+				placeHolder: 'Select SOURCE environment (compare from)'
+			});
+			if (!sourceEnv) return;
+
+			// Pick target environment (exclude source)
+			const targetPickItems = quickPickItems.filter(item => item.envId !== sourceEnv.envId);
+			const targetEnv = await vscode.window.showQuickPick(targetPickItems, {
+				placeHolder: 'Select TARGET environment (compare to)'
+			});
+			if (!targetEnv) return;
+
+			// Open panel with both environments
+			await initializeSolutionDiff(
+				context,
+				factories.getEnvironments,
+				factories.dataverseApiServiceFactory,
+				container.logger,
+				sourceEnv.envId,
+				targetEnv.envId
+			);
+		} catch (error) {
+			container.logger.error('Failed to open Solution Diff', error);
+			vscode.window.showErrorMessage(
+				`Failed to open Solution Diff: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
 	// Register all disposables with VS Code's extension context.
 	// When the extension deactivates, VS Code automatically calls .dispose() on each
 	// registered disposable in reverse order, ensuring proper cleanup of:
@@ -647,6 +694,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		openCellInDataExplorerCommand,
 		webResourcesCommand,
 		webResourcesPickEnvironmentCommand,
+		solutionDiffCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,

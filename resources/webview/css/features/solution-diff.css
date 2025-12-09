@@ -1,0 +1,263 @@
+/* Solution Diff Panel Styles */
+
+/* Dual Environment Selector */
+.dual-environment-selector {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.environment-selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.environment-selector-group label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--vscode-descriptionForeground);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.environment-dropdown {
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  cursor: pointer;
+}
+
+.environment-dropdown:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+}
+
+.comparison-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.arrow-icon {
+  font-size: 24px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.no-environments {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+/* Solution Selector */
+.solution-selector {
+  padding: 12px 16px;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.solution-selector label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--vscode-descriptionForeground);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.solution-dropdown {
+  width: 100%;
+  max-width: 400px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  cursor: pointer;
+}
+
+.solution-dropdown:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+}
+
+/* Comparison Placeholder */
+.comparison-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+}
+
+.placeholder-icon {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.placeholder-icon svg {
+  stroke: currentColor;
+}
+
+/* Comparison Loading */
+.comparison-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--vscode-progressBar-background);
+  border-top-color: var(--vscode-button-background);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Comparison Results */
+.comparison-results {
+  padding: 16px;
+}
+
+.comparison-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.comparison-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.comparison-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.status-same {
+  background: rgba(40, 167, 69, 0.15);
+  color: #28a745;
+}
+
+.status-different {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.status-source-only,
+.status-target-only {
+  background: rgba(220, 53, 69, 0.15);
+  color: #dc3545;
+}
+
+/* Comparison Table */
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.comparison-table th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-editor-background);
+}
+
+.comparison-table td {
+  font-size: 13px;
+}
+
+.property-label {
+  font-weight: 500;
+  width: 120px;
+}
+
+.source-value,
+.target-value {
+  width: calc((100% - 120px) / 2);
+}
+
+.diff-row .source-value,
+.diff-row .target-value {
+  background: rgba(255, 193, 7, 0.1);
+}
+
+/* Differences Section */
+.differences-section {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(255, 193, 7, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.differences-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffc107;
+}
+
+.differences-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.differences-list li {
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: var(--vscode-foreground);
+}
+
+/* Solution Comparison Section Container */
+.solution-comparison-section {
+  display: flex;
+  flex-direction: column;
+}
