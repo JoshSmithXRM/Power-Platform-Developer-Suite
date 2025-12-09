@@ -34,7 +34,7 @@ export class PluginStepViewModelMapper {
 			type: 'step',
 			name: step.getName(),
 			displayName: step.getName(),
-			icon: step.isEnabled() ? '⚡' : '⚫',
+			icon: step.isEnabled() ? '⚡' : '🚫',
 			metadata,
 			isManaged: step.isInManagedState(),
 			children: images,

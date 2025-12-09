@@ -210,13 +210,20 @@
 	font-weight: normal;
 }
 
-/* Disabled step */
+/* Disabled step - multiple visual cues for clear differentiation */
 .tree-node.disabled {
-	opacity: 0.5;
+	opacity: 0.6;
 }
 
 .tree-node.disabled .tree-node-label {
 	text-decoration: line-through;
+	color: var(--vscode-disabledForeground, #888);
+}
+
+.tree-node.disabled .tree-node-badge {
+	background: rgba(255, 100, 100, 0.15);
+	border-color: rgba(255, 100, 100, 0.3);
+	color: var(--vscode-errorForeground, #f48771);
 }
 
 /* Empty State */

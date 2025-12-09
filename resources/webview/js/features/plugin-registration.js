@@ -11,6 +11,7 @@
 // State (module-scoped)
 let treeData = [];
 let expandedNodes = new Set();
+let currentFilter = '';
 
 /**
  * Update loading progress display
@@ -99,10 +100,11 @@ function renderNode(item, depth) {
 	const isExpanded = expandedNodes.has(item.id);
 	const indent = depth * 16;
 
+	const isDisabledStep = item.type === 'step' && item.metadata?.isEnabled === false;
 	const classes = [
 		'tree-node',
 		item.isManaged ? 'managed' : '',
-		item.metadata?.statecode === 1 ? 'disabled' : ''
+		isDisabledStep ? 'disabled' : ''
 	].filter(Boolean).join(' ');
 
 	const toggleClass = hasChildren
@@ -192,6 +194,10 @@ function handleNodeClick(event) {
 			expandedNodes.add(id);
 		}
 		renderTree(treeData);
+		// Re-apply filter after re-rendering
+		if (currentFilter) {
+			filterTree(currentFilter);
+		}
 	}
 
 	// Notify extension of selection (use window.vscode from messaging.js)
@@ -213,23 +219,89 @@ function escapeHtml(text) {
 }
 
 /**
- * Filter tree based on search input
+ * Filter tree based on search input.
+ * Shows matching nodes plus all ancestors (path to root) and descendants.
  */
 function filterTree(searchTerm) {
+	// Store current filter for re-application after expand/collapse
+	currentFilter = searchTerm;
+
 	const pluginTree = document.getElementById('pluginTree');
 	if (!pluginTree) return;
 
-	const term = searchTerm.toLowerCase();
-	const nodes = pluginTree.querySelectorAll('.tree-node');
+	const term = searchTerm.toLowerCase().trim();
 
-	nodes.forEach(node => {
-		const label = node.querySelector('.tree-node-label');
-		const text = label ? label.textContent.toLowerCase() : '';
-		const matches = term === '' || text.includes(term);
+	// If no filter, show all nodes
+	if (term === '') {
+		pluginTree.querySelectorAll('.tree-node').forEach(node => {
+			node.style.display = 'flex';
+		});
+		pluginTree.querySelectorAll('.tree-children').forEach(container => {
+			container.style.display = 'block';
+		});
+		return;
+	}
 
-		// Show/hide based on match
-		// For simplicity, just show matching nodes (full tree filtering is complex)
-		node.style.display = matches ? 'flex' : 'none';
+	// Build a set of node IDs that should be visible
+	const visibleNodeIds = new Set();
+
+	// Recursive function to check if node or any descendant matches
+	// Returns true if this node or any descendant matches
+	function markMatchingBranches(item) {
+		const nodeMatches = item.displayName.toLowerCase().includes(term);
+		let hasMatchingDescendant = false;
+
+		// Check all children recursively
+		if (item.children && item.children.length > 0) {
+			for (const child of item.children) {
+				if (markMatchingBranches(child)) {
+					hasMatchingDescendant = true;
+				}
+			}
+		}
+
+		// If this node matches or has matching descendant, mark entire branch visible
+		if (nodeMatches || hasMatchingDescendant) {
+			visibleNodeIds.add(item.id);
+
+			// If this node directly matches, also show all descendants
+			if (nodeMatches && item.children) {
+				markAllDescendantsVisible(item.children);
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
+	// Mark all descendants of a node as visible
+	function markAllDescendantsVisible(children) {
+		for (const child of children) {
+			visibleNodeIds.add(child.id);
+			if (child.children && child.children.length > 0) {
+				markAllDescendantsVisible(child.children);
+			}
+		}
+	}
+
+	// Process all top-level items
+	for (const item of treeData) {
+		markMatchingBranches(item);
+	}
+
+	// Apply visibility to DOM nodes
+	pluginTree.querySelectorAll('.tree-node').forEach(node => {
+		const nodeId = node.dataset.id;
+		const isVisible = visibleNodeIds.has(nodeId);
+		node.style.display = isVisible ? 'flex' : 'none';
+	});
+
+	// Show/hide tree-children containers based on whether they have visible children
+	pluginTree.querySelectorAll('.tree-children').forEach(container => {
+		const hasVisibleChild = Array.from(container.querySelectorAll(':scope > .tree-node'))
+			.some(node => node.style.display !== 'none');
+		container.style.display = hasVisibleChild ? 'block' : 'none';
 	});
 }
 
