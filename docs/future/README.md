@@ -13,13 +13,22 @@ Track features and improvements that are planned but not actively being worked o
 
 | File | Description | Status |
 |------|-------------|--------|
-| [DATA_MANAGEMENT.md](DATA_MANAGEMENT.md) | Data Explorer (✅ IntelliSense, ✅ Aggregates/JOINs), Visual Builder | Visual Builder in progress |
-| [DEVELOPMENT_TOOLS.md](DEVELOPMENT_TOOLS.md) | Web Resources (✅ Complete), Plugin Registration | Plugin Reg planned |
-| [ALM_DEVOPS.md](ALM_DEVOPS.md) | Deployment promotion, Solution Diff | Planned |
-| [ADMINISTRATION.md](ADMINISTRATION.md) | Connection Manager, Async Jobs, Workflows | Planned |
-| [OBSERVABILITY.md](OBSERVABILITY.md) | Flow History, Dependencies, Telemetry | Planned |
-| [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | E2E Testing (✅), Virtual Tables (✅), Config (✅) | Mostly done |
-| [METADATA_BROWSER_ENHANCEMENTS.md](METADATA_BROWSER_ENHANCEMENTS.md) | Core (✅), Solution filtering, export | Enhancements planned |
+| [DATA_MANAGEMENT.md](DATA_MANAGEMENT.md) | Data Explorer (✅ Complete: IntelliSense, Aggregates/JOINs, Visual Builder, Notebooks) | ✅ v0.3.0 |
+| [DEVELOPMENT_TOOLS.md](DEVELOPMENT_TOOLS.md) | Web Resources (✅ Complete), Plugin Registration (v0.6.0) | Plugin Reg planned |
+| [ALM_DEVOPS.md](ALM_DEVOPS.md) | Deployment Settings Promotion (v0.4.0), Solution Diff (v0.5.0) | **Next up** |
+| [ADMINISTRATION.md](ADMINISTRATION.md) | Connection Manager, Async Jobs, Workflows | Future |
+| [OBSERVABILITY.md](OBSERVABILITY.md) | Flow History, Dependencies, Telemetry | Future |
+| [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | E2E Testing (✅), Virtual Tables (✅), Config (✅) | ✅ Complete |
+| [METADATA_BROWSER_ENHANCEMENTS.md](METADATA_BROWSER_ENHANCEMENTS.md) | Core (✅), Comparison, Global Search | Low priority |
+
+## Version Roadmap
+
+| Version | Focus | Key Features |
+|---------|-------|--------------|
+| **v0.4.0** | ALM | Deployment Settings Promotion (new panel) |
+| **v0.5.0** | ALM | Solution Diff/Compare |
+| **v0.6.0** | Dev Tools | Plugin Registration Tool |
+| **v1.0+** | Data | INSERT/UPDATE/DELETE, View Management |
 
 ## Design Docs (Detailed Technical Designs)
 
@@ -93,4 +102,4 @@ Items moved here from feature files with rejection reason.
 
 ---
 
-**Last Reviewed**: 2025-12-07
+**Last Reviewed**: 2025-12-08

@@ -51,7 +51,7 @@ export class ErrorSanitizer {
      * Maximum length for sanitized error messages.
      * Long messages are truncated to prevent information leakage through verbose errors.
      */
-    private static readonly MAX_MESSAGE_LENGTH = 200;
+    private static readonly MAX_MESSAGE_LENGTH = 500;
 
     /**
      * Sanitizes an error for display to end users.

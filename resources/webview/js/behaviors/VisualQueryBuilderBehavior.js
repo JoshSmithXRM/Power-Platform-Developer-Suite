@@ -717,11 +717,11 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 	 * @param {MessageEvent} event
 	 */
 	function handleMessage(event) {
-		// VS Code webview security: messages from extension host have empty origin
-		// Only process messages that have the expected structure
-		if (event.origin !== '' && event.origin !== 'null') {
-			// In VS Code webviews, origin is typically empty string or 'null'
-			// If we get a real origin, it's not from the extension host
+		// VS Code webview security: messages from extension host have empty origin,
+		// messages from webview context have vscode-webview:// scheme
+		const origin = event.origin || '';
+		if (origin !== '' && !origin.startsWith('vscode-webview://')) {
+			console.warn('Rejected message from untrusted origin:', event.origin);
 			return;
 		}
 

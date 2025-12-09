@@ -34,6 +34,7 @@ Power Platform development tools for plugins and web resources.
 **Status**: Planned
 **Target Version**: v0.6.0
 **Priority**: High
+**Note**: Can be developed in parallel with Solution Diff (v0.5.0)
 **Estimated Effort**: 40-60 hours
 **Value**: VSCode-native plugin registration without leaving the IDE
 
@@ -77,28 +78,6 @@ Port of Microsoft's Plugin Registration Tool (PRT) functionality to VSCode. Regi
 
 ---
 
-### Solution Explorer - Entity Browsing
-**Status**: Planned
-**Target Version**: v0.4.0+
-**Priority**: Medium
-**Estimated Effort**: 4-6 hours
-**Value**: View entities/tables belonging to a specific solution
-
-**Description**:
-Expand Solution Explorer to show entities (tables) that belong to the selected solution, with drill-down to view their metadata.
-
-**Core Features**:
-- Show entities as children of solution node
-- Click entity to view attributes, relationships, keys (like Metadata Browser)
-- Filter to show only solution-owned vs all entities in solution
-
-**Technical Considerations**:
-- Query solution components (type = Entity)
-- Reuse Metadata Browser's entity detail views
-- Consider lazy loading for large solutions
-
----
-
 ### Web Resources Sync (Local Folder Mapping)
 **Status**: Deferred
 **Target Version**: v1.0+
@@ -131,8 +110,17 @@ Map local folder to solution's web resources for two-way sync. Enables version c
 
 ## Archive (Considered & Rejected)
 
-*None yet.*
+### Solution Explorer - Entity Browsing
+**Status**: Won't Implement
+**Decision Date**: 2025-12-08
+**Reason**: Scope creep with unclear value proposition.
+
+**Why Rejected**:
+1. **Scope creep**: If we show entities, users will expect ALL solution component types (flows, plugins, canvas apps, security roles, etc.) - that's 30+ component types
+2. **Duplicates Microsoft tooling**: make.powerapps.com Solution Editor already shows all components in a tree with drill-down
+3. **Unclear value add**: We already have specialized panels (Web Resources, Environment Variables, Connection References, Metadata Browser) that provide VS Code-native experiences Microsoft can't match
+4. **Better alternatives**: Users who need to browse solution components can use the free, maintained Microsoft Solution Editor
 
 ---
 
-**Last Updated**: 2025-12-03
+**Last Updated**: 2025-12-08

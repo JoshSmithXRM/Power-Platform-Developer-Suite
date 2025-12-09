@@ -8,7 +8,7 @@ Application lifecycle management and DevOps tooling.
 
 ### Deployment Settings Promotion
 **Status**: Planned
-**Target Version**: v0.5.0
+**Target Version**: v0.4.0
 **Priority**: High
 **Estimated Effort**: 16-24 hours
 **Value**: Automate environment config promotion (Dev→QA→Prod)
@@ -50,6 +50,7 @@ Promote deployment settings between environments with intelligent mapping for cu
 **Status**: Planned
 **Target Version**: v0.5.0
 **Priority**: High
+**Note**: Can be developed in parallel with Plugin Registration (v0.6.0)
 **Estimated Effort**: 24-32 hours
 **Value**: Understand differences between environments
 
@@ -163,4 +164,4 @@ GitHub issue template for release preparation and post-release validation.
 
 ---
 
-**Last Updated**: 2025-11-30
+**Last Updated**: 2025-12-08

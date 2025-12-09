@@ -1,6 +1,6 @@
 import type { QueryResult } from '../../domain/entities/QueryResult';
 import type { QueryResultColumn } from '../../domain/valueObjects/QueryResultColumn';
-import type { QueryResultRow, QueryCellValue, QueryLookupValue } from '../../domain/valueObjects/QueryResultRow';
+import type { QueryResultRow, QueryCellValue, QueryLookupValue, QueryFormattedValue } from '../../domain/valueObjects/QueryResultRow';
 import type {
 	QueryResultViewModel,
 	QueryColumnViewModel,
@@ -24,8 +24,11 @@ export class QueryResultViewModelMapper {
 	public toViewModel(result: QueryResult): QueryResultViewModel {
 		const entityLogicalName = this.extractEntityNameFromFetchXml(result.executedFetchXml);
 
+		// Expand columns to include virtual "name" columns for optionsets and lookups
+		const expandedColumns = this.expandColumnsWithVirtualNameColumns(result.columns);
+
 		return {
-			columns: result.columns.map((col) => this.mapColumn(col)),
+			columns: expandedColumns,
 			rows: result.rows.map((row) => this.mapRow(row, result.columns)),
 			rowLookups: result.rows.map((row) => this.extractLookups(row, result.columns)),
 			totalRecordCount: result.totalRecordCount,
@@ -34,6 +37,42 @@ export class QueryResultViewModelMapper {
 			executedFetchXml: result.executedFetchXml,
 			entityLogicalName,
 		};
+	}
+
+	/**
+	 * Expands columns to include virtual "name" columns for optionset and lookup fields.
+	 *
+	 * For optionset columns (e.g., accountcategorycode), creates a companion column
+	 * with "name" suffix (e.g., accountcategorycodename) to hold the label.
+	 *
+	 * For lookup columns (e.g., primarycontactid), creates a companion column
+	 * with "name" suffix (e.g., primarycontactidname) to hold the display name.
+	 * This ensures the column name matches the content - "id" suffix columns show GUIDs.
+	 *
+	 * @param columns - Original domain columns
+	 * @returns Expanded columns including virtual name columns
+	 */
+	private expandColumnsWithVirtualNameColumns(
+		columns: readonly QueryResultColumn[]
+	): QueryColumnViewModel[] {
+		const expandedColumns: QueryColumnViewModel[] = [];
+
+		for (const column of columns) {
+			// Add the original column
+			expandedColumns.push(this.mapColumn(column));
+
+			// For optionset and lookup columns, add a companion "name" column
+			if (column.dataType === 'optionset' || column.dataType === 'lookup') {
+				const nameColumnName = `${column.logicalName}name`;
+				expandedColumns.push({
+					name: nameColumnName,
+					header: nameColumnName, // Use logical name as header (e.g., "statuscodename")
+					dataType: 'string',
+				});
+			}
+		}
+
+		return expandedColumns;
 	}
 
 	/**
@@ -67,6 +106,7 @@ export class QueryResultViewModelMapper {
 
 	/**
 	 * Maps QueryResultRow to ViewModel row.
+	 * For optionset and lookup columns, creates both the raw value column and the "name" column.
 	 *
 	 * @param row - Domain row to transform
 	 * @param columns - Column definitions for the row
@@ -80,20 +120,64 @@ export class QueryResultViewModelMapper {
 
 		for (const column of columns) {
 			const value = row.getValue(column.logicalName);
-			viewModelRow[column.logicalName] = this.toDisplayString(value);
+
+			// Handle optionset columns specially
+			if (column.dataType === 'optionset' && this.isFormattedValue(value)) {
+				// Original column shows raw numeric value
+				viewModelRow[column.logicalName] = value.value === null ? '' : String(value.value);
+				// Virtual "name" column shows formatted label
+				viewModelRow[`${column.logicalName}name`] = value.formattedValue || '';
+			}
+			// Handle null optionset columns for consistency
+			else if (column.dataType === 'optionset' && value === null) {
+				viewModelRow[column.logicalName] = '';
+				viewModelRow[`${column.logicalName}name`] = '';
+			}
+			// Handle lookup columns specially - show GUID in column, name in name column
+			else if (column.dataType === 'lookup' && this.isLookupValue(value)) {
+				// Original column shows GUID (column name ends with "id", should show ID)
+				viewModelRow[column.logicalName] = value.id;
+				// Virtual "name" column shows display name
+				viewModelRow[`${column.logicalName}name`] = value.name || '';
+			}
+			// Handle null lookup columns
+			else if (column.dataType === 'lookup' && value === null) {
+				viewModelRow[column.logicalName] = '';
+				viewModelRow[`${column.logicalName}name`] = '';
+			} else {
+				viewModelRow[column.logicalName] = this.toDisplayString(value, column.dataType);
+			}
 		}
 
 		return viewModelRow;
 	}
 
 	/**
+	 * Type guard to check if a value is a QueryFormattedValue.
+	 */
+	private isFormattedValue(value: QueryCellValue): value is QueryFormattedValue {
+		return (
+			value !== null &&
+			typeof value === 'object' &&
+			'formattedValue' in value &&
+			'value' in value &&
+			!('entityType' in value) // Exclude lookups which also have formattedValue-like structure
+		);
+	}
+
+	/**
 	 * Converts cell value to display string.
 	 * Handles null, boolean, Date, lookup, and formatted value types.
 	 *
+	 * Note: Optionset columns are handled specially in mapRow() and should not
+	 * reach this method. For other formatted values (like money), we use the
+	 * formatted display string.
+	 *
 	 * @param value - Domain cell value
+	 * @param _dataType - Column data type (reserved for future use)
 	 * @returns Display-ready string
 	 */
-	private toDisplayString(value: QueryCellValue): string {
+	private toDisplayString(value: QueryCellValue, _dataType?: string): string {
 		if (value === null || value === undefined) {
 			return '';
 		}
@@ -130,6 +214,9 @@ export class QueryResultViewModelMapper {
 	 * Extracts lookup metadata from a row.
 	 * Creates a map of column names to lookup info for cells that contain record references.
 	 *
+	 * For lookup columns, adds entries for BOTH the original column (e.g., primarycontactid)
+	 * AND the virtual name column (e.g., primarycontactidname) so both are clickable.
+	 *
 	 * @param row - Domain row to extract lookups from
 	 * @param columns - Column definitions for the row
 	 * @returns Map of column names to lookup info
@@ -143,10 +230,15 @@ export class QueryResultViewModelMapper {
 		for (const column of columns) {
 			const value = row.getValue(column.logicalName);
 			if (this.isLookupValue(value)) {
-				lookups[column.logicalName] = {
+				const lookupInfo = {
 					entityType: value.entityType,
 					id: value.id,
 				};
+				// Add to original column (e.g., primarycontactid - shows GUID)
+				lookups[column.logicalName] = lookupInfo;
+				// Also add to virtual name column (e.g., primarycontactidname - shows display name)
+				// This makes both columns clickable
+				lookups[`${column.logicalName}name`] = lookupInfo;
 			}
 		}
 

@@ -157,14 +157,86 @@ describe('QueryResultViewModelMapper', () => {
 			expect(viewModel.rows[0]!['createdon']).toBe('2024-01-15T10:30:00.000Z');
 		});
 
-		it('should use formattedValue for QueryFormattedValue', () => {
+		it('should show raw numeric value for optionset columns, not formatted label', () => {
+			// Regression test for optionset formatting issue
+			// accountcategorycode optionset: 1 = "Preferred Customer", 2 = "Standard"
+			// Expected: accountcategorycode column shows 1, NOT "Preferred Customer"
 			const formattedValue: QueryFormattedValue = {
 				value: 1,
-				formattedValue: 'Active',
+				formattedValue: 'Preferred Customer',
 			};
-			const result = createResultWithValue('statecode', formattedValue);
-			const viewModel = mapper.toViewModel(result);
-			expect(viewModel.rows[0]!['statecode']).toBe('Active');
+			// Must use 'optionset' dataType - this is what the repository infers for integer formatted values
+			const columns = [new QueryResultColumn('accountcategorycode', 'accountcategorycode', 'optionset')];
+			const rows = [
+				QueryResultRow.fromRecord({ accountcategorycode: formattedValue as never }),
+			];
+			const queryResult = new QueryResult(columns, rows, 1, false, null, '', 0);
+			const viewModel = mapper.toViewModel(queryResult);
+			// Should show the raw numeric value, not the label
+			expect(viewModel.rows[0]!['accountcategorycode']).toBe('1');
+		});
+
+		it('should create virtual "name" column for optionset formatted labels', () => {
+			// Regression test: optionset fields should have a companion "name" column
+			// accountcategorycode = 1, accountcategorycodename = "Preferred Customer"
+			const formattedValue: QueryFormattedValue = {
+				value: 1,
+				formattedValue: 'Preferred Customer',
+			};
+			const columns = [new QueryResultColumn('accountcategorycode', 'accountcategorycode', 'optionset')];
+			const rows = [
+				QueryResultRow.fromRecord({ accountcategorycode: formattedValue as never }),
+			];
+			const queryResult = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(queryResult);
+
+			// Should have 2 columns: original + name column
+			expect(viewModel.columns).toHaveLength(2);
+			expect(viewModel.columns.map(c => c.name)).toContain('accountcategorycode');
+			expect(viewModel.columns.map(c => c.name)).toContain('accountcategorycodename');
+
+			// Original column shows numeric value
+			expect(viewModel.rows[0]!['accountcategorycode']).toBe('1');
+			// Name column shows formatted label
+			expect(viewModel.rows[0]!['accountcategorycodename']).toBe('Preferred Customer');
+		});
+
+		it('should handle null optionset values gracefully', () => {
+			// Optionset with null value should not create name column with undefined
+			const formattedValue: QueryFormattedValue = {
+				value: null,
+				formattedValue: '',
+			};
+			const columns = [new QueryResultColumn('accountcategorycode', 'accountcategorycode', 'optionset')];
+			const rows = [
+				QueryResultRow.fromRecord({ accountcategorycode: formattedValue as never }),
+			];
+			const queryResult = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(queryResult);
+
+			// Should still have 2 columns
+			expect(viewModel.columns).toHaveLength(2);
+			// Both should show empty for null values
+			expect(viewModel.rows[0]!['accountcategorycode']).toBe('');
+			expect(viewModel.rows[0]!['accountcategorycodename']).toBe('');
+		});
+
+		it('should use formattedValue for non-optionset QueryFormattedValue (money)', () => {
+			// Money columns should still use formatted value for display
+			const formattedValue: QueryFormattedValue = {
+				value: 1000000,
+				formattedValue: '$1,000,000.00',
+			};
+			const columns = [new QueryResultColumn('revenue', 'revenue', 'money')];
+			const rows = [
+				QueryResultRow.fromRecord({ revenue: formattedValue as never }),
+			];
+			const queryResult = new QueryResult(columns, rows, 1, false, null, '', 0);
+			const viewModel = mapper.toViewModel(queryResult);
+			// Money should still show formatted value
+			expect(viewModel.rows[0]!['revenue']).toBe('$1,000,000.00');
 		});
 
 		it('should use name for QueryLookupValue', () => {
