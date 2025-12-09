@@ -12,6 +12,10 @@
  * - Server search indicator for large datasets
  *
  * Works with VirtualDataTableSection TypeScript component.
+ *
+ * IMPORTANT: The core spacer row algorithm is shared with notebook virtual scrolling.
+ * If you change renderVisibleRows() or createSpacerRow(), also update:
+ * src/shared/infrastructure/ui/virtualScroll/VirtualScrollScriptGenerator.ts
  */
 
 (function () {

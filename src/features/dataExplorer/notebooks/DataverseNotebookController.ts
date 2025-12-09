@@ -7,6 +7,7 @@ import type { QueryResultViewModelMapper } from '../application/mappers/QueryRes
 import type { QueryResultViewModel } from '../application/viewModels/QueryResultViewModel';
 import { FetchXmlValidationError } from '../domain/errors/FetchXmlValidationError';
 import { SqlParseError } from '../domain/errors/SqlParseError';
+import { generateVirtualScrollScript } from '../../../shared/infrastructure/ui/virtualScroll/VirtualScrollScriptGenerator';
 
 /**
  * Environment info for notebook environment picker.
@@ -666,74 +667,17 @@ export class DataverseNotebookController {
 
 	/**
 	 * Returns inline JavaScript for virtual scrolling.
-	 * Uses spacer row approach (same as VirtualTableRenderer.js) to keep rows
-	 * in normal table flow, allowing width: max-content to work properly.
+	 * Uses shared VirtualScrollScriptGenerator for single source of truth.
 	 */
 	private getVirtualScrollScript(rowData: string[][], columnCount: number): string {
-		const rowDataJson = JSON.stringify(rowData);
-		return `
-			(function() {
-				const ROW_HEIGHT = ${DataverseNotebookController.ROW_HEIGHT};
-				const OVERSCAN = ${DataverseNotebookController.OVERSCAN};
-				const rowData = ${rowDataJson};
-				const totalRows = rowData.length;
-				const columnCount = ${columnCount};
-
-				const container = document.getElementById('scrollContainer');
-				const tbody = document.getElementById('tableBody');
-
-				let lastStart = -1;
-				let lastEnd = -1;
-
-				function createSpacerRow(height) {
-					if (height <= 0) return '';
-					return '<tr class="virtual-spacer"><td colspan="' + columnCount + '" style="height:' + height + 'px;padding:0;border:none;"></td></tr>';
-				}
-
-				function renderVisibleRows() {
-					const scrollTop = container.scrollTop;
-					const containerHeight = container.clientHeight;
-
-					// Calculate visible range
-					const startRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
-					const endRow = Math.min(totalRows, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + OVERSCAN);
-
-					// Skip if range hasn't changed
-					if (startRow === lastStart && endRow === lastEnd) return;
-					lastStart = startRow;
-					lastEnd = endRow;
-
-					// Calculate spacer heights
-					const topSpacerHeight = startRow * ROW_HEIGHT;
-					const bottomSpacerHeight = Math.max(0, (totalRows - endRow) * ROW_HEIGHT);
-
-					// Build rows HTML with spacers (normal flow, not absolute)
-					let html = createSpacerRow(topSpacerHeight);
-					for (let i = startRow; i < endRow; i++) {
-						const row = rowData[i];
-						const rowClass = i % 2 === 0 ? 'row-even' : 'row-odd';
-						html += '<tr class="data-row ' + rowClass + '">';
-						for (let j = 0; j < row.length; j++) {
-							html += '<td class="data-cell">' + row[j] + '</td>';
-						}
-						html += '</tr>';
-					}
-					html += createSpacerRow(bottomSpacerHeight);
-
-					tbody.innerHTML = html;
-				}
-
-				// Initial render
-				renderVisibleRows();
-
-				// Re-render on scroll (debounced)
-				let scrollTimer = null;
-				container.addEventListener('scroll', function() {
-					if (scrollTimer) clearTimeout(scrollTimer);
-					scrollTimer = setTimeout(renderVisibleRows, 10);
-				});
-			})();
-		`;
+		return generateVirtualScrollScript(JSON.stringify(rowData), {
+			rowHeight: DataverseNotebookController.ROW_HEIGHT,
+			overscan: DataverseNotebookController.OVERSCAN,
+			scrollContainerId: 'scrollContainer',
+			tbodyId: 'tableBody',
+			columnCount,
+			scrollDebounceMs: 10
+		});
 	}
 
 	/**
