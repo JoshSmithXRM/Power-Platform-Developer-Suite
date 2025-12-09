@@ -197,6 +197,32 @@ The entire `rows` + `rowLookups` arrays are serialized to JSON and deserialized.
 
 ---
 
+## Phase 2 Complete - Remaining Issues
+
+### Issue: Column Widths Cramped/Smooshed
+After Phase 2 fixes, table columns appear very narrow and content is truncated.
+See screenshot - all columns cramped together despite horizontal scroll being available.
+
+**Possible causes:**
+1. CSS changes to `.virtual-table-container` (added `display: flex; flex-direction: column`)
+2. CSS changes to `.virtual-scroll-wrapper` (changed from `height: 100%` to `flex: 1`)
+3. Table `width: max-content` not working as expected in new flex context
+4. Column width calculation in VirtualTableRenderer not accounting for content
+
+**Files to investigate:**
+- `resources/webview/css/features/data-explorer.css` - recent changes to flex layout
+- `resources/webview/js/renderers/VirtualTableRenderer.js` - column width logic
+- `src/shared/infrastructure/ui/tables/ColumnWidthCalculator.ts` - if used
+
+### Unstaged Notebook Changes
+Previous session modified notebook rendering but changes are unstaged:
+- `src/features/dataExplorer/notebooks/DataverseNotebookController.ts` (417 lines changed)
+- `src/features/dataExplorer/presentation/panels/DataExplorerPanelComposed.ts` (12 lines added)
+
+These were part of "inline virtual scrolling for notebooks" work.
+
+---
+
 ## Testing Checklist
 
 - [ ] Data Explorer: Query with 5k rows, all columns - memory stays under 1.5GB
