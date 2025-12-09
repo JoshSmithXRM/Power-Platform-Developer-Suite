@@ -3,7 +3,7 @@
  * Determines execution context (sandbox isolation vs none).
  *
  * Values:
- * - None (1): No isolation, full trust
+ * - None (0 or 1): No isolation, full trust (0 returned by some system assemblies)
  * - Sandbox (2): Isolated execution environment (recommended)
  */
 export class IsolationMode {
@@ -17,10 +17,12 @@ export class IsolationMode {
 
 	/**
 	 * Creates IsolationMode from Dataverse numeric value.
+	 * Note: 0 is treated as None (some system/older assemblies return 0)
 	 * @throws Error if value is not recognized
 	 */
 	public static fromValue(value: number): IsolationMode {
 		switch (value) {
+			case 0: // Some system assemblies return 0
 			case 1:
 				return IsolationMode.None;
 			case 2:

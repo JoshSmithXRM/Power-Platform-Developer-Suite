@@ -13,6 +13,7 @@ export interface CssModulesConfig {
 	readonly base?: boolean; // Load base/reset.css and base/typography.css
 	readonly components?: ReadonlyArray<string>; // Component names (e.g., ['buttons', 'inputs'])
 	readonly sections?: ReadonlyArray<string>; // Section names (e.g., ['datatable', 'action-buttons'])
+	readonly features?: ReadonlyArray<string>; // Feature names (e.g., ['plugin-registration'])
 }
 
 /**
@@ -66,6 +67,17 @@ export function resolveCssModules(
 			uris.push(
 				webview.asWebviewUri(
 					vscode.Uri.joinPath(extensionUri, 'resources', 'webview', 'css', 'sections', `${section}.css`)
+				).toString()
+			);
+		}
+	}
+
+	// 4. Feature CSS
+	if (cssModules.features) {
+		for (const feature of cssModules.features) {
+			uris.push(
+				webview.asWebviewUri(
+					vscode.Uri.joinPath(extensionUri, 'resources', 'webview', 'css', 'features', `${feature}.css`)
 				).toString()
 			);
 		}

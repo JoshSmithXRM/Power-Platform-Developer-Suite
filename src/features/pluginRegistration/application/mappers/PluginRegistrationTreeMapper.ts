@@ -4,6 +4,7 @@ import type { PluginStep } from '../../domain/entities/PluginStep';
 import type { PluginType } from '../../domain/entities/PluginType';
 import type { StepImage } from '../../domain/entities/StepImage';
 import type { TreeItemViewModel } from '../viewModels/TreeItemViewModel';
+
 import { PluginAssemblyViewModelMapper } from './PluginAssemblyViewModelMapper';
 import { PluginPackageViewModelMapper } from './PluginPackageViewModelMapper';
 import { PluginStepViewModelMapper } from './PluginStepViewModelMapper';
@@ -11,9 +12,9 @@ import { PluginTypeViewModelMapper } from './PluginTypeViewModelMapper';
 import { StepImageViewModelMapper } from './StepImageViewModelMapper';
 
 /**
- * Helper type for assembly tree nodes (reused in packages and standalone).
+ * Helper interface for assembly tree nodes (reused in packages and standalone).
  */
-export type AssemblyTreeNode = {
+export interface AssemblyTreeNode {
 	assembly: PluginAssembly;
 	pluginTypes: ReadonlyArray<{
 		pluginType: PluginType;
@@ -22,15 +23,15 @@ export type AssemblyTreeNode = {
 			images: ReadonlyArray<StepImage>;
 		}>;
 	}>;
-};
+}
 
 /**
- * Helper type for package tree nodes.
+ * Helper interface for package tree nodes.
  */
-export type PackageTreeNode = {
+export interface PackageTreeNode {
 	package: PluginPackage;
 	assemblies: ReadonlyArray<AssemblyTreeNode>;
-};
+}
 
 /**
  * Orchestrates all mappers to build tree ViewModels.

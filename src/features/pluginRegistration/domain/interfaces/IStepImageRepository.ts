@@ -6,6 +6,12 @@ import type { StepImage } from '../entities/StepImage';
  */
 export interface IStepImageRepository {
 	/**
+	 * Find ALL images in the environment.
+	 * Used for bulk loading to avoid N+1 queries.
+	 */
+	findAll(environmentId: string): Promise<readonly StepImage[]>;
+
+	/**
 	 * Find all images for a step.
 	 */
 	findByStepId(environmentId: string, stepId: string): Promise<readonly StepImage[]>;

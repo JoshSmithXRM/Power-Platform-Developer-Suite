@@ -28,7 +28,7 @@ export class PluginPackageViewModelMapper {
 			type: 'package',
 			name: pkg.getName(),
 			displayName: `${pkg.getName()} (${pkg.getDisplayVersion()})`,
-			icon: pkg.isInManagedState() ? 'package-lock' : 'package',
+			icon: '📦',
 			metadata,
 			isManaged: pkg.isInManagedState(),
 			children: assemblies,

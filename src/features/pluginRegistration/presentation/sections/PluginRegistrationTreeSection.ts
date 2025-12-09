@@ -29,9 +29,17 @@ export class PluginRegistrationTreeSection implements ISection {
 					/>
 				</div>
 
+				<!-- Loading Progress -->
+				<div class="loading-progress-container" id="loadingProgress">
+					<div class="loading-spinner"></div>
+					<div class="loading-step" id="loadingStep">Loading plugin registration...</div>
+					<div class="loading-bar-container">
+						<div class="loading-bar" id="loadingBar" style="width: 0%"></div>
+					</div>
+				</div>
+
 				<!-- Tree Container -->
-				<div class="tree-container" id="pluginTree">
-					<div class="tree-loading">Loading plugin registration...</div>
+				<div class="tree-container" id="pluginTree" style="display: none;">
 				</div>
 
 				<!-- Empty State -->

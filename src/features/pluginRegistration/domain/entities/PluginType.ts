@@ -9,7 +9,6 @@
  *
  * Rich behavior (NOT anemic):
  * - isWorkflowActivity(): boolean
- * - getDisplayName(): string (prefers friendly name)
  */
 export class PluginType {
 	constructor(
@@ -26,13 +25,6 @@ export class PluginType {
 	 */
 	public isWorkflowActivity(): boolean {
 		return this.workflowActivityGroupName !== null;
-	}
-
-	/**
-	 * Gets display name (prefers FriendlyName over TypeName).
-	 */
-	public getDisplayName(): string {
-		return this.friendlyName || this.name;
 	}
 
 	// Getters (NO business logic in getters)

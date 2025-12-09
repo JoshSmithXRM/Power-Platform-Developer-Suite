@@ -8,9 +8,12 @@ import type { ImageMetadata, TreeItemViewModel } from '../viewModels/TreeItemVie
  */
 export class StepImageViewModelMapper {
 	public toTreeItem(image: StepImage, stepId: string): TreeItemViewModel {
+		// Use raw ImageType name - presentation layer handles display formatting
+		const imageTypeName = image.getImageType().getName();
+
 		const metadata: ImageMetadata = {
 			type: 'image',
-			imageType: image.getImageTypeDisplay(),
+			imageType: imageTypeName,
 			entityAlias: image.getEntityAlias(),
 			attributes: image.getAttributesArray(),
 			createdOn: image.getCreatedOn().toISOString(),
@@ -21,8 +24,8 @@ export class StepImageViewModelMapper {
 			parentId: stepId,
 			type: 'image',
 			name: image.getName(),
-			displayName: `${image.getEntityAlias()} (${image.getImageTypeDisplay()})`,
-			icon: 'symbol-field',
+			displayName: `${image.getEntityAlias()} (${imageTypeName})`,
+			icon: '🖼️',
 			metadata,
 			isManaged: false,
 			children: [],

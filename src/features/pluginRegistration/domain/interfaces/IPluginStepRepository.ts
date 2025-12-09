@@ -6,6 +6,12 @@ import type { PluginStep } from '../entities/PluginStep';
  */
 export interface IPluginStepRepository {
 	/**
+	 * Find ALL steps in the environment.
+	 * Used for bulk loading to avoid N+1 queries.
+	 */
+	findAll(environmentId: string): Promise<readonly PluginStep[]>;
+
+	/**
 	 * Find all steps for a plugin type.
 	 */
 	findByPluginTypeId(environmentId: string, pluginTypeId: string): Promise<readonly PluginStep[]>;

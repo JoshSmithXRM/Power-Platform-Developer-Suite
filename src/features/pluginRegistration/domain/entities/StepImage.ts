@@ -12,7 +12,6 @@ import { ImageType } from '../valueObjects/ImageType';
  *
  * Rich behavior (NOT anemic):
  * - getAttributesArray(): string[]
- * - getImageTypeDisplay(): string
  */
 export class StepImage {
 	constructor(
@@ -33,14 +32,6 @@ export class StepImage {
 			return [];
 		}
 		return this.attributes.split(',').map((attr) => attr.trim());
-	}
-
-	/**
-	 * Gets display name for image type.
-	 * Example: "PreImage" → "Pre-Image"
-	 */
-	public getImageTypeDisplay(): string {
-		return this.imageType.getDisplayName();
 	}
 
 	// Getters (NO business logic in getters)

@@ -115,6 +115,10 @@ Add/edit/delete step images.
 |-----|--------|-------|
 | Tree JS not implemented | Open | Need client-side JavaScript to render tree from `updateTree` message |
 | CSS for tree section | Open | Need feature-specific CSS for tree styling |
+| ~~`_pluginpackageid_value` doesn't exist~~ | **FIXED** | Removed from queries - field doesn't exist in most Dataverse envs |
+| ~~`SolutionComponentContains` invalid~~ | **FIXED** | Removed - OData function doesn't exist. Solution filtering deferred |
+| Plugin packages not supported | Deferred | Most environments don't have pluginpackages entity. Returns empty gracefully |
+| Solution filtering | Deferred | Need to use ISolutionComponentRepository like other features |
 
 ---
 
@@ -198,3 +202,29 @@ Add/edit/delete step images.
 4. Fix any bugs found
 5. Write unit tests
 6. Code review
+
+### Session 2 (2025-12-08)
+**Completed:**
+- Fixed critical API bugs in repositories:
+  - Removed `_pluginpackageid_value` from DataversePluginAssemblyRepository (field doesn't exist)
+  - Removed `SolutionComponentContains` OData function (doesn't exist)
+  - Added graceful handling for environments without pluginpackages entity
+- Fixed lint errors:
+  - Removed `getDisplayName()` from PluginType entity (presentation logic)
+  - Removed `getDisplayName()` from ImageType value object (presentation logic)
+  - Moved display logic to mappers (PluginTypeViewModelMapper, StepImageViewModelMapper)
+  - Fixed import ordering in PluginRegistrationTreeMapper
+
+**Deferred:**
+- Solution filtering (requires ISolutionComponentRepository like other features)
+- Plugin package → assembly relationship (field doesn't exist in most environments)
+
+**Design Decisions:**
+- All assemblies shown as "standalone" (no way to query by package)
+- Plugin packages return empty array if entity doesn't exist (graceful degradation)
+- ImageType display uses raw name (e.g., "PreImage" not "Pre-Image") - can be formatted in presentation layer later
+
+**Next Steps:**
+1. Test with F5 to verify tree loads with assemblies
+2. Implement client-side tree JavaScript
+3. Add tree CSS styling

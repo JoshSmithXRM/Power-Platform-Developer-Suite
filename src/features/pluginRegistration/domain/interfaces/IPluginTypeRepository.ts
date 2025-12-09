@@ -6,6 +6,12 @@ import type { PluginType } from '../entities/PluginType';
  */
 export interface IPluginTypeRepository {
 	/**
+	 * Find ALL plugin types in the environment.
+	 * Used for bulk loading to avoid N+1 queries.
+	 */
+	findAll(environmentId: string): Promise<readonly PluginType[]>;
+
+	/**
 	 * Find all plugin types in an assembly.
 	 */
 	findByAssemblyId(environmentId: string, assemblyId: string): Promise<readonly PluginType[]>;

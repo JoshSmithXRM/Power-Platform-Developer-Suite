@@ -4,12 +4,18 @@
  * Values:
  * - Database (0): Assembly stored in Dataverse database
  * - Disk (1): Assembly stored on disk (on-premises only)
- * - AzureWebApp (2): Assembly deployed as Azure web app
+ * - Normal (2): Normal/standard deployment
+ * - AzureWebApp (3): Assembly deployed as Azure web app
+ * - NuGet (4): Assembly from NuGet package (plugin packages)
+ *
+ * Note: Values may vary by Dataverse version. Unknown values handled gracefully.
  */
 export class SourceType {
 	public static readonly Database = new SourceType(0, 'Database');
 	public static readonly Disk = new SourceType(1, 'Disk');
-	public static readonly AzureWebApp = new SourceType(2, 'AzureWebApp');
+	public static readonly Normal = new SourceType(2, 'Normal');
+	public static readonly AzureWebApp = new SourceType(3, 'AzureWebApp');
+	public static readonly NuGet = new SourceType(4, 'NuGet');
 
 	private constructor(
 		private readonly value: number,
@@ -18,7 +24,7 @@ export class SourceType {
 
 	/**
 	 * Creates SourceType from Dataverse numeric value.
-	 * @throws Error if value is not recognized
+	 * Returns "Unknown" for unrecognized values instead of throwing.
 	 */
 	public static fromValue(value: number): SourceType {
 		switch (value) {
@@ -27,9 +33,13 @@ export class SourceType {
 			case 1:
 				return SourceType.Disk;
 			case 2:
+				return SourceType.Normal;
+			case 3:
 				return SourceType.AzureWebApp;
+			case 4:
+				return SourceType.NuGet;
 			default:
-				throw new Error(`Invalid SourceType value: ${value}`);
+				return new SourceType(value, `Unknown (${value})`);
 		}
 	}
 

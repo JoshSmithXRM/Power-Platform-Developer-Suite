@@ -38,6 +38,30 @@ export class DataverseStepImageRepository implements IStepImageRepository {
 		private readonly logger: ILogger
 	) {}
 
+	public async findAll(environmentId: string): Promise<readonly StepImage[]> {
+		this.logger.debug('DataverseStepImageRepository: Fetching ALL images', {
+			environmentId,
+		});
+
+		const endpoint =
+			`/api/data/v9.2/${DataverseStepImageRepository.ENTITY_SET}` +
+			`?$select=${DataverseStepImageRepository.SELECT_FIELDS}` +
+			`&$orderby=name asc`;
+
+		const response = await this.apiService.get<StepImageCollectionResponse>(
+			environmentId,
+			endpoint
+		);
+
+		const images = response.value.map((dto) => this.mapToDomain(dto));
+
+		this.logger.debug('DataverseStepImageRepository: Fetched ALL images', {
+			count: images.length,
+		});
+
+		return images;
+	}
+
 	public async findByStepId(
 		environmentId: string,
 		stepId: string

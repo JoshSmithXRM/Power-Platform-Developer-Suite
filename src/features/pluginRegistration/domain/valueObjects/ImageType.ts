@@ -7,14 +7,13 @@
  * - Both (2): Both pre and post images
  */
 export class ImageType {
-	public static readonly PreImage = new ImageType(0, 'PreImage', 'Pre-Image');
-	public static readonly PostImage = new ImageType(1, 'PostImage', 'Post-Image');
-	public static readonly Both = new ImageType(2, 'Both', 'Both');
+	public static readonly PreImage = new ImageType(0, 'PreImage');
+	public static readonly PostImage = new ImageType(1, 'PostImage');
+	public static readonly Both = new ImageType(2, 'Both');
 
 	private constructor(
 		private readonly value: number,
-		private readonly name: string,
-		private readonly displayName: string
+		private readonly name: string
 	) {}
 
 	/**
@@ -40,13 +39,6 @@ export class ImageType {
 
 	public getName(): string {
 		return this.name;
-	}
-
-	/**
-	 * Returns user-friendly display name.
-	 */
-	public getDisplayName(): string {
-		return this.displayName;
 	}
 
 	public equals(other: ImageType): boolean {

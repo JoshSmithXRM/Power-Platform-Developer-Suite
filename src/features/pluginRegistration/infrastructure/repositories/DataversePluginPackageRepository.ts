@@ -40,35 +40,41 @@ export class DataversePluginPackageRepository implements IPluginPackageRepositor
 
 	public async findAll(
 		environmentId: string,
-		solutionId?: string
+		_solutionId?: string
 	): Promise<readonly PluginPackage[]> {
 		this.logger.debug('DataversePluginPackageRepository: Fetching packages', {
 			environmentId,
-			solutionId: solutionId ?? 'all',
 		});
 
-		let endpoint = `/api/data/v9.2/${DataversePluginPackageRepository.ENTITY_SET}?$select=${DataversePluginPackageRepository.SELECT_FIELDS}`;
+		// Note: Solution filtering is deferred - would require ISolutionComponentRepository.
+		// Also, pluginpackages entity doesn't exist in all Dataverse environments
+		// (it's a newer feature). Handle 404 gracefully.
+		const endpoint =
+			`/api/data/v9.2/${DataversePluginPackageRepository.ENTITY_SET}` +
+			`?$select=${DataversePluginPackageRepository.SELECT_FIELDS}` +
+			'&$orderby=name asc';
 
-		// Add solution filtering if specified (component type 10090 for plugin packages)
-		if (solutionId && solutionId !== 'default') {
-			const solutionFilter = `Microsoft.Dynamics.CRM.SolutionComponentContains(SolutionId=${solutionId},ComponentType=10090,ObjectId=pluginpackageid)`;
-			endpoint += `&$filter=${solutionFilter}`;
+		try {
+			const response = await this.apiService.get<PluginPackageCollectionResponse>(
+				environmentId,
+				endpoint
+			);
+
+			const packages = response.value.map((dto) => this.mapToDomain(dto));
+
+			this.logger.debug('DataversePluginPackageRepository: Fetched packages', {
+				count: packages.length,
+			});
+
+			return packages;
+		} catch (error) {
+			// Gracefully handle environments where pluginpackages entity doesn't exist
+			if (error instanceof Error && (error.message.includes('404') || error.message.includes('does not exist'))) {
+				this.logger.debug('DataversePluginPackageRepository: Plugin packages not supported in this environment');
+				return [];
+			}
+			throw error;
 		}
-
-		endpoint += '&$orderby=name asc';
-
-		const response = await this.apiService.get<PluginPackageCollectionResponse>(
-			environmentId,
-			endpoint
-		);
-
-		const packages = response.value.map((dto) => this.mapToDomain(dto));
-
-		this.logger.debug('DataversePluginPackageRepository: Fetched packages', {
-			count: packages.length,
-		});
-
-		return packages;
 	}
 
 	public async findById(
@@ -99,14 +105,15 @@ export class DataversePluginPackageRepository implements IPluginPackageRepositor
 			packageId,
 		});
 
-		const endpoint = `/api/data/v9.2/pluginassemblies?$select=pluginassemblyid&$filter=_pluginpackageid_value eq ${packageId}&$count=true`;
-
-		const response = await this.apiService.get<PluginPackageCollectionResponse>(
-			environmentId,
-			endpoint
+		// Note: The pluginassembly entity doesn't have _pluginpackageid_value in most
+		// Dataverse environments. For now, return 0 as we cannot count by package.
+		// TODO: When plugin packages are properly supported, implement the count query.
+		this.logger.debug(
+			'DataversePluginPackageRepository: Assembly count by package not supported',
+			{ packageId }
 		);
 
-		return response['@odata.count'] ?? response.value.length;
+		return 0;
 	}
 
 	private mapToDomain(dto: PluginPackageDto): PluginPackage {
