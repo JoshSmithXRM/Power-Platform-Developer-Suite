@@ -534,10 +534,9 @@ export class DataverseNotebookController {
 							<tr>${headerCells}</tr>
 						</thead>
 						<tbody id="tableBody">
-							<!-- Rows rendered by JavaScript -->
+							<!-- Rows rendered by JavaScript using spacer row approach -->
 						</tbody>
 					</table>
-					<div class="virtual-spacer" id="spacer"></div>
 				</div>
 				${statusBar}
 			</div>
@@ -645,11 +644,9 @@ export class DataverseNotebookController {
 				color: var(--vscode-textLink-activeForeground);
 				text-decoration: underline;
 			}
-			.virtual-spacer {
-				position: absolute;
-				left: 0;
-				width: 1px;
-				pointer-events: none;
+			.virtual-spacer td {
+				padding: 0 !important;
+				border: none !important;
 			}
 			.status-bar {
 				display: flex;
@@ -669,7 +666,8 @@ export class DataverseNotebookController {
 
 	/**
 	 * Returns inline JavaScript for virtual scrolling.
-	 * This script runs in the notebook output iframe.
+	 * Uses spacer row approach (same as VirtualTableRenderer.js) to keep rows
+	 * in normal table flow, allowing width: max-content to work properly.
 	 */
 	private getVirtualScrollScript(rowData: string[][], columnCount: number): string {
 		const rowDataJson = JSON.stringify(rowData);
@@ -683,13 +681,14 @@ export class DataverseNotebookController {
 
 				const container = document.getElementById('scrollContainer');
 				const tbody = document.getElementById('tableBody');
-				const spacer = document.getElementById('spacer');
-
-				// Set spacer height to create scrollable area
-				spacer.style.height = (totalRows * ROW_HEIGHT) + 'px';
 
 				let lastStart = -1;
 				let lastEnd = -1;
+
+				function createSpacerRow(height) {
+					if (height <= 0) return '';
+					return '<tr class="virtual-spacer"><td colspan="' + columnCount + '" style="height:' + height + 'px;padding:0;border:none;"></td></tr>';
+				}
 
 				function renderVisibleRows() {
 					const scrollTop = container.scrollTop;
@@ -704,22 +703,24 @@ export class DataverseNotebookController {
 					lastStart = startRow;
 					lastEnd = endRow;
 
-					// Build rows HTML
-					let html = '';
+					// Calculate spacer heights
+					const topSpacerHeight = startRow * ROW_HEIGHT;
+					const bottomSpacerHeight = Math.max(0, (totalRows - endRow) * ROW_HEIGHT);
+
+					// Build rows HTML with spacers (normal flow, not absolute)
+					let html = createSpacerRow(topSpacerHeight);
 					for (let i = startRow; i < endRow; i++) {
 						const row = rowData[i];
 						const rowClass = i % 2 === 0 ? 'row-even' : 'row-odd';
-						const top = i * ROW_HEIGHT;
-						html += '<tr class="data-row ' + rowClass + '" style="position:absolute;top:' + top + 'px;width:100%">';
+						html += '<tr class="data-row ' + rowClass + '">';
 						for (let j = 0; j < row.length; j++) {
 							html += '<td class="data-cell">' + row[j] + '</td>';
 						}
 						html += '</tr>';
 					}
+					html += createSpacerRow(bottomSpacerHeight);
 
 					tbody.innerHTML = html;
-					tbody.style.position = 'relative';
-					tbody.style.height = (totalRows * ROW_HEIGHT) + 'px';
 				}
 
 				// Initial render
