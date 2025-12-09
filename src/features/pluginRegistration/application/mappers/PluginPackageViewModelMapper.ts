@@ -27,7 +27,7 @@ export class PluginPackageViewModelMapper {
 			parentId: null,
 			type: 'package',
 			name: pkg.getName(),
-			displayName: `${pkg.getName()} (${pkg.getDisplayVersion()})`,
+			displayName: pkg.getName(),
 			icon: '📦',
 			metadata,
 			isManaged: pkg.isInManagedState(),
