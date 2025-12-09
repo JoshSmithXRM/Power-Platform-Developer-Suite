@@ -414,6 +414,29 @@ export class DataverseNotebookController {
 			// Map to view model
 			const viewModel = this.resultMapper.toViewModel(result);
 
+			// DEBUG: Log detailed info about the mapping result to diagnose race conditions
+			// This logging helps identify cases where data exists but doesn't display
+			this.logger.debug('Notebook cell query completed', {
+				rowCount: viewModel.rows.length,
+				columnCount: viewModel.columns.length,
+				columnNames: viewModel.columns.map((c) => c.name),
+				firstRowKeys: viewModel.rows.length > 0 ? Object.keys(viewModel.rows[0]!) : [],
+				hasEnvironmentUrl: !!this.selectedEnvironmentUrl,
+				entityLogicalName: viewModel.entityLogicalName,
+			});
+
+			// Verify column/row key alignment (helps diagnose "no data" issues)
+			if (viewModel.rows.length > 0) {
+				const firstRow = viewModel.rows[0]!;
+				const missingColumns = viewModel.columns.filter((col) => !(col.name in firstRow));
+				if (missingColumns.length > 0) {
+					this.logger.error('REGRESSION BUG: Column/row key mismatch detected', {
+						missingColumnNames: missingColumns.map((c) => c.name),
+						availableRowKeys: Object.keys(firstRow),
+					});
+				}
+			}
+
 			// Store results for export functionality
 			this.cellResults.set(cell.document.uri.toString(), viewModel);
 

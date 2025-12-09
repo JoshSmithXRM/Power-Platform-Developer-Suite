@@ -410,6 +410,120 @@ describe('QueryResultViewModelMapper - All Column Types', () => {
 		});
 	});
 
+	describe('Explicit name column queries - Notebook regression', () => {
+		/**
+		 * REGRESSION TEST: Notebook shows "no data" when user explicitly queries name columns
+		 *
+		 * Customer scenario:
+		 * SELECT TOP 20
+		 *   et_salesappointmentsid,
+		 *   et_salesrepownerid,       -- lookup field
+		 *   et_salesrepowneridname,   -- explicitly queried name column
+		 *   createdby,                -- lookup field
+		 *   createdbyname             -- explicitly queried name column
+		 * FROM et_salesappointments
+		 *
+		 * Bug: When dataType is NOT correctly inferred as 'lookup' (e.g., all values are null),
+		 * the explicit name column doesn't get populated from the lookup's name value.
+		 *
+		 * Root cause hypothesis: If lookup field dataType is 'unknown' (not 'lookup'),
+		 * virtualNameColumns set is empty, and the explicit name column with null value
+		 * shows empty instead of deriving from the lookup.
+		 */
+		it('should handle explicit name column when lookup dataType is unknown (all null values)', () => {
+			// Scenario: User queries both createdby and createdbyname
+			// BUT dataType for createdby is 'unknown' (not detected as lookup)
+			// because all rows have null lookup values
+			const columns = [
+				new QueryResultColumn('createdby', 'createdby', 'unknown'), // NOT 'lookup'!
+				new QueryResultColumn('createdbyname', 'createdbyname', 'unknown'),
+			];
+			const rows = [QueryResultRow.fromRecord({
+				createdby: null,
+				createdbyname: null,
+			})];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have exactly 2 columns (no virtual columns added for 'unknown' type)
+			expect(viewModel.columns).toHaveLength(2);
+			expect(viewModel.columns.map(c => c.name)).toEqual(['createdby', 'createdbyname']);
+
+			// Both should be empty strings (null values)
+			expect(viewModel.rows[0]!['createdby']).toBe('');
+			expect(viewModel.rows[0]!['createdbyname']).toBe('');
+		});
+
+		it('should show name column data when some rows have values and others are null', () => {
+			// Scenario: Mixed data - some rows have lookup values, others don't
+			// DataType is correctly detected as 'lookup' because at least one row has data
+			const lookupValue: QueryLookupValue = {
+				id: '12345678-1234-1234-1234-123456789012',
+				name: 'John Smith',
+				entityType: 'systemuser',
+			};
+
+			const columns = [
+				new QueryResultColumn('createdby', 'createdby', 'lookup'),
+				new QueryResultColumn('createdbyname', 'createdbyname', 'unknown'),
+			];
+			const rows = [
+				// Row with lookup value
+				QueryResultRow.fromRecord({
+					createdby: lookupValue as never,
+					createdbyname: null, // Dataverse returns null for explicit name column query
+				}),
+				// Row with null lookup (e.g., system record with no creator)
+				QueryResultRow.fromRecord({
+					createdby: null,
+					createdbyname: null,
+				}),
+			];
+			const result = new QueryResult(columns, rows, 2, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have exactly 2 columns
+			expect(viewModel.columns).toHaveLength(2);
+
+			// First row: lookup data should be used
+			expect(viewModel.rows[0]!['createdby']).toBe('12345678-1234-1234-1234-123456789012');
+			expect(viewModel.rows[0]!['createdbyname']).toBe('John Smith');
+
+			// Second row: both should be empty
+			expect(viewModel.rows[1]!['createdby']).toBe('');
+			expect(viewModel.rows[1]!['createdbyname']).toBe('');
+		});
+
+		it('should populate name column from lookup even when name column explicitly queried', () => {
+			// This is the CRITICAL regression test for notebook bug
+			// User explicitly queries both the lookup field AND its name field
+			// Dataverse returns null for the explicit name column query
+			// BUT the lookup field has the name in its metadata
+			const lookupValue: QueryLookupValue = {
+				id: '12345678-1234-1234-1234-123456789012',
+				name: 'John Smith', // This is where the name actually comes from
+				entityType: 'systemuser',
+			};
+
+			const columns = [
+				new QueryResultColumn('createdby', 'createdby', 'lookup'),
+				new QueryResultColumn('createdbyname', 'createdbyname', 'unknown'), // explicit, with null data
+			];
+			const rows = [QueryResultRow.fromRecord({
+				createdby: lookupValue as never,
+				createdbyname: null, // Dataverse returns null for explicit virtual column queries
+			})];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// CRITICAL: createdbyname should show 'John Smith' (from lookup.name), NOT empty!
+			expect(viewModel.rows[0]!['createdbyname']).toBe('John Smith');
+		});
+	});
+
 	describe('NULL handling for all types', () => {
 		it('should handle null string', () => {
 			const columns = [new QueryResultColumn('name', 'name', 'string')];
