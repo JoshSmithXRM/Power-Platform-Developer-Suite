@@ -2,7 +2,7 @@
 
 **Branch:** `feature/virtual-table-data-explorer`
 **Started:** 2025-12-08
-**Status:** Testing in progress
+**Status:** ✅ COMPLETE - Ready for PR
 
 ---
 
@@ -226,20 +226,34 @@ Changed notebook to use same **spacer row approach** as VirtualTableRenderer.js:
 
 Both Data Explorer and Notebook now use the same virtual scrolling pattern.
 
+### Refactoring: Shared Virtual Scroll Generator ✅ COMPLETE
+Extracted notebook virtual scroll script to shared module to eliminate duplication.
+
+**New file:** `src/shared/infrastructure/ui/virtualScroll/VirtualScrollScriptGenerator.ts`
+- Single source of truth for notebook virtual scrolling algorithm
+- `generateVirtualScrollScript()` takes config and returns inline JS
+- DataverseNotebookController now uses this generator
+- VirtualTableRenderer.js has cross-reference comment pointing to generator
+
+**Why not fully unified:**
+VirtualTableRenderer.js has additional panel features (search, sort, selection, pagination) that notebooks don't need. The core spacer row algorithm is now shared via the generator.
+
 ---
 
 ## Testing Checklist
 
-- [ ] Data Explorer: Query with 5k rows, all columns - memory stays under 1.5GB
-- [ ] Data Explorer: Virtual scrolling works (smooth scroll through all rows)
-- [ ] Data Explorer: Search filter works
-- [ ] Data Explorer: Sort columns work
-- [ ] Data Explorer: Lookup links clickable
-- [ ] Data Explorer: Copy URL buttons work
-- [ ] Data Explorer: Cell selection (click-drag) works
-- [ ] Notebooks: Query with 5k rows renders in 400px scroll container
-- [ ] Notebooks: Virtual scrolling works in notebook output
-- [ ] Notebooks: Links open in browser
+- [x] Data Explorer: Query with 5k rows, all columns - memory stays under 1.5GB
+- [x] Data Explorer: Virtual scrolling works (smooth scroll through all rows)
+- [x] Data Explorer: Search filter works
+- [x] Data Explorer: Sort columns work
+- [x] Data Explorer: Lookup links clickable
+- [x] Data Explorer: Copy URL buttons work
+- [x] Data Explorer: Cell selection (click-drag) works
+- [x] Data Explorer: Column widths size to content properly
+- [x] Notebooks: Query with 5k rows renders in 400px scroll container
+- [x] Notebooks: Virtual scrolling works in notebook output
+- [x] Notebooks: Links open in browser
+- [x] Notebooks: Column widths size to content properly
 
 ---
 

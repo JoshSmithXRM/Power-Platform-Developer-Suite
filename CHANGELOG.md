@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed CSS flex chain for proper virtual scroll container sizing
   - Result: Memory reduced from 4GB to ~300MB, smooth scrolling restored
 
+- **Notebooks - Virtual Scrolling for Large Results** - Added virtual scrolling to notebook query outputs
+  - Notebooks now handle 5000+ row results efficiently (renders only visible ~15-20 rows)
+  - Fixed column width issue caused by `position: absolute` on rows breaking table layout
+  - Uses spacer row approach (same pattern as Data Explorer) for proper column sizing
+  - Extracted shared `VirtualScrollScriptGenerator` for single source of truth
+
 - **Data Explorer - Duplicate Virtual Name Columns** - Fixed bug where querying both a lookup column and its virtual name column (e.g., `createdby` and `createdbyname`) caused duplicate columns and empty values
   - Virtual name columns queried explicitly were overwriting values derived from the lookup
   - Now correctly uses the lookup-derived name value and prevents duplicate column creation
