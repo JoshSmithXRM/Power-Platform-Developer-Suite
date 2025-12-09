@@ -209,12 +209,22 @@ See screenshot - all columns cramped together despite horizontal scroll being av
 **Fix applied:**
 Added `table-layout: auto` override in `data-explorer.css` for `#results-table-container .virtual-table`. This allows content-based column sizing for variable-width query result columns while maintaining the fixed layout behavior in other panels that need it.
 
-### Unstaged Notebook Changes
-Previous session modified notebook rendering but changes are unstaged:
-- `src/features/dataExplorer/notebooks/DataverseNotebookController.ts` (417 lines changed)
-- `src/features/dataExplorer/presentation/panels/DataExplorerPanelComposed.ts` (12 lines added)
+### Issue: Notebook Columns Cramped ✅ FIXED
+After implementing virtual scrolling for notebooks, columns were cramped/smooshed.
 
-These were part of "inline virtual scrolling for notebooks" work.
+**Root cause:**
+Notebook used `position: absolute; width: 100%` on rows (line 713), which:
+1. Removed rows from normal table flow
+2. Constrained rows to container width
+3. Prevented `width: max-content` from sizing columns to content
+
+**Fix applied:**
+Changed notebook to use same **spacer row approach** as VirtualTableRenderer.js:
+- Top spacer row with calculated height (normal flow)
+- Visible rows in normal table flow (NO absolute positioning)
+- Bottom spacer row with calculated height
+
+Both Data Explorer and Notebook now use the same virtual scrolling pattern.
 
 ---
 
