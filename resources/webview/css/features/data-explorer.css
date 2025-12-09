@@ -52,14 +52,63 @@
 /* Table container scrolls independently */
 #results-table-container {
 	flex: 1;
-	overflow: auto;
-	min-height: 100px; /* Minimum visible area */
+	overflow: hidden;
+	min-height: 200px; /* Minimum visible area for results */
+	max-height: 100%; /* Ensure it doesn't exceed parent */
+	display: flex;
+	flex-direction: column;
+}
+
+/* Search container above the virtual table */
+#results-table-container .search-container {
+	flex-shrink: 0;
+}
+
+/* Virtual table container fills remaining space */
+#results-table-container .virtual-table-container {
+	flex: 1;
+	min-height: 0; /* Critical for flex child to shrink */
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+/* Virtual scroll wrapper handles scrolling */
+#results-table-container .virtual-scroll-wrapper {
+	flex: 1;
+	min-height: 0; /* Critical for flex child to scroll */
+	overflow-y: auto;
+	overflow-x: auto;
 }
 
 /* Ensure table scrolls properly - use min-width for horizontal scroll */
 #results-table-container .data-table {
 	min-width: 100%;
 	width: max-content;
+}
+
+/* Virtual table specific styles */
+#results-table-container .virtual-table {
+	min-width: 100%;
+	width: max-content;
+	border-collapse: collapse;
+}
+
+#results-table-container .virtual-table tbody tr {
+	height: 36px;
+}
+
+/* Spacer rows for virtual scrolling */
+#results-table-container .virtual-spacer-top,
+#results-table-container .virtual-spacer-bottom {
+	height: 0;
+	border: none;
+}
+
+#results-table-container .virtual-spacer-top td,
+#results-table-container .virtual-spacer-bottom td {
+	padding: 0;
+	border: none;
 }
 
 /* Make header columns clickable for sorting */

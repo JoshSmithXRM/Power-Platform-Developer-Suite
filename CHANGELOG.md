@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Data Explorer - Memory Usage with Large Datasets** - Fixed critical bug causing 4GB+ memory usage when displaying 5000 rows
+  - Removed duplicate message processing (VisualQueryBuilderBehavior was building full HTML table before VirtualTableRenderer)
+  - Replaced O(n) `indexOf` lookups with O(1) WeakMap for row index tracking
+  - Eliminated unnecessary array copies in VirtualTableRenderer (use reference, copy only on sort)
+  - Fixed CSS flex chain for proper virtual scroll container sizing
+  - Result: Memory reduced from 4GB to ~300MB, smooth scrolling restored
+
 - **Data Explorer - Duplicate Virtual Name Columns** - Fixed bug where querying both a lookup column and its virtual name column (e.g., `createdby` and `createdbyname`) caused duplicate columns and empty values
   - Virtual name columns queried explicitly were overwriting values derived from the lookup
   - Now correctly uses the lookup-derived name value and prevents duplicate column creation
