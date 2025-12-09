@@ -36,7 +36,7 @@ export class PluginStepViewModelMapper {
 			type: 'step',
 			name: step.getName(),
 			displayName: `${step.getMessageName()}: ${entityDisplay}`,
-			icon: step.isEnabled() ? 'symbol-event' : 'circle-slash',
+			icon: step.isEnabled() ? '⚡' : '⚫',
 			metadata,
 			isManaged: step.isInManagedState(),
 			children: images,

@@ -55,6 +55,32 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 		private readonly logger: ILogger
 	) {}
 
+	public async findAll(environmentId: string): Promise<readonly PluginStep[]> {
+		this.logger.debug('DataversePluginStepRepository: Fetching ALL steps', {
+			environmentId,
+		});
+
+		// Expand sdkmessageid to get message name, and sdkmessagefilterid to get entity name
+		const endpoint =
+			`/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}` +
+			`?$select=${DataversePluginStepRepository.SELECT_FIELDS}` +
+			`&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)` +
+			`&$orderby=name asc`;
+
+		const response = await this.apiService.get<PluginStepCollectionResponse>(
+			environmentId,
+			endpoint
+		);
+
+		const steps = response.value.map((dto) => this.mapToDomain(dto));
+
+		this.logger.debug('DataversePluginStepRepository: Fetched ALL steps', {
+			count: steps.length,
+		});
+
+		return steps;
+	}
+
 	public async findByPluginTypeId(
 		environmentId: string,
 		pluginTypeId: string

@@ -30,7 +30,7 @@ export class PluginAssemblyViewModelMapper {
 			type: 'assembly',
 			name: assembly.getName(),
 			displayName: `${assembly.getName()} (${assembly.getDisplayVersion()})`,
-			icon: assembly.isInManagedState() ? 'lock' : 'library',
+			icon: '⚙️',
 			metadata,
 			isManaged: assembly.isInManagedState(),
 			children: pluginTypes,

@@ -35,6 +35,30 @@ export class DataversePluginTypeRepository implements IPluginTypeRepository {
 		private readonly logger: ILogger
 	) {}
 
+	public async findAll(environmentId: string): Promise<readonly PluginType[]> {
+		this.logger.debug('DataversePluginTypeRepository: Fetching ALL plugin types', {
+			environmentId,
+		});
+
+		const endpoint =
+			`/api/data/v9.2/${DataversePluginTypeRepository.ENTITY_SET}` +
+			`?$select=${DataversePluginTypeRepository.SELECT_FIELDS}` +
+			'&$orderby=typename asc';
+
+		const response = await this.apiService.get<PluginTypeCollectionResponse>(
+			environmentId,
+			endpoint
+		);
+
+		const pluginTypes = response.value.map((dto) => this.mapToDomain(dto));
+
+		this.logger.debug('DataversePluginTypeRepository: Fetched ALL plugin types', {
+			count: pluginTypes.length,
+		});
+
+		return pluginTypes;
+	}
+
 	public async findByAssemblyId(
 		environmentId: string,
 		assemblyId: string

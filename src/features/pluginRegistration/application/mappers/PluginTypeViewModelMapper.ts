@@ -20,13 +20,16 @@ export class PluginTypeViewModelMapper {
 			workflowActivityGroupName: pluginType.getWorkflowActivityGroupName(),
 		};
 
+		// Display name: prefer FriendlyName over TypeName
+		const displayName = pluginType.getFriendlyName() || pluginType.getName();
+
 		return {
 			id: pluginType.getId(),
 			parentId: assemblyId,
 			type: 'pluginType',
 			name: pluginType.getName(),
-			displayName: pluginType.getDisplayName(),
-			icon: pluginType.isWorkflowActivity() ? 'workflow' : 'symbol-class',
+			displayName,
+			icon: '🔌',
 			metadata,
 			isManaged: false,
 			children: steps,

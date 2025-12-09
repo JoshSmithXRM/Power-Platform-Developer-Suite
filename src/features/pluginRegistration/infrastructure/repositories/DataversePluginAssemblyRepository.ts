@@ -7,6 +7,9 @@ import { SourceType } from '../../domain/valueObjects/SourceType';
 
 /**
  * DTO for Dataverse pluginassembly entity.
+ *
+ * Note: _pluginpackageid_value was removed because the pluginpackageid lookup
+ * doesn't exist in most Dataverse environments (plugin packages are a newer feature).
  */
 interface PluginAssemblyDto {
 	pluginassemblyid: string;
@@ -15,7 +18,6 @@ interface PluginAssemblyDto {
 	isolationmode: number;
 	ismanaged: boolean;
 	sourcetype: number;
-	_pluginpackageid_value: string | null;
 	createdon: string;
 	modifiedon: string;
 }
@@ -35,7 +37,7 @@ interface PluginAssemblyCollectionResponse {
 export class DataversePluginAssemblyRepository implements IPluginAssemblyRepository {
 	private static readonly ENTITY_SET = 'pluginassemblies';
 	private static readonly SELECT_FIELDS =
-		'pluginassemblyid,name,version,isolationmode,ismanaged,sourcetype,_pluginpackageid_value,createdon,modifiedon';
+		'pluginassemblyid,name,version,isolationmode,ismanaged,sourcetype,createdon,modifiedon';
 
 	constructor(
 		private readonly apiService: IDataverseApiService,
@@ -44,22 +46,18 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 
 	public async findAll(
 		environmentId: string,
-		solutionId?: string
+		_solutionId?: string
 	): Promise<readonly PluginAssembly[]> {
 		this.logger.debug('DataversePluginAssemblyRepository: Fetching assemblies', {
 			environmentId,
-			solutionId: solutionId ?? 'all',
 		});
 
-		let endpoint = `/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}?$select=${DataversePluginAssemblyRepository.SELECT_FIELDS}`;
-
-		// Add solution filtering if specified (component type 91 for plugin assemblies)
-		if (solutionId && solutionId !== 'default') {
-			const solutionFilter = `Microsoft.Dynamics.CRM.SolutionComponentContains(SolutionId=${solutionId},ComponentType=91,ObjectId=pluginassemblyid)`;
-			endpoint += `&$filter=${solutionFilter}`;
-		}
-
-		endpoint += '&$orderby=name asc';
+		// Note: Solution filtering is deferred - would require ISolutionComponentRepository
+		// like ListWebResourcesUseCase. For now, returns all assemblies.
+		const endpoint =
+			`/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}` +
+			`?$select=${DataversePluginAssemblyRepository.SELECT_FIELDS}` +
+			'&$orderby=name asc';
 
 		const response = await this.apiService.get<PluginAssemblyCollectionResponse>(
 			environmentId,
@@ -84,37 +82,34 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 			packageId,
 		});
 
-		const endpoint =
-			`/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}?$select=${DataversePluginAssemblyRepository.SELECT_FIELDS}` +
-			`&$filter=_pluginpackageid_value eq ${packageId}&$orderby=name asc`;
-
-		const response = await this.apiService.get<PluginAssemblyCollectionResponse>(
-			environmentId,
-			endpoint
+		// Note: The pluginassembly entity doesn't have _pluginpackageid_value in most
+		// Dataverse environments. Plugin packages are a newer feature. For now, we
+		// cannot query assemblies by package, so return empty array.
+		// TODO: When plugin packages are supported, query using expand or separate lookup.
+		this.logger.debug(
+			'DataversePluginAssemblyRepository: Package lookup not supported - returning empty',
+			{ packageId }
 		);
 
-		return response.value.map((dto) => this.mapToDomain(dto));
+		return [];
 	}
 
 	public async findStandalone(
 		environmentId: string,
-		solutionId?: string
+		_solutionId?: string
 	): Promise<readonly PluginAssembly[]> {
 		this.logger.debug('DataversePluginAssemblyRepository: Fetching standalone assemblies', {
 			environmentId,
-			solutionId: solutionId ?? 'all',
 		});
 
-		let filter = '_pluginpackageid_value eq null';
-
-		// Add solution filtering if specified
-		if (solutionId && solutionId !== 'default') {
-			filter += ` and Microsoft.Dynamics.CRM.SolutionComponentContains(SolutionId=${solutionId},ComponentType=91,ObjectId=pluginassemblyid)`;
-		}
-
+		// Note: Since _pluginpackageid_value doesn't exist in most environments,
+		// we cannot distinguish between standalone and packaged assemblies.
+		// Return all assemblies as "standalone" for now.
+		// Solution filtering is also deferred (requires ISolutionComponentRepository).
 		const endpoint =
-			`/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}?$select=${DataversePluginAssemblyRepository.SELECT_FIELDS}` +
-			`&$filter=${filter}&$orderby=name asc`;
+			`/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}` +
+			`?$select=${DataversePluginAssemblyRepository.SELECT_FIELDS}` +
+			'&$orderby=name asc';
 
 		const response = await this.apiService.get<PluginAssemblyCollectionResponse>(
 			environmentId,
@@ -180,7 +175,7 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 			IsolationMode.fromValue(dto.isolationmode),
 			dto.ismanaged,
 			SourceType.fromValue(dto.sourcetype),
-			dto._pluginpackageid_value,
+			null, // packageId - not available in most Dataverse environments
 			new Date(dto.createdon),
 			new Date(dto.modifiedon)
 		);
