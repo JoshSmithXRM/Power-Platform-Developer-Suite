@@ -4,27 +4,34 @@
 	display: flex;
 	flex-direction: column;
 	height: 100%;
-	padding: 8px;
+	padding: 0;
+	overflow: hidden;
 }
 
 /* Tree Search */
 .tree-search-container {
-	margin-bottom: 8px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBar-background);
 }
 
 .tree-search-input {
 	width: 100%;
-	padding: 6px 10px;
+	padding: 6px 10px 6px 28px;
 	border: 1px solid var(--vscode-input-border);
 	background: var(--vscode-input-background);
 	color: var(--vscode-input-foreground);
-	border-radius: 2px;
+	border-radius: 4px;
 	font-size: 13px;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='%23888'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: 8px center;
+	background-size: 14px;
 }
 
 .tree-search-input:focus {
-	outline: 1px solid var(--vscode-focusBorder);
-	outline-offset: -1px;
+	outline: none;
+	border-color: var(--vscode-focusBorder);
 }
 
 .tree-search-input::placeholder {
@@ -37,18 +44,19 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	padding: 40px 20px;
+	padding: 60px 20px;
 	text-align: center;
+	flex: 1;
 }
 
 .loading-spinner {
-	width: 32px;
-	height: 32px;
+	width: 36px;
+	height: 36px;
 	border: 3px solid var(--vscode-progressBar-background, #3c3c3c);
 	border-top: 3px solid var(--vscode-progressBar-foreground, #0e639c);
 	border-radius: 50%;
 	animation: spin 1s linear infinite;
-	margin-bottom: 16px;
+	margin-bottom: 20px;
 }
 
 @keyframes spin {
@@ -59,12 +67,12 @@
 .loading-step {
 	font-size: 13px;
 	color: var(--vscode-foreground);
-	margin-bottom: 12px;
+	margin-bottom: 16px;
 	min-height: 20px;
 }
 
 .loading-bar-container {
-	width: 200px;
+	width: 240px;
 	height: 4px;
 	background: var(--vscode-progressBar-background, #3c3c3c);
 	border-radius: 2px;
@@ -82,18 +90,20 @@
 .tree-container {
 	flex: 1;
 	overflow: auto;
-	border: 1px solid var(--vscode-panel-border);
-	border-radius: 2px;
 	background: var(--vscode-editor-background);
+	padding: 4px 0;
 }
 
 /* Tree Node Styles */
 .tree-node {
 	display: flex;
 	align-items: center;
-	padding: 4px 8px;
+	padding: 3px 12px 3px 8px;
 	cursor: pointer;
 	user-select: none;
+	min-height: 24px;
+	border-left: 2px solid transparent;
+	transition: background-color 0.1s ease;
 }
 
 .tree-node:hover {
@@ -103,6 +113,7 @@
 .tree-node.selected {
 	background: var(--vscode-list-activeSelectionBackground);
 	color: var(--vscode-list-activeSelectionForeground);
+	border-left-color: var(--vscode-focusBorder);
 }
 
 .tree-node-toggle {
@@ -111,32 +122,39 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	margin-right: 4px;
+	margin-right: 2px;
 	color: var(--vscode-foreground);
-	opacity: 0.7;
+	opacity: 0.6;
+	flex-shrink: 0;
+	transition: transform 0.15s ease;
 }
 
 .tree-node-toggle.collapsed::before {
-	content: '\25B6'; /* Right triangle ▶ */
-	font-size: 8px;
+	content: '\25B6'; /* Right triangle */
+	font-size: 9px;
 }
 
 .tree-node-toggle.expanded::before {
-	content: '\25BC'; /* Down triangle ▼ */
-	font-size: 8px;
+	content: '\25BC'; /* Down triangle */
+	font-size: 9px;
 }
 
 .tree-node-toggle.leaf {
 	visibility: hidden;
 }
 
+.tree-node:hover .tree-node-toggle {
+	opacity: 1;
+}
+
 .tree-node-icon {
-	width: 16px;
-	height: 16px;
+	width: 18px;
+	height: 18px;
 	margin-right: 6px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	flex-shrink: 0;
 	/* Emoji font stack - ensures emoji render correctly across platforms */
 	font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif;
 	font-size: 14px;
@@ -148,49 +166,48 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	font-size: 13px;
+	line-height: 1.4;
 }
 
 .tree-node-badge {
 	font-size: 11px;
-	color: var(--vscode-descriptionForeground);
+	color: var(--vscode-foreground);
 	margin-left: 8px;
+	padding: 2px 8px;
+	border-radius: 10px;
+	flex-shrink: 0;
+	background: rgba(128, 128, 128, 0.2);
+	border: 1px solid rgba(128, 128, 128, 0.3);
 }
 
-/* Indentation */
+/* Tree Children - indentation handled by inline styles */
 .tree-children {
-	padding-left: 16px;
+	/* No additional padding - inline styles handle indentation */
 }
 
-/* Node type-specific colors */
-.tree-node[data-type="package"] .tree-node-icon {
-	color: var(--vscode-symbolIcon-packageForeground, #6a9955);
+/* Assembly nodes - slightly bolder */
+.tree-node[data-type="assembly"] .tree-node-label {
+	font-weight: 500;
 }
 
-.tree-node[data-type="assembly"] .tree-node-icon {
-	color: var(--vscode-symbolIcon-moduleForeground, #dcdcaa);
-}
-
-.tree-node[data-type="pluginType"] .tree-node-icon {
-	color: var(--vscode-symbolIcon-classForeground, #4ec9b0);
-}
-
-.tree-node[data-type="step"] .tree-node-icon {
-	color: var(--vscode-symbolIcon-methodForeground, #dcdcaa);
-}
-
-.tree-node[data-type="image"] .tree-node-icon {
-	color: var(--vscode-symbolIcon-fieldForeground, #9cdcfe);
+/* Step nodes - show stage/mode badge differently */
+.tree-node[data-type="step"] .tree-node-badge {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 10px;
+	padding: 2px 6px;
+	border-radius: 3px;
 }
 
 /* Managed item indicator */
-.tree-node.managed {
-	opacity: 0.7;
+.tree-node.managed .tree-node-label {
+	opacity: 0.85;
 }
 
 .tree-node.managed .tree-node-label::after {
 	content: ' (managed)';
 	font-size: 11px;
 	color: var(--vscode-descriptionForeground);
+	font-weight: normal;
 }
 
 /* Disabled step */
@@ -208,9 +225,10 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	padding: 40px 20px;
+	padding: 60px 20px;
 	text-align: center;
 	color: var(--vscode-descriptionForeground);
+	flex: 1;
 }
 
 .tree-empty p {
@@ -220,4 +238,28 @@
 .tree-empty .help-text {
 	font-size: 12px;
 	opacity: 0.8;
+}
+
+/* Scrollbar styling */
+.tree-container::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+.tree-container::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.tree-container::-webkit-scrollbar-thumb {
+	background: var(--vscode-scrollbarSlider-background);
+	border-radius: 5px;
+}
+
+.tree-container::-webkit-scrollbar-thumb:hover {
+	background: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+/* Filter highlight - when searching */
+.tree-node.filter-match .tree-node-label {
+	background: var(--vscode-editor-findMatchHighlightBackground);
 }

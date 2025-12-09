@@ -161,10 +161,12 @@ function getIcon(type, iconHint) {
  */
 function getBadge(item) {
 	if (item.type === 'assembly' && item.children) {
-		return `${item.children.length} types`;
+		const count = item.children.length;
+		return `${count} plugin${count !== 1 ? 's' : ''}`;
 	}
 	if (item.type === 'pluginType' && item.children) {
-		return `${item.children.length} steps`;
+		const count = item.children.length;
+		return `${count} step${count !== 1 ? 's' : ''}`;
 	}
 	if (item.type === 'step' && item.metadata) {
 		const stage = item.metadata.stage || '';

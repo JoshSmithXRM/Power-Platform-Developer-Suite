@@ -150,19 +150,32 @@ export class LoadPluginRegistrationTreeUseCase {
 		const stepsByPluginTypeId = this.groupBy(data.steps, (s) => s.getPluginTypeId());
 		const imagesByStepId = this.groupBy(data.images, (img) => img.getStepId());
 
-		// Build assembly trees (all standalone since we can't link to packages)
-		const standaloneAssemblyTrees = this.buildAssemblyTrees(
+		// Group assemblies by package ID (null = standalone)
+		const assembliesByPackageId = this.groupByNullable(
 			data.assemblies,
+			(a) => a.getPackageId()
+		);
+
+		// Build package trees with their assemblies
+		const packageTrees: PackageTreeNode[] = data.packages.map((pkg) => {
+			const packageAssemblies = assembliesByPackageId.get(pkg.getId()) ?? [];
+			const assemblyTrees = this.buildAssemblyTrees(
+				packageAssemblies,
+				pluginTypesByAssemblyId,
+				stepsByPluginTypeId,
+				imagesByStepId
+			);
+			return { package: pkg, assemblies: assemblyTrees };
+		});
+
+		// Standalone assemblies (no package)
+		const standaloneAssemblies = assembliesByPackageId.get(null) ?? [];
+		const standaloneAssemblyTrees = this.buildAssemblyTrees(
+			standaloneAssemblies,
 			pluginTypesByAssemblyId,
 			stepsByPluginTypeId,
 			imagesByStepId
 		);
-
-		// Package trees are empty since we can't link assemblies to packages
-		const packageTrees: PackageTreeNode[] = data.packages.map((pkg) => ({
-			package: pkg,
-			assemblies: [],
-		}));
 
 		const totalNodeCount = this.countTotalNodes(packageTrees, standaloneAssemblyTrees);
 
@@ -176,6 +189,26 @@ export class LoadPluginRegistrationTreeUseCase {
 	 */
 	private groupBy<T>(items: readonly T[], keyFn: (item: T) => string): Map<string, T[]> {
 		const map = new Map<string, T[]>();
+		for (const item of items) {
+			const key = keyFn(item);
+			const existing = map.get(key);
+			if (existing) {
+				existing.push(item);
+			} else {
+				map.set(key, [item]);
+			}
+		}
+		return map;
+	}
+
+	/**
+	 * Groups items by a nullable key (null keys are grouped together).
+	 */
+	private groupByNullable<T>(
+		items: readonly T[],
+		keyFn: (item: T) => string | null
+	): Map<string | null, T[]> {
+		const map = new Map<string | null, T[]>();
 		for (const item of items) {
 			const key = keyFn(item);
 			const existing = map.get(key);
