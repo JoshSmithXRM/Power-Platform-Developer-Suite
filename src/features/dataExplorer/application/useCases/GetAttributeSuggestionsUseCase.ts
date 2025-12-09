@@ -33,10 +33,12 @@ export class GetAttributeSuggestionsUseCase {
 			const allAttributes = await this.metadataCache.getAttributeSuggestions(environmentId, entityLogicalName);
 			const lowerPrefix = prefix.toLowerCase();
 
+			// Use 'includes' instead of 'startsWith' for broader matching
+			// This allows typing "name" to find "primarycontactidname"
 			const filtered = allAttributes.filter(
 				attr =>
-					attr.logicalName.toLowerCase().startsWith(lowerPrefix) ||
-					attr.displayName.toLowerCase().startsWith(lowerPrefix)
+					attr.logicalName.toLowerCase().includes(lowerPrefix) ||
+					attr.displayName.toLowerCase().includes(lowerPrefix)
 			);
 
 			const sorted = this.sortByRelevance(filtered, lowerPrefix);
@@ -50,16 +52,22 @@ export class GetAttributeSuggestionsUseCase {
 
 	private sortByRelevance(attributes: AttributeSuggestion[], lowerPrefix: string): AttributeSuggestion[] {
 		return [...attributes].sort((a, b) => {
-			const aExact = a.logicalName.toLowerCase() === lowerPrefix;
-			const bExact = b.logicalName.toLowerCase() === lowerPrefix;
+			const aLower = a.logicalName.toLowerCase();
+			const bLower = b.logicalName.toLowerCase();
+
+			// 1. Exact match first
+			const aExact = aLower === lowerPrefix;
+			const bExact = bLower === lowerPrefix;
 			if (aExact && !bExact) return -1;
 			if (!aExact && bExact) return 1;
 
-			const aStarts = a.logicalName.toLowerCase().startsWith(lowerPrefix);
-			const bStarts = b.logicalName.toLowerCase().startsWith(lowerPrefix);
+			// 2. StartsWith second (prioritize prefix matches)
+			const aStarts = aLower.startsWith(lowerPrefix);
+			const bStarts = bLower.startsWith(lowerPrefix);
 			if (aStarts && !bStarts) return -1;
 			if (!aStarts && bStarts) return 1;
 
+			// 3. Alphabetically within same category
 			return a.logicalName.localeCompare(b.logicalName);
 		});
 	}

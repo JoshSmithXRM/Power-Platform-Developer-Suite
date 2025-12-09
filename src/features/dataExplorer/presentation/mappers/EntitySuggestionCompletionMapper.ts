@@ -32,6 +32,10 @@ export class EntitySuggestionCompletionMapper {
 		item.insertText = entity.logicalName;
 		item.sortText = sortIndex.toString().padStart(5, '0');
 
+		// Allow VS Code to match on both logical name and display name
+		// e.g., typing "account" matches "account" or "Account" display name
+		item.filterText = `${entity.logicalName} ${entity.displayName}`;
+
 		return item;
 	}
 

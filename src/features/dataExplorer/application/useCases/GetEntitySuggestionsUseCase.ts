@@ -31,34 +31,33 @@ export class GetEntitySuggestionsUseCase {
 			const allEntities = await this.metadataCache.getEntitySuggestions(environmentId);
 			const lowerPrefix = prefix.toLowerCase();
 
+			// Use 'includes' instead of 'startsWith' for broader matching
+			// This allows typing "message" to find "sdkmessageprocessingstep"
+			// VS Code's fuzzy matching will further refine results
 			const filtered = allEntities.filter(
 				entity =>
-					entity.logicalName.toLowerCase().startsWith(lowerPrefix) ||
-					entity.displayName.toLowerCase().startsWith(lowerPrefix)
+					entity.logicalName.toLowerCase().includes(lowerPrefix) ||
+					entity.displayName.toLowerCase().includes(lowerPrefix)
 			);
 
-			// Sort: exact logical name matches first, then alphabetically
+			// Sort: exact matches first, then startsWith, then contains, then alphabetically
 			const sorted = [...filtered].sort((a, b) => {
-				const aExact = a.logicalName.toLowerCase() === lowerPrefix;
-				const bExact = b.logicalName.toLowerCase() === lowerPrefix;
+				const aLower = a.logicalName.toLowerCase();
+				const bLower = b.logicalName.toLowerCase();
 
-				if (aExact && !bExact) {
-					return -1;
-				}
-				if (!aExact && bExact) {
-					return 1;
-				}
+				// 1. Exact match first
+				const aExact = aLower === lowerPrefix;
+				const bExact = bLower === lowerPrefix;
+				if (aExact && !bExact) return -1;
+				if (!aExact && bExact) return 1;
 
-				const aStarts = a.logicalName.toLowerCase().startsWith(lowerPrefix);
-				const bStarts = b.logicalName.toLowerCase().startsWith(lowerPrefix);
+				// 2. StartsWith second (prioritize prefix matches)
+				const aStarts = aLower.startsWith(lowerPrefix);
+				const bStarts = bLower.startsWith(lowerPrefix);
+				if (aStarts && !bStarts) return -1;
+				if (!aStarts && bStarts) return 1;
 
-				if (aStarts && !bStarts) {
-					return -1;
-				}
-				if (!aStarts && bStarts) {
-					return 1;
-				}
-
+				// 3. Alphabetically within same category
 				return a.logicalName.localeCompare(b.logicalName);
 			});
 

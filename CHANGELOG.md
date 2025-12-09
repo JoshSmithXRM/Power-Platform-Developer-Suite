@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Virtual name columns queried explicitly were overwriting values derived from the lookup
   - Now correctly uses the lookup-derived name value and prevents duplicate column creation
 
+- **Notebooks - IntelliSense Not Working** - Fixed bug where IntelliSense was not available in notebooks unless Data Explorer panel was opened first
+  - IntelliSense is now registered during extension activation, not when panel opens
+  - Notebooks now have entity/attribute suggestions immediately
+
+- **IntelliSense - Missing Entities** - Fixed bug where entities like `sdkmessageprocessingstep` weren't appearing in IntelliSense
+  - Changed entity/attribute filtering from `startsWith` to `includes` for broader matching
+  - Added `filterText` to completion items for VS Code fuzzy matching on both logical and display names
+  - Returns `CompletionList` with `isIncomplete: true` to force VS Code to re-query on each keystroke
+
 ### Changed
 
 - **Documentation - Squash Merge Strategy** - Documented Git branching and merge strategy
