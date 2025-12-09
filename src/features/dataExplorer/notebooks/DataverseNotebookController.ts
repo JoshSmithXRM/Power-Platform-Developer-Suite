@@ -416,18 +416,18 @@ export class DataverseNotebookController {
 
 			// DEBUG: Log detailed info about the mapping result to diagnose race conditions
 			// This logging helps identify cases where data exists but doesn't display
+			const firstRow = viewModel.rows[0];
 			this.logger.debug('Notebook cell query completed', {
 				rowCount: viewModel.rows.length,
 				columnCount: viewModel.columns.length,
 				columnNames: viewModel.columns.map((c) => c.name),
-				firstRowKeys: viewModel.rows.length > 0 ? Object.keys(viewModel.rows[0]!) : [],
+				firstRowKeys: firstRow ? Object.keys(firstRow) : [],
 				hasEnvironmentUrl: !!this.selectedEnvironmentUrl,
 				entityLogicalName: viewModel.entityLogicalName,
 			});
 
 			// Verify column/row key alignment (helps diagnose "no data" issues)
-			if (viewModel.rows.length > 0) {
-				const firstRow = viewModel.rows[0]!;
+			if (firstRow) {
 				const missingColumns = viewModel.columns.filter((col) => !(col.name in firstRow));
 				if (missingColumns.length > 0) {
 					this.logger.error('REGRESSION BUG: Column/row key mismatch detected', {

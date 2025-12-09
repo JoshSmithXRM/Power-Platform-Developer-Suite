@@ -604,6 +604,76 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	// DEBUG COMMAND: Test Dataverse API response for virtual column behavior
+	// TODO: Remove after investigation complete
+	const debugVirtualColumnCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.debugVirtualColumn',
+		async () => {
+			try {
+				await showEnvironmentPickerAndExecute(
+					container.environmentRepository,
+					'Select environment to test virtual column behavior',
+					async (envId) => {
+						const apiService = new DataverseApiService(
+							(id) => container.authService.getAccessToken(id),
+							async (id) => {
+								const env = await container.environmentRepository.getById(new EnvironmentId(id));
+								return env?.getDataverseUrl().getValue() ?? '';
+							},
+							container.logger
+						);
+
+						container.logger.info('=== DEBUG: Testing Virtual Column Behavior ===');
+
+						// Test 1: Query ONLY createdbyname
+						const fetchXml1 = `<fetch top="1"><entity name="account"><attribute name="createdbyname" /></entity></fetch>`;
+						const encoded1 = encodeURIComponent(fetchXml1);
+						const response1 = await apiService.get<{ value: unknown[] }>(
+							envId,
+							`/api/data/v9.2/accounts?fetchXml=${encoded1}`
+						);
+						container.logger.info('Test 1: SELECT createdbyname only', {
+							rawResponse: JSON.stringify(response1, null, 2)
+						});
+
+						// Test 2: Query BOTH createdby AND createdbyname
+						const fetchXml2 = `<fetch top="1"><entity name="account"><attribute name="createdby" /><attribute name="createdbyname" /></entity></fetch>`;
+						const encoded2 = encodeURIComponent(fetchXml2);
+						const response2 = await apiService.get<{ value: unknown[] }>(
+							envId,
+							`/api/data/v9.2/accounts?fetchXml=${encoded2}`
+						);
+						container.logger.info('Test 2: SELECT createdby, createdbyname', {
+							rawResponse: JSON.stringify(response2, null, 2)
+						});
+
+						// Test 3: Query ONLY createdby (to see name in annotation)
+						const fetchXml3 = `<fetch top="1"><entity name="account"><attribute name="createdby" /></entity></fetch>`;
+						const encoded3 = encodeURIComponent(fetchXml3);
+						const response3 = await apiService.get<{ value: unknown[] }>(
+							envId,
+							`/api/data/v9.2/accounts?fetchXml=${encoded3}`
+						);
+						container.logger.info('Test 3: SELECT createdby only', {
+							rawResponse: JSON.stringify(response3, null, 2)
+						});
+
+						// Show output channel
+						container.outputChannel.show();
+						vscode.window.showInformationMessage(
+							'Debug output written to Output channel. Check "Power Platform Developer Suite" output.'
+						);
+					}
+				);
+			} catch (error) {
+				container.logger.error('Debug virtual column test failed', error);
+				vscode.window.showErrorMessage(
+					`Debug test failed: ${error instanceof Error ? error.message : String(error)}`
+				);
+			}
+		}
+	);
+
 	// Register all disposables with VS Code's extension context.
 	// When the extension deactivates, VS Code automatically calls .dispose() on each
 	// registered disposable in reverse order, ensuring proper cleanup of:
@@ -613,6 +683,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	// - Webview panels (close any open panels)
 	// This eliminates the need for manual cleanup in deactivate().
 	context.subscriptions.push(
+		debugVirtualColumnCommand,
 		addEnvironmentCommand,
 		editEnvironmentCommand,
 		testEnvironmentConnectionCommand,

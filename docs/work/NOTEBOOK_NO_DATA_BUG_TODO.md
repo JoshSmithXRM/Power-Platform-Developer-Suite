@@ -146,3 +146,82 @@ const uniqueId = crypto.randomUUID().substring(0, 8);
 - Cell 2's script targets Cell 1's elements by mistake
 - Wrote regression tests documenting the bug
 - **Ready to implement fix**
+
+---
+
+## Additional Issues Discovered
+
+### Issue 2: Aggregate Query Adds Spurious `countname` Column
+
+**Symptom:** Running an aggregate query like:
+```xml
+<fetch aggregate="true">
+  <entity name="et_salesopportunity">
+    <attribute name="et_salesopportunityid" alias="count" aggregate="count" />
+  </entity>
+</fetch>
+```
+
+Results in headers: `count    countname` (spurious `countname` column added)
+
+**Root Cause:** In `DataverseDataExplorerQueryRepository.inferDataType()`:
+```typescript
+if (formattedKey in record) {
+    if (typeof value === 'number') {
+        if (Number.isInteger(value)) {
+            return 'optionset';  // <-- BUG: Aggregate COUNT is an integer!
+        }
+        return 'money';
+    }
+}
+```
+
+Aggregate results have `FormattedValue` annotations (e.g., `count@OData.Community.Display.V1.FormattedValue`).
+The code incorrectly identifies integer aggregates as `optionset`, triggering virtual column expansion.
+
+**Fix:** Add check for aggregate queries or improve data type inference to distinguish optionsets from aggregates.
+
+**Status:** Bug confirmed, fix pending.
+
+---
+
+### Issue 3: Virtual Column (`createdbyname`) Returns Null When Queried Alone
+
+**Symptom:**
+- `SELECT createdbyname FROM account` → Returns null
+- `SELECT createdby, createdbyname FROM account` → Both populated
+
+**Question:** Is this Dataverse API behavior or a bug in our code?
+
+**Investigation:** Added debug command `power-platform-dev-suite.debugVirtualColumn` to test raw API response.
+
+**How to test:**
+1. Press `Ctrl+Shift+P`
+2. Run "Power Platform: Debug Virtual Column"
+3. Select environment
+4. Check Output panel for raw API responses
+
+**Status:** Awaiting API test results to determine if this is Dataverse behavior or our bug.
+
+---
+
+## Implementation Checklist (Updated)
+
+### Bug 1: Duplicate Element IDs
+- [x] Identify root cause
+- [x] Write regression tests documenting bug
+- [ ] Implement fix (unique IDs per cell)
+- [ ] Update tests to verify unique IDs
+- [ ] Manual testing with multi-cell notebook
+
+### Bug 2: Aggregate `countname` Column
+- [x] Identify root cause
+- [ ] Write regression test
+- [ ] Fix data type inference for aggregates
+- [ ] Manual testing
+
+### Issue 3: Virtual Column Behavior
+- [x] Add debug command for API testing
+- [ ] Run debug command to capture raw API response
+- [ ] Determine if Dataverse behavior or our bug
+- [ ] Implement fix if needed
