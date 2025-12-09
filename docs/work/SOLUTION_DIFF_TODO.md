@@ -2,7 +2,7 @@
 
 **Branch:** `feature/solution-diff`
 **Created:** 2025-12-08
-**Status:** Implementation (Slice 1 complete, testing pending)
+**Status:** Slice 1 complete (metadata only), Slice 2/3 needed for real value
 
 ---
 
@@ -151,30 +151,50 @@
 - Read requirements from `docs/future/ALM_DEVOPS.md`
 - Explored codebase for existing patterns
 - Created technical design document (`docs/design/SOLUTION_DIFF_DESIGN.md`)
-- Implemented all 4 layers (Domain, Application, Infrastructure, Presentation)
-- Integrated with extension (package.json, extension.ts)
-- Established NEW dual-environment panel pattern
+- Implemented Slice 1 (metadata comparison only)
+- Fixed bug: JS using wrong postMessage + event delegation
+- F5 tested - metadata diff working (version, timestamps, managed state)
+
+**User Feedback:**
+- Slice 1 works but is NOT deep enough for real troubleshooting
+- Need component-level diff to find actual problems
+- Current output only shows "version doesn't match" or "install dates differ"
+- **Priority: Implement Slice 3 (Component-Level Diff)**
 
 **Commits:**
 1. `0791acd` - Design document
-2. `06ca1ff` - Full Slice 1 implementation
+2. `06ca1ff` - Slice 1 implementation
+3. `1d45d38` - Bug fix (vscode.postMessage + event delegation)
 
-**Handoff for next session:**
-- F5 test the panel manually
-- Write unit tests for domain layer (SolutionComparison, ComparisonResult)
-- Fix any bugs found during manual testing
-- Run `/code-review` for approval
-- Update CHANGELOG.md
-- Create PR
+**What Slice 3 needs (Component-Level Diff):**
+
+1. **New API calls needed:**
+   - `GET /api/data/v9.2/solutioncomponents?$filter=_solutionid_value eq '{solutionId}'`
+   - Returns: componenttype, objectid, rootcomponentbehavior
+   - Component types: 1=Entity, 29=Workflow/Flow, 92=PluginAssembly, 61=WebResource, etc.
+
+2. **Domain entities to create:**
+   - `SolutionComponent` entity (componentType, objectId, name, etc.)
+   - `ComponentComparison` entity (compares components across envs)
+   - `ComponentDiff` value object (added, removed, modified components)
+
+3. **UI changes:**
+   - Expandable sections by component type (Entities, Flows, Plugins, etc.)
+   - Show added (green), removed (red), modified (yellow) components
+   - Click to expand component details
+
+4. **Deep comparison (future):**
+   - Entity schema diff (fields, relationships)
+   - Flow definition diff
+   - Plugin step configuration diff
 
 **Key Files:**
 - Panel: `src/features/solutionDiff/presentation/panels/SolutionDiffPanelComposed.ts`
 - Domain: `src/features/solutionDiff/domain/entities/SolutionComparison.ts`
-- Use Case: `src/features/solutionDiff/application/useCases/CompareSolutionMetadataUseCase.ts`
-- Command: `power-platform-dev-suite.solutionDiff` in extension.ts (line ~600)
+- JS Behavior: `resources/webview/js/behaviors/SolutionDiffBehavior.js`
 
 **Architecture Notes:**
 - First dual-environment feature in codebase
 - Uses `customData` in `SectionRenderData` for feature-specific properties
-- Panel is singleton (only one diff panel at a time, not per-environment)
-- Solutions loaded from source environment only
+- Panel is singleton (only one diff panel at a time)
+- Reuses existing `ISolutionRepository` for solution queries
