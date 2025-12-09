@@ -8,6 +8,7 @@ import { SectionPosition } from '../../../../shared/infrastructure/ui/types/Sect
 import type { SectionRenderData } from '../../../../shared/infrastructure/ui/types/SectionRenderData';
 import type { ISection } from '../../../../shared/infrastructure/ui/sections/ISection';
 import type { SolutionComparisonViewModel, SolutionOptionViewModel } from '../../application/viewModels/SolutionComparisonViewModel';
+import type { ComponentDiffViewModel } from '../../application/viewModels/ComponentDiffViewModel';
 import {
   renderSolutionSelector,
   renderComparisonPlaceholder,
@@ -22,6 +23,7 @@ interface SolutionComparisonCustomData {
   readonly solutions?: readonly SolutionOptionViewModel[];
   readonly selectedSolutionUniqueName?: string;
   readonly comparisonViewModel?: SolutionComparisonViewModel;
+  readonly componentDiffViewModel?: ComponentDiffViewModel;
   readonly isComparing?: boolean;
   readonly isSolutionsLoading?: boolean;
 }
@@ -41,6 +43,7 @@ export class SolutionComparisonSection implements ISection {
     const solutions = custom.solutions ?? [];
     const selectedUniqueName = custom.selectedSolutionUniqueName;
     const comparison = custom.comparisonViewModel;
+    const componentDiff = custom.componentDiffViewModel;
     const isComparing = custom.isComparing ?? false;
     const isSolutionsLoading = custom.isSolutionsLoading ?? false;
 
@@ -50,7 +53,7 @@ export class SolutionComparisonSection implements ISection {
     if (isComparing) {
       comparisonHtml = renderComparisonLoading();
     } else if (comparison !== undefined) {
-      comparisonHtml = renderSolutionComparison(comparison);
+      comparisonHtml = renderSolutionComparison(comparison, componentDiff);
     } else {
       comparisonHtml = renderComparisonPlaceholder();
     }

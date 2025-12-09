@@ -21,16 +21,19 @@ export async function initializeSolutionDiff(
 ): Promise<void> {
   const { DataverseApiService } = await import('../../../../shared/infrastructure/services/DataverseApiService.js');
   const { DataverseApiSolutionRepository } = await import('../../../solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');
+  const { DataverseApiSolutionComponentRepository } = await import('../../../../shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js');
   const { SolutionDiffPanelComposed } = await import('../panels/SolutionDiffPanelComposed.js');
 
   const { getAccessToken, getDataverseUrl } = dataverseApiServiceFactory;
   const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
   const solutionRepository = new DataverseApiSolutionRepository(dataverseApiService, logger);
+  const componentRepository = new DataverseApiSolutionComponentRepository(dataverseApiService, logger);
 
   await SolutionDiffPanelComposed.createOrShow(
     context.extensionUri,
     getEnvironments,
     solutionRepository,
+    componentRepository,
     logger,
     sourceEnvironmentId,
     targetEnvironmentId

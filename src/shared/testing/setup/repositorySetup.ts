@@ -90,7 +90,8 @@ export function createMockPluginTraceRepository(): jest.Mocked<IPluginTraceRepos
 export function createMockSolutionComponentRepository(): jest.Mocked<ISolutionComponentRepository> {
 	return {
 		findComponentIdsBySolution: jest.fn(),
-		getObjectTypeCode: jest.fn()
+		getObjectTypeCode: jest.fn(),
+		findAllComponentsForSolution: jest.fn()
 	};
 }
 

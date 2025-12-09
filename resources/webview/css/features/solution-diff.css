@@ -261,3 +261,182 @@
   display: flex;
   flex-direction: column;
 }
+
+/* ============================================
+   Component Diff Section (Slice 3)
+   ============================================ */
+
+.component-diff-section {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.component-diff-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.component-summary {
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 16px;
+}
+
+.component-counts {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin-left: 8px;
+}
+
+.no-components {
+  font-style: italic;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Component Type Groups */
+.component-type-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.component-type-group {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.component-type-group summary {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--vscode-editor-background);
+  font-weight: 500;
+  user-select: none;
+}
+
+.component-type-group summary:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.component-type-group summary::marker,
+.component-type-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.component-type-group summary::before {
+  content: '▶';
+  font-size: 10px;
+  margin-right: 8px;
+  transition: transform 0.2s ease;
+}
+
+.component-type-group[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.component-type-name {
+  font-size: 13px;
+}
+
+.component-type-counts {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.count-added {
+  color: #28a745;
+  font-weight: 500;
+}
+
+.count-removed {
+  color: #dc3545;
+  font-weight: 500;
+}
+
+.count-same {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Component Lists */
+.component-lists {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--vscode-editor-background);
+}
+
+.component-list h5 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.component-list-added h5 {
+  color: #28a745;
+}
+
+.component-list-removed h5 {
+  color: #dc3545;
+}
+
+.component-list-same h5 {
+  color: var(--vscode-descriptionForeground);
+}
+
+.component-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.component-list li {
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.component-list-added li {
+  background: rgba(40, 167, 69, 0.1);
+  border-left: 3px solid #28a745;
+}
+
+.component-list-removed li {
+  background: rgba(220, 53, 69, 0.1);
+  border-left: 3px solid #dc3545;
+}
+
+.component-list-same li {
+  background: var(--vscode-editor-inactiveSelectionBackground);
+  border-left: 3px solid var(--vscode-descriptionForeground);
+}
+
+.component-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+.component-id {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family, monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40%;
+}

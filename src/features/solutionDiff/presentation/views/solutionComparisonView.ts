@@ -5,6 +5,8 @@
 
 import { escapeHtml, classNames } from '../../../../shared/infrastructure/ui/views/htmlHelpers';
 import type { SolutionComparisonViewModel, SolutionOptionViewModel } from '../../application/viewModels/SolutionComparisonViewModel';
+import type { ComponentDiffViewModel } from '../../application/viewModels/ComponentDiffViewModel';
+import { renderComponentDiff } from './componentDiffView';
 
 /**
  * Renders solution selector dropdown.
@@ -82,10 +84,21 @@ export function renderComparisonLoading(): string {
 
 /**
  * Renders solution comparison results.
+ *
+ * @param comparison - Solution metadata comparison ViewModel
+ * @param componentDiff - Optional component-level diff ViewModel
  */
-export function renderSolutionComparison(comparison: SolutionComparisonViewModel): string {
+export function renderSolutionComparison(
+  comparison: SolutionComparisonViewModel,
+  componentDiff?: ComponentDiffViewModel
+): string {
   const statusClass = getStatusClass(comparison.status);
   const statusIcon = getStatusIcon(comparison.status);
+
+  // Only show component diff if both solutions exist (not SourceOnly/TargetOnly)
+  const showComponentDiff = componentDiff !== undefined &&
+    comparison.status !== 'SourceOnly' &&
+    comparison.status !== 'TargetOnly';
 
   return `
     <div class="comparison-results">
@@ -100,6 +113,8 @@ export function renderSolutionComparison(comparison: SolutionComparisonViewModel
       ${renderMetadataTable(comparison)}
 
       ${comparison.differences.length > 0 ? renderDifferencesList(comparison.differences) : ''}
+
+      ${showComponentDiff ? renderComponentDiff(componentDiff) : ''}
     </div>
   `;
 }

@@ -13,9 +13,13 @@ import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/Cs
 import { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
+import type { ISolutionComponentRepository } from '../../../../shared/domain/interfaces/ISolutionComponentRepository';
 import { CompareSolutionMetadataUseCase } from '../../application/useCases/CompareSolutionMetadataUseCase';
+import { CompareSolutionComponentsUseCase } from '../../application/useCases/CompareSolutionComponentsUseCase';
 import { SolutionComparisonViewModelMapper } from '../../application/mappers/SolutionComparisonViewModelMapper';
+import { ComponentDiffViewModelMapper } from '../../application/mappers/ComponentDiffViewModelMapper';
 import type { SolutionComparisonViewModel, SolutionOptionViewModel } from '../../application/viewModels/SolutionComparisonViewModel';
+import type { ComponentDiffViewModel } from '../../application/viewModels/ComponentDiffViewModel';
 import { DualEnvironmentSelectorSection } from '../sections/DualEnvironmentSelectorSection';
 import { SolutionComparisonSection } from '../sections/SolutionComparisonSection';
 
@@ -47,6 +51,7 @@ export class SolutionDiffPanelComposed {
   private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
   private readonly loadingBehavior: LoadingStateBehavior;
   private readonly compareUseCase: CompareSolutionMetadataUseCase;
+  private readonly compareComponentsUseCase: CompareSolutionComponentsUseCase;
 
   // Dual environment state
   private sourceEnvironmentId: string;
@@ -54,12 +59,14 @@ export class SolutionDiffPanelComposed {
   private selectedSolutionUniqueName: string | null = null;
   private solutions: SolutionOptionViewModel[] = [];
   private comparisonViewModel: SolutionComparisonViewModel | null = null;
+  private componentDiffViewModel: ComponentDiffViewModel | null = null;
 
   private constructor(
     private readonly panel: SafeWebviewPanel,
     private readonly extensionUri: vscode.Uri,
     private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
     private readonly solutionRepository: ISolutionRepository,
+    private readonly componentRepository: ISolutionComponentRepository,
     private readonly logger: ILogger,
     sourceEnvironmentId: string,
     targetEnvironmentId: string
@@ -67,8 +74,9 @@ export class SolutionDiffPanelComposed {
     this.sourceEnvironmentId = sourceEnvironmentId;
     this.targetEnvironmentId = targetEnvironmentId;
 
-    // Create use case
+    // Create use cases
     this.compareUseCase = new CompareSolutionMetadataUseCase(solutionRepository, logger);
+    this.compareComponentsUseCase = new CompareSolutionComponentsUseCase(componentRepository, logger);
 
     // Configure webview
     panel.webview.options = {
@@ -99,6 +107,7 @@ export class SolutionDiffPanelComposed {
     extensionUri: vscode.Uri,
     getEnvironments: () => Promise<EnvironmentOption[]>,
     solutionRepository: ISolutionRepository,
+    componentRepository: ISolutionComponentRepository,
     logger: ILogger,
     sourceEnvironmentId: string,
     targetEnvironmentId: string
@@ -127,6 +136,7 @@ export class SolutionDiffPanelComposed {
       extensionUri,
       getEnvironments,
       solutionRepository,
+      componentRepository,
       logger,
       sourceEnvironmentId,
       targetEnvironmentId
@@ -240,6 +250,7 @@ export class SolutionDiffPanelComposed {
       isComparing?: boolean | undefined;
       selectedSolutionUniqueName?: string | undefined;
       comparisonViewModel?: SolutionComparisonViewModel | undefined;
+      componentDiffViewModel?: ComponentDiffViewModel | undefined;
     } = {}
   ): { environments: EnvironmentOption[]; customData: Record<string, unknown> } {
     return {
@@ -251,7 +262,8 @@ export class SolutionDiffPanelComposed {
         selectedSolutionUniqueName: options.selectedSolutionUniqueName,
         isSolutionsLoading: options.isSolutionsLoading ?? false,
         isComparing: options.isComparing ?? false,
-        comparisonViewModel: options.comparisonViewModel
+        comparisonViewModel: options.comparisonViewModel,
+        componentDiffViewModel: options.componentDiffViewModel
       }
     };
   }
@@ -386,7 +398,7 @@ export class SolutionDiffPanelComposed {
         isComparing: true
       }));
 
-      // Execute comparison
+      // Execute metadata comparison
       const comparison = await this.compareUseCase.execute(
         this.sourceEnvironmentId,
         this.targetEnvironmentId,
@@ -396,15 +408,39 @@ export class SolutionDiffPanelComposed {
       // Map to ViewModel
       this.comparisonViewModel = SolutionComparisonViewModelMapper.toViewModel(comparison);
 
+      // Execute component comparison (only if both solutions exist)
+      this.componentDiffViewModel = null;
+      const sourceSolution = comparison.getSourceSolution();
+      const targetSolution = comparison.getTargetSolution();
+
+      if (sourceSolution !== null && targetSolution !== null) {
+        const componentComparison = await this.compareComponentsUseCase.execute(
+          this.sourceEnvironmentId,
+          this.targetEnvironmentId,
+          sourceSolution.id,
+          targetSolution.id
+        );
+
+        this.componentDiffViewModel = ComponentDiffViewModelMapper.toViewModel(componentComparison);
+
+        this.logger.info('Component comparison completed', {
+          sourceCount: this.componentDiffViewModel.sourceComponentCount,
+          targetCount: this.componentDiffViewModel.targetComponentCount,
+          summary: this.componentDiffViewModel.summary
+        });
+      }
+
       this.logger.info('Comparison completed', {
         status: this.comparisonViewModel.status,
-        differences: this.comparisonViewModel.differences.length
+        differences: this.comparisonViewModel.differences.length,
+        hasComponentDiff: this.componentDiffViewModel !== null
       });
 
       // Update UI with results
       await this.scaffoldingBehavior.refresh(this.createRenderData(environments, {
         selectedSolutionUniqueName: this.selectedSolutionUniqueName ?? undefined,
-        comparisonViewModel: this.comparisonViewModel ?? undefined
+        comparisonViewModel: this.comparisonViewModel ?? undefined,
+        componentDiffViewModel: this.componentDiffViewModel ?? undefined
       }));
     } catch (error) {
       this.logger.error('Comparison failed', error);
@@ -413,6 +449,7 @@ export class SolutionDiffPanelComposed {
 
       // Clear comparison and show placeholder
       this.comparisonViewModel = null;
+      this.componentDiffViewModel = null;
       const environments = await this.getEnvironments();
       await this.scaffoldingBehavior.refresh(this.createRenderData(environments, {
         selectedSolutionUniqueName: this.selectedSolutionUniqueName ?? undefined

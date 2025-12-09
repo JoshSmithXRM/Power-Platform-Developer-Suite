@@ -2,7 +2,7 @@
 
 **Branch:** `feature/solution-diff`
 **Created:** 2025-12-08
-**Status:** Slice 1 complete (metadata only), Slice 2/3 needed for real value
+**Status:** Slice 1 + Slice 3 complete (metadata + component-level diff)
 
 ---
 
@@ -33,10 +33,10 @@
 - [ ] Filter to show only differences
 - [ ] Sort by status/name
 
-### Slice 3 (Future) - Component-Level Diff
-- [ ] Fetch solution components from both environments
-- [ ] Compare component lists (entities, flows, plugins, etc.)
-- [ ] Show added/removed/modified components
+### Slice 3 - Component-Level Diff (COMPLETE)
+- [x] Fetch solution components from both environments
+- [x] Compare component lists (entities, flows, plugins, etc.)
+- [x] Show added/removed components with expandable sections
 
 ### Slice 4 (Future) - Export
 - [ ] Export diff report (JSON/CSV)
@@ -198,3 +198,42 @@
 - Uses `customData` in `SectionRenderData` for feature-specific properties
 - Panel is singleton (only one diff panel at a time)
 - Reuses existing `ISolutionRepository` for solution queries
+
+### Session 2 (2025-12-09)
+
+**Completed:**
+- Created design document for Slice 3 (`docs/design/SOLUTION_DIFF_COMPONENT_DESIGN.md`)
+- Implemented Slice 3 (component-level diff):
+
+**Domain Layer (NEW):**
+- `ComponentType.ts` - Enum with display name helpers
+- `SolutionComponent.ts` - Entity with matching logic
+- `ComponentDiff.ts` - Value object for categorized differences
+- `ComponentComparison.ts` - Entity with diff business logic
+
+**Application Layer (NEW):**
+- `CompareSolutionComponentsUseCase.ts` - Orchestrates component comparison
+- `ComponentDiffViewModel.ts` - ViewModels for component diff
+- `ComponentDiffViewModelMapper.ts` - Maps domain to ViewModels
+
+**Infrastructure Layer (MODIFIED):**
+- `ISolutionComponentRepository.ts` - Added `findAllComponentsForSolution()` method + DTO
+- `DataverseApiSolutionComponentRepository.ts` - Implemented new method
+
+**Presentation Layer (MODIFIED/NEW):**
+- `componentDiffView.ts` - NEW HTML rendering for component diff
+- `solutionComparisonView.ts` - Extended to render component diff
+- `SolutionComparisonSection.ts` - Extended to include component diff data
+- `SolutionDiffPanelComposed.ts` - Extended to call component comparison use case
+- `initializeSolutionDiff.ts` - Extended to create component repository
+- `solution-diff.css` - Added component diff styles
+
+**Key Features:**
+- Components grouped by type (Entities, Flows, Plugins, etc.)
+- Expandable sections with counts
+- Color-coded: Added (green), Removed (red), Unchanged (gray)
+- Auto-expands groups with differences
+- Graceful handling: Component diff only shown if both solutions exist
+
+**Pending:**
+- F5 manual testing with real environments

@@ -1,7 +1,7 @@
 import { IDataverseApiService } from '../interfaces/IDataverseApiService';
 import { ICancellationToken } from '../../domain/interfaces/ICancellationToken';
 import { QueryOptions } from '../../domain/interfaces/QueryOptions';
-import { ISolutionComponentRepository } from '../../domain/interfaces/ISolutionComponentRepository';
+import { ISolutionComponentRepository, SolutionComponentDto } from '../../domain/interfaces/ISolutionComponentRepository';
 import { ILogger } from '../../../infrastructure/logging/ILogger';
 import { ODataQueryBuilder } from '../utils/ODataQueryBuilder';
 import { CancellationHelper } from '../utils/CancellationHelper';
@@ -27,14 +27,15 @@ interface EntityDefinitionDto {
  * Includes optional @odata.nextLink for pagination (Dataverse defaults to 5000 records per page).
  */
 interface SolutionComponentsResponse {
-	value: SolutionComponentDto[];
+	value: DataverseSolutionComponentDto[];
 	'@odata.nextLink'?: string;
 }
 
 /**
- * DTO for solution component data from Dataverse API
+ * Raw DTO for solution component data from Dataverse API.
+ * Named distinctly from the domain DTO to avoid confusion.
  */
-interface SolutionComponentDto {
+interface DataverseSolutionComponentDto {
 	solutioncomponentid: string;
 	objectid: string;
 	componenttype: number;
@@ -200,7 +201,7 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 
 				CancellationHelper.throwIfCancelled(cancellationToken);
 
-				const pageIds = response.value.map((dto: SolutionComponentDto) => dto.objectid);
+				const pageIds = response.value.map((dto: DataverseSolutionComponentDto) => dto.objectid);
 				allComponentIds.push(...pageIds);
 				pageCount++;
 
@@ -228,6 +229,93 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 		} catch (error) {
 			const normalizedError = normalizeError(error);
 			this.logger.error('Failed to fetch solution components from Dataverse API', normalizedError);
+			throw normalizedError;
+		}
+	}
+
+	/**
+	 * Finds ALL components for a specific solution (all component types).
+	 *
+	 * Returns minimal metadata: objectId, componentType, displayName (if available).
+	 *
+	 * NOTE: displayName is NOT available in solutioncomponent table.
+	 * For MVP, we return null for displayName.
+	 * Future enhancement: Join with entity metadata tables for actual names.
+	 */
+	async findAllComponentsForSolution(
+		environmentId: string,
+		solutionId: string,
+		options?: QueryOptions,
+		cancellationToken?: ICancellationToken
+	): Promise<SolutionComponentDto[]> {
+		this.logger.debug('Fetching all solution components from Dataverse API', {
+			environmentId,
+			solutionId
+		});
+
+		const defaultOptions: QueryOptions = {
+			select: ['solutioncomponentid', 'objectid', 'componenttype'],
+			filter: `_solutionid_value eq ${solutionId}`
+		};
+
+		const mergedOptions: QueryOptions = {
+			...defaultOptions,
+			...options
+		};
+
+		const queryString = ODataQueryBuilder.build(mergedOptions);
+		const initialEndpoint = `/api/data/v9.2/solutioncomponents${queryString ? '?' + queryString : ''}`;
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			// Fetch all pages - Dataverse defaults to 5000 records per page
+			const allComponents: SolutionComponentDto[] = [];
+			let currentEndpoint: string | null = initialEndpoint;
+			let pageCount = 0;
+
+			while (currentEndpoint !== null) {
+				CancellationHelper.throwIfCancelled(cancellationToken);
+
+				const response: SolutionComponentsResponse = await this.apiService.get<SolutionComponentsResponse>(
+					environmentId,
+					currentEndpoint,
+					cancellationToken
+				);
+
+				CancellationHelper.throwIfCancelled(cancellationToken);
+
+				const pageComponents = response.value.map((dto: DataverseSolutionComponentDto): SolutionComponentDto => ({
+					objectId: dto.objectid,
+					componentType: dto.componenttype,
+					displayName: null, // Not available in solutioncomponent table (MVP limitation)
+					solutionId
+				}));
+
+				allComponents.push(...pageComponents);
+				pageCount++;
+
+				// Check for next page
+				const nextLink: string | undefined = response['@odata.nextLink'];
+				if (nextLink) {
+					const url: URL = new URL(nextLink);
+					currentEndpoint = url.pathname + url.search;
+				} else {
+					currentEndpoint = null;
+				}
+			}
+
+			this.logger.debug('Fetched all solution components from Dataverse', {
+				environmentId,
+				solutionId,
+				count: allComponents.length,
+				pages: pageCount
+			});
+
+			return allComponents;
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to fetch all solution components from Dataverse API', normalizedError);
 			throw normalizedError;
 		}
 	}
