@@ -2,7 +2,7 @@
 
 **Branch:** `feature/deployment-settings-promotion`
 **Created:** 2025-12-08
-**Status:** Workflow Pivot - Restructuring
+**Status:** MVP Complete - Ready for F5 Testing
 
 ---
 
@@ -95,29 +95,29 @@
 
 ## Revised Slices
 
-### Slice A: Panel Restructure - TODO
-- [ ] Add Source Environment selector (FIRST - enables solution loading)
-- [ ] Add Solution selector (loads after source env selected)
-- [ ] Add Target Environment selector (independent of source)
-- [ ] Remove "Load Source File" button and file loading logic
-- [ ] Update status section for new workflow
-- [ ] Auto-trigger data load when source + solution + target all selected
+### Slice A: Panel Restructure - COMPLETE
+- [x] Add Source Environment selector (FIRST - enables solution loading)
+- [x] Add Solution selector (loads after source env selected)
+- [x] Add Target Environment selector (independent of source)
+- [x] Remove "Load Source File" button and file loading logic
+- [x] Update status section for new workflow
+- [x] Auto-trigger data load when source + solution + target all selected
 
-### Slice B: Source Data Loading - TODO
-- [ ] Query connection references from source environment + solution
-- [ ] Query environment variables from source environment + solution
-- [ ] Reuse existing ListConnectionReferencesUseCase (or extract shared logic)
-- [ ] Reuse existing environment variables query logic
+### Slice B: Source Data Loading - COMPLETE
+- [x] Query connection references from source environment + solution
+- [ ] Query environment variables from source environment + solution (deferred)
+- [x] Reuse existing ListConnectionReferencesUseCase
+- [ ] Reuse existing environment variables query logic (deferred)
 
-### Slice C: Target Matching - TODO
-- [ ] Query connections from target environment (existing code)
-- [ ] Run ConnectorMappingService.matchConnectors()
-- [ ] Display results: auto-matched vs unmatched
-- [ ] Display environment variables status
+### Slice C: Target Matching - COMPLETE
+- [x] Query connections from target environment (existing code)
+- [x] Run ConnectorMappingService.matchConnectors()
+- [x] Display results: auto-matched vs unmatched
+- [ ] Display environment variables status (deferred)
 
-### Slice D: Save with Location Persistence - TODO
-- [ ] Save button generates deployment settings JSON
-- [ ] Prompt for file location
+### Slice D: Save with Location Persistence - PARTIAL
+- [x] Save button generates deployment settings JSON
+- [x] Prompt for file location
 - [ ] Persist last location per target environment (workspace storage)
 - [ ] Pre-fill with persisted location on subsequent saves
 
@@ -151,22 +151,29 @@ src/features/deploymentSettingsPromotion/
 │       └── PowerPlatformApiConnectionRepository.ts ✓
 └── presentation/
     ├── panels/
-    │   └── DeploymentSettingsPromotionPanel.ts (needs pivot)
+    │   └── DeploymentSettingsPromotionPanel.ts ✓ (restructured)
     ├── sections/
-    │   └── DeploymentSettingsStatusSection.ts (needs update)
+    │   ├── DeploymentSettingsStatusSection.ts ✓ (updated)
+    │   └── DeploymentSettingsToolbarSection.ts ✓ (new)
     └── initialization/
-        └── initializeDeploymentSettingsPromotion.ts ✓
+        └── initializeDeploymentSettingsPromotion.ts ✓ (updated)
+
+resources/webview/
+├── js/behaviors/
+│   └── DeploymentSettingsBehavior.js ✓ (new)
+└── css/features/
+    └── deployment-settings.css ✓ (updated)
 ```
 
 ---
 
 ## Verification Status
 
-- [x] `npm run compile` - 0 errors
+- [x] `npm run compile` - 0 errors (8046 tests passing)
 - [x] `npm test deploymentSettingsPromotion` - 46 tests passing
 - [x] Command registered in package.json
 - [x] Tools provider entry added
-- [ ] F5 manual testing (blocked on workflow pivot)
+- [ ] F5 manual testing (ready to test)
 
 ---
 
@@ -203,6 +210,22 @@ src/features/deploymentSettingsPromotion/
 - Existing sync functionality in CR/EV panels to be deprecated (redirect to this panel)
 - Domain layer still valid, presentation layer needs restructure
 - Committed checkpoint before pivot
+
+### Session 5 (2025-12-09) - MVP COMPLETE
+- Implemented correct workflow with three selectors
+- Created `DeploymentSettingsToolbarSection` for custom toolbar layout
+- Created `DeploymentSettingsBehavior.js` to wire up selector events
+- Rewrote `DeploymentSettingsPromotionPanel.ts` with:
+  - Source env selector (enables solution loading)
+  - Solution selector (disabled until source selected)
+  - Target env selector (independent)
+  - Auto-load when all three selected
+  - Connector matching with results display
+  - Save button generates JSON
+- Updated `DeploymentSettingsStatusSection.ts` with stage-based messages
+- Updated `initializeDeploymentSettingsPromotion.ts` with new dependencies
+- Updated CSS with toolbar styles and loading spinner
+- All tests pass (8046), ready for F5 testing
 
 ---
 

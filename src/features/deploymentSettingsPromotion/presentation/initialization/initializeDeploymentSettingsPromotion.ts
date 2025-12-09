@@ -8,6 +8,10 @@ import type { IPowerAppsAdminApiService } from '../../../../shared/infrastructur
  */
 export interface DeploymentSettingsPromotionDependencies {
 	getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>;
+	dataverseApiServiceFactory: {
+		getAccessToken: (envId: string) => Promise<string>;
+		getDataverseUrl: (envId: string) => Promise<string>;
+	};
 	powerAppsAdminApiFactory: {
 		getAccessToken: (envId: string) => Promise<string>;
 		getPowerPlatformEnvironmentId: (envId: string) => Promise<string>;
@@ -27,21 +31,55 @@ export async function initializeDeploymentSettingsPromotion(
 		{ DeploymentSettingsPromotionPanel },
 		{ PowerAppsAdminApiService },
 		{ PowerPlatformApiConnectionRepository },
-		{ FileSystemDeploymentSettingsRepository },
-		{ ConnectorMappingService }
+		{ ConnectorMappingService },
+		{ DataverseApiService },
+		{ DataverseApiConnectionReferenceRepository },
+		{ DataverseApiCloudFlowRepository },
+		{ DataverseApiSolutionComponentRepository },
+		{ DataverseApiSolutionRepository },
+		{ FlowConnectionRelationshipBuilder },
+		{ ListConnectionReferencesUseCase }
 	] = await Promise.all([
 		import('../panels/DeploymentSettingsPromotionPanel.js'),
 		import('../../../../shared/infrastructure/services/PowerAppsAdminApiService.js'),
 		import('../../infrastructure/repositories/PowerPlatformApiConnectionRepository.js'),
-		import('../../../../shared/infrastructure/repositories/FileSystemDeploymentSettingsRepository.js'),
-		import('../../domain/services/ConnectorMappingService.js')
+		import('../../domain/services/ConnectorMappingService.js'),
+		import('../../../../shared/infrastructure/services/DataverseApiService.js'),
+		import('../../../connectionReferences/infrastructure/repositories/DataverseApiConnectionReferenceRepository.js'),
+		import('../../../connectionReferences/infrastructure/repositories/DataverseApiCloudFlowRepository.js'),
+		import('../../../../shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js'),
+		import('../../../solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js'),
+		import('../../../connectionReferences/domain/services/FlowConnectionRelationshipBuilder.js'),
+		import('../../../connectionReferences/application/useCases/ListConnectionReferencesUseCase.js')
 	]);
 
-	// Create Power Apps Admin API service with token factory
+	const { logger } = dependencies;
+
+	// Create Dataverse API service for source environment queries
+	const { getAccessToken, getDataverseUrl } = dependencies.dataverseApiServiceFactory;
+	const dataverseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, logger);
+
+	// Create repositories for source environment
+	const flowRepository = new DataverseApiCloudFlowRepository(dataverseApiService, logger);
+	const connectionReferenceRepository = new DataverseApiConnectionReferenceRepository(dataverseApiService, logger);
+	const solutionComponentRepository = new DataverseApiSolutionComponentRepository(dataverseApiService, logger);
+	const solutionRepository = new DataverseApiSolutionRepository(dataverseApiService, logger);
+
+	// Create use case for listing connection references
+	const relationshipBuilder = new FlowConnectionRelationshipBuilder();
+	const listConnectionReferencesUseCase = new ListConnectionReferencesUseCase(
+		flowRepository,
+		connectionReferenceRepository,
+		solutionComponentRepository,
+		relationshipBuilder,
+		logger
+	);
+
+	// Create Power Apps Admin API service factory for target environment connections
 	const createPowerAppsAdminApiService = (envId: string): IPowerAppsAdminApiService => {
 		return new PowerAppsAdminApiService(
 			async () => dependencies.powerAppsAdminApiFactory.getAccessToken(envId),
-			dependencies.logger
+			logger
 		);
 	};
 
@@ -49,7 +87,7 @@ export async function initializeDeploymentSettingsPromotion(
 	interface ConnectionRepository { findAll: () => Promise<readonly import('../../domain/entities/Connection.js').Connection[]> }
 	const createConnectionRepository = (envId: string): ConnectionRepository => {
 		const apiService = createPowerAppsAdminApiService(envId);
-		const repo = new PowerPlatformApiConnectionRepository(apiService, dependencies.logger);
+		const repo = new PowerPlatformApiConnectionRepository(apiService, logger);
 		return {
 			findAll: async (): Promise<readonly import('../../domain/entities/Connection.js').Connection[]> => {
 				const ppEnvId = await dependencies.powerAppsAdminApiFactory.getPowerPlatformEnvironmentId(envId);
@@ -58,9 +96,6 @@ export async function initializeDeploymentSettingsPromotion(
 		};
 	};
 
-	// Create deployment settings repository
-	const deploymentSettingsRepository = new FileSystemDeploymentSettingsRepository(dependencies.logger);
-
 	// Create connector mapping service
 	const connectorMappingService = new ConnectorMappingService();
 
@@ -68,8 +103,9 @@ export async function initializeDeploymentSettingsPromotion(
 		context.extensionUri,
 		dependencies.getEnvironments,
 		createConnectionRepository,
-		deploymentSettingsRepository,
+		solutionRepository,
+		listConnectionReferencesUseCase,
 		connectorMappingService,
-		dependencies.logger
+		logger
 	);
 }

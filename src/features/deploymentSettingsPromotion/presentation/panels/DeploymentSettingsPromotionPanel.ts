@@ -1,5 +1,3 @@
-import path from 'path';
-
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
@@ -10,26 +8,26 @@ import {
 	type HtmlScaffoldingConfig
 } from '../../../../shared/infrastructure/ui/behaviors/HtmlScaffoldingBehavior';
 import { SectionCompositionBehavior } from '../../../../shared/infrastructure/ui/behaviors/SectionCompositionBehavior';
-import { ActionButtonsSection } from '../../../../shared/infrastructure/ui/sections/ActionButtonsSection';
-import { EnvironmentSelectorSection } from '../../../../shared/infrastructure/ui/sections/EnvironmentSelectorSection';
 import { PanelLayout } from '../../../../shared/infrastructure/ui/types/PanelLayout';
-import { SectionPosition } from '../../../../shared/infrastructure/ui/types/SectionPosition';
 import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
 import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
-import type { DeploymentSettings } from '../../../../shared/domain/entities/DeploymentSettings';
-import type { IDeploymentSettingsRepository } from '../../../../shared/domain/interfaces/IDeploymentSettingsRepository';
+import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { Connection } from '../../domain/entities/Connection';
 import type { ConnectorMappingService } from '../../domain/services/ConnectorMappingService';
 import type { ConnectorMatchResult } from '../../domain/valueObjects/ConnectorMatchResult';
+import type { ListConnectionReferencesUseCase } from '../../../connectionReferences/application/useCases/ListConnectionReferencesUseCase';
+import type { ConnectionReference } from '../../../connectionReferences/domain/entities/ConnectionReference';
+import { DeploymentSettingsToolbarSection, type DeploymentSettingsToolbarData } from '../sections/DeploymentSettingsToolbarSection';
 import { DeploymentSettingsStatusSection, type DeploymentSettingsStatus } from '../sections/DeploymentSettingsStatusSection';
 
 /**
  * Commands supported by Deployment Settings Promotion panel.
  */
 type DeploymentSettingsPromotionCommands =
-	| 'loadSourceFile'
-	| 'environmentChange'
-	| 'generateOutputFile';
+	| 'sourceEnvironmentChange'
+	| 'solutionChange'
+	| 'targetEnvironmentChange'
+	| 'saveDeploymentSettings';
 
 /**
  * Factory for creating connection repositories per environment.
@@ -38,13 +36,25 @@ type ConnectionRepositoryFactory = (envId: string) => {
 	findAll: () => Promise<readonly Connection[]>;
 };
 
+interface SolutionOption {
+	readonly id: string;
+	readonly name: string;
+	readonly uniqueName: string;
+}
+
 /**
  * Presentation layer panel for Deployment Settings Promotion.
  *
+ * **Workflow:**
+ * 1. Select SOURCE Environment (where solution is configured and working)
+ * 2. Select Solution (loads from source environment)
+ * 3. Select TARGET Environment (where solution will be deployed)
+ * 4. System automatically loads and matches connection references
+ * 5. Save generates deployment settings file
+ *
  * **Singleton Pattern (NOT Environment-Scoped)**:
- * This panel operates across TWO environments (source file + target environment),
- * so it doesn't fit the EnvironmentScopedPanel pattern. It's a singleton panel
- * that lets users select both source and target independently.
+ * This panel operates across TWO environments (source + target),
+ * so it doesn't fit the EnvironmentScopedPanel pattern.
  */
 export class DeploymentSettingsPromotionPanel {
 	private static currentPanel: DeploymentSettingsPromotionPanel | undefined;
@@ -52,20 +62,23 @@ export class DeploymentSettingsPromotionPanel {
 	private scaffoldingBehavior!: HtmlScaffoldingBehavior;
 
 	// State
-	private sourceFilePath: string | undefined;
-	private sourceDeploymentSettings: DeploymentSettings | undefined;
+	private environments: Array<{ id: string; name: string }> = [];
+	private sourceEnvironmentId: string | undefined;
+	private solutionId: string | undefined;
+	private solutions: SolutionOption[] = [];
 	private targetEnvironmentId: string | undefined;
 	private targetConnections: readonly Connection[] = [];
+	private sourceConnectionReferences: ConnectionReference[] = [];
 	private matchResult: ConnectorMatchResult | undefined;
-	private status: DeploymentSettingsStatus = { fileLoaded: false, matchingComplete: false };
-	private environments: Array<{ id: string; name: string }> = [];
+	private status: DeploymentSettingsStatus = { stage: 'initial' };
 
 	private constructor(
 		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
 		private readonly getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>,
 		private readonly createConnectionRepository: ConnectionRepositoryFactory,
-		private readonly deploymentSettingsRepository: IDeploymentSettingsRepository,
+		private readonly solutionRepository: ISolutionRepository,
+		private readonly listConnectionReferencesUseCase: ListConnectionReferencesUseCase,
 		private readonly connectorMappingService: ConnectorMappingService,
 		private readonly logger: ILogger
 	) {
@@ -93,7 +106,8 @@ export class DeploymentSettingsPromotionPanel {
 		extensionUri: vscode.Uri,
 		getEnvironments: () => Promise<Array<{ id: string; name: string; url: string }>>,
 		createConnectionRepository: ConnectionRepositoryFactory,
-		deploymentSettingsRepository: IDeploymentSettingsRepository,
+		solutionRepository: ISolutionRepository,
+		listConnectionReferencesUseCase: ListConnectionReferencesUseCase,
 		connectorMappingService: ConnectorMappingService,
 		logger: ILogger
 	): DeploymentSettingsPromotionPanel {
@@ -123,7 +137,8 @@ export class DeploymentSettingsPromotionPanel {
 			extensionUri,
 			getEnvironments,
 			createConnectionRepository,
-			deploymentSettingsRepository,
+			solutionRepository,
+			listConnectionReferencesUseCase,
 			connectorMappingService,
 			logger
 		);
@@ -133,7 +148,7 @@ export class DeploymentSettingsPromotionPanel {
 	}
 
 	private async initializePanel(): Promise<void> {
-		// Load environments for dropdown
+		// Load environments for dropdowns
 		const envData = await this.getEnvironments();
 		this.environments = envData.map((e) => ({ id: e.id, name: e.name }));
 
@@ -144,40 +159,44 @@ export class DeploymentSettingsPromotionPanel {
 	 * Refreshes the panel HTML with current state.
 	 */
 	private async refreshPanel(): Promise<void> {
-		await this.scaffoldingBehavior.refresh({
+		const toolbarData: DeploymentSettingsToolbarData = {
 			environments: this.environments,
+			sourceEnvironmentId: this.sourceEnvironmentId,
+			solutions: this.solutions,
+			currentSolutionId: this.solutionId,
+			solutionDisabled: !this.sourceEnvironmentId,
+			targetEnvironmentId: this.targetEnvironmentId,
+			saveDisabled: !this.canSave()
+		};
+
+		await this.scaffoldingBehavior.refresh({
 			customData: {
+				...toolbarData,
 				deploymentSettingsStatus: this.status
 			}
 		});
+	}
+
+	/**
+	 * Determines if save is enabled.
+	 * Requires matching to be complete with no unmatched connectors.
+	 */
+	private canSave(): boolean {
+		return this.matchResult !== undefined && !this.matchResult.hasUnmatchedConnectors();
 	}
 
 	private createCoordinator(): {
 		coordinator: PanelCoordinator<DeploymentSettingsPromotionCommands>;
 		scaffoldingBehavior: HtmlScaffoldingBehavior;
 	} {
-		// Environment selector for target environment
-		const environmentSelector = new EnvironmentSelectorSection({
-			label: 'Target Environment:'
-		});
-
-		// Action buttons at top (left side of toolbar)
-		const actionButtons = new ActionButtonsSection(
-			{
-				buttons: [
-					{ id: 'loadSourceFile', label: 'Load Source File' },
-					{ id: 'generateOutputFile', label: 'Generate Output', disabled: true }
-				],
-				position: 'left'
-			},
-			SectionPosition.Toolbar
-		);
+		// Custom toolbar with three selectors and save button
+		const toolbarSection = new DeploymentSettingsToolbarSection();
 
 		// Status section in main content area
 		const statusSection = new DeploymentSettingsStatusSection();
 
 		const compositionBehavior = new SectionCompositionBehavior(
-			[actionButtons, environmentSelector, statusSection],
+			[toolbarSection, statusSection],
 			PanelLayout.SingleColumn
 		);
 
@@ -202,6 +221,9 @@ export class DeploymentSettingsPromotionPanel {
 			jsUris: [
 				this.panel.webview
 					.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'messaging.js'))
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'js', 'behaviors', 'DeploymentSettingsBehavior.js'))
 					.toString()
 			],
 			cspNonce: getNonce(),
@@ -222,141 +244,206 @@ export class DeploymentSettingsPromotionPanel {
 
 	private registerCommandHandlers(): void {
 		this.coordinator.registerHandler(
-			'loadSourceFile',
-			async () => {
-				await this.handleLoadSourceFile();
-			},
-			{ disableOnExecute: true }
-		);
-
-		this.coordinator.registerHandler(
-			'environmentChange',
+			'sourceEnvironmentChange',
 			async (data?: unknown) => {
 				if (typeof data === 'object' && data !== null && 'environmentId' in data) {
-					await this.handleEnvironmentChanged((data as { environmentId: string }).environmentId);
+					await this.handleSourceEnvironmentChanged((data as { environmentId: string }).environmentId);
 				}
 			},
 			{ disableOnExecute: false }
 		);
 
 		this.coordinator.registerHandler(
-			'generateOutputFile',
+			'solutionChange',
+			async (data?: unknown) => {
+				if (typeof data === 'object' && data !== null && 'solutionId' in data) {
+					await this.handleSolutionChanged((data as { solutionId: string }).solutionId);
+				}
+			},
+			{ disableOnExecute: false }
+		);
+
+		this.coordinator.registerHandler(
+			'targetEnvironmentChange',
+			async (data?: unknown) => {
+				if (typeof data === 'object' && data !== null && 'environmentId' in data) {
+					await this.handleTargetEnvironmentChanged((data as { environmentId: string }).environmentId);
+				}
+			},
+			{ disableOnExecute: false }
+		);
+
+		this.coordinator.registerHandler(
+			'saveDeploymentSettings',
 			async () => {
-				await this.handleGenerateOutputFile();
+				await this.handleSaveDeploymentSettings();
 			},
 			{ disableOnExecute: true }
 		);
 	}
 
-	private async handleLoadSourceFile(): Promise<void> {
-		this.logger.debug('Opening file picker for source deployment settings');
+	/**
+	 * Handles source environment selection.
+	 * Loads solutions for the selected source environment.
+	 */
+	private async handleSourceEnvironmentChanged(environmentId: string): Promise<void> {
+		this.sourceEnvironmentId = environmentId;
+		this.solutionId = undefined; // Reset solution when source changes
+		this.matchResult = undefined; // Reset matching
+		this.sourceConnectionReferences = [];
 
-		// Start in workspace folder if available
-		const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+		this.logger.info('Source environment changed', { environmentId });
 
-		const dialogOptions: vscode.OpenDialogOptions = {
-			canSelectFiles: true,
-			canSelectFolders: false,
-			canSelectMany: false,
-			filters: {
-				'JSON Files': ['json'],
-				'All Files': ['*']
-			},
-			title: 'Select Source Deployment Settings File'
-		};
-
-		// Only set defaultUri if we have a workspace folder
-		if (workspaceFolder) {
-			dialogOptions.defaultUri = workspaceFolder;
-		}
-
-		const fileUri = await vscode.window.showOpenDialog(dialogOptions);
-
-		if (fileUri === undefined || fileUri.length === 0) {
-			this.logger.debug('File selection cancelled');
-			return;
-		}
-
-		const selectedFile = fileUri[0];
-		if (selectedFile === undefined) {
-			this.logger.debug('No file selected');
-			return;
-		}
-
-		const filePath = selectedFile.fsPath;
+		// Update status
+		this.status = { stage: 'sourceSelected' };
+		await this.refreshPanel();
 
 		try {
-			// Parse deployment settings file
-			this.sourceDeploymentSettings = await this.deploymentSettingsRepository.read(filePath);
-			this.sourceFilePath = filePath;
+			// Load solutions for the source environment
+			this.logger.debug('Loading solutions for source environment');
+			this.solutions = await this.solutionRepository.findAllForDropdown(environmentId);
 
-			const crCount = this.sourceDeploymentSettings.connectionReferences.length;
-			const evCount = this.sourceDeploymentSettings.environmentVariables.length;
-
-			this.logger.info('Source deployment settings loaded', {
-				filePath,
-				connectionReferences: crCount,
-				environmentVariables: evCount
-			});
-
-			// Update status and refresh panel
-			this.status = {
-				fileLoaded: true,
-				sourceFileName: path.basename(filePath),
-				connectionReferenceCount: crCount,
-				environmentVariableCount: evCount,
-				matchingComplete: false
-			};
-			await this.refreshPanel();
-
-			void vscode.window.showInformationMessage(
-				`Loaded: ${crCount} connection references, ${evCount} environment variables`
-			);
-
-			// If target environment is already selected, run matching
-			await this.tryRunMatching();
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			this.logger.error('Failed to load deployment settings', { filePath, error: message });
-			void vscode.window.showErrorMessage(`Failed to load deployment settings: ${message}`);
-		}
-	}
-
-	private async handleEnvironmentChanged(environmentId: string): Promise<void> {
-		this.targetEnvironmentId = environmentId;
-		this.logger.info('Target environment changed', { environmentId });
-
-		try {
-			// Query connections from target environment
-			this.logger.debug('Fetching connections from target environment');
-			const connectionRepo = this.createConnectionRepository(environmentId);
-			this.targetConnections = await connectionRepo.findAll();
-
-			this.logger.info('Fetched target connections', {
+			this.logger.info('Loaded solutions for source', {
 				environmentId,
-				count: this.targetConnections.length
+				count: this.solutions.length
 			});
 
-			// Run matching if source is loaded
-			await this.tryRunMatching();
+			// Update solution dropdown via message
+			await this.panel.postMessage({
+				command: 'updateSolutionSelector',
+				data: {
+					solutions: this.solutions,
+					currentSolutionId: undefined,
+					disabled: false
+				}
+			});
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			this.logger.error('Failed to fetch target connections', { environmentId, error: message });
-			void vscode.window.showErrorMessage(`Failed to fetch connections: ${message}`);
+			this.logger.error('Failed to load solutions', { environmentId, error: message });
+			void vscode.window.showErrorMessage(`Failed to load solutions: ${message}`);
 		}
 	}
 
 	/**
-	 * Runs connector matching if both source and target are available.
+	 * Handles solution selection.
 	 */
-	private async tryRunMatching(): Promise<void> {
-		if (!this.sourceDeploymentSettings || this.targetConnections.length === 0) {
+	private async handleSolutionChanged(solutionId: string): Promise<void> {
+		this.solutionId = solutionId;
+		this.matchResult = undefined; // Reset matching
+		this.sourceConnectionReferences = [];
+
+		const solution = this.solutions.find(s => s.id === solutionId);
+		this.logger.info('Solution changed', { solutionId, solutionName: solution?.name });
+
+		// Update status
+		if (this.targetEnvironmentId) {
+			this.status = { stage: 'loading' };
+		} else {
+			this.status = { stage: 'solutionSelected' };
+		}
+		await this.refreshPanel();
+
+		// Trigger auto-load if target is also selected
+		await this.tryAutoLoad();
+	}
+
+	/**
+	 * Handles target environment selection.
+	 */
+	private async handleTargetEnvironmentChanged(environmentId: string): Promise<void> {
+		this.targetEnvironmentId = environmentId;
+		this.matchResult = undefined; // Reset matching
+
+		this.logger.info('Target environment changed', { environmentId });
+
+		// Update status
+		if (this.sourceEnvironmentId && this.solutionId) {
+			this.status = { stage: 'loading' };
+		} else {
+			this.status = { stage: 'targetSelected' };
+		}
+		await this.refreshPanel();
+
+		// Trigger auto-load if source and solution are also selected
+		await this.tryAutoLoad();
+	}
+
+	/**
+	 * Auto-loads data and runs matching when all three selections are made.
+	 */
+	private async tryAutoLoad(): Promise<void> {
+		if (!this.sourceEnvironmentId || !this.solutionId || !this.targetEnvironmentId) {
+			return;
+		}
+
+		// Prevent selecting same environment as source and target
+		if (this.sourceEnvironmentId === this.targetEnvironmentId) {
+			void vscode.window.showWarningMessage('Source and target environments must be different');
+			return;
+		}
+
+		this.logger.info('Auto-loading deployment settings data', {
+			sourceEnv: this.sourceEnvironmentId,
+			solutionId: this.solutionId,
+			targetEnv: this.targetEnvironmentId
+		});
+
+		this.status = { stage: 'loading' };
+		await this.refreshPanel();
+
+		try {
+			// Load connection references from source environment + solution
+			const sourceResult = await this.listConnectionReferencesUseCase.execute(
+				this.sourceEnvironmentId,
+				this.solutionId
+			);
+			this.sourceConnectionReferences = sourceResult.connectionReferences;
+
+			// Load connections from target environment
+			const connectionRepo = this.createConnectionRepository(this.targetEnvironmentId);
+			this.targetConnections = await connectionRepo.findAll();
+
+			this.logger.info('Loaded source and target data', {
+				sourceConnectionRefs: this.sourceConnectionReferences.length,
+				targetConnections: this.targetConnections.length
+			});
+
+			// Run matching
+			await this.runMatching();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.logger.error('Failed to auto-load data', { error: message });
+
+			this.status = {
+				stage: 'error',
+				errorMessage: `Failed to load data: ${message}`
+			};
+			await this.refreshPanel();
+
+			void vscode.window.showErrorMessage(`Failed to load data: ${message}`);
+		}
+	}
+
+	/**
+	 * Runs connector matching between source connection refs and target connections.
+	 */
+	private async runMatching(): Promise<void> {
+		if (this.sourceConnectionReferences.length === 0) {
+			this.status = {
+				stage: 'matched',
+				connectionReferenceCount: 0,
+				autoMatchedCount: 0,
+				unmatchedCount: 0
+			};
+			await this.refreshPanel();
 			return;
 		}
 
 		// Extract unique ConnectorIds from source connection references
 		const sourceConnectorIds = new Set(
-			this.sourceDeploymentSettings.connectionReferences.map((cr) => cr.ConnectorId)
+			this.sourceConnectionReferences
+				.map((cr) => cr.connectorId)
+				.filter((id): id is string => id !== null)
 		);
 
 		// Run matching algorithm
@@ -372,8 +459,8 @@ export class DeploymentSettingsPromotionPanel {
 
 		// Update status with matching results
 		this.status = {
-			...this.status,
-			matchingComplete: true,
+			stage: 'matched',
+			connectionReferenceCount: this.sourceConnectionReferences.length,
 			autoMatchedCount,
 			unmatchedCount
 		};
@@ -382,93 +469,104 @@ export class DeploymentSettingsPromotionPanel {
 		// Show results summary
 		if (unmatchedCount === 0) {
 			void vscode.window.showInformationMessage(
-				`All ${autoMatchedCount} connectors auto-matched! Ready to generate output.`
+				`All ${autoMatchedCount} connectors auto-matched! Ready to save.`
 			);
 		} else {
 			void vscode.window.showWarningMessage(
 				`${autoMatchedCount} connectors auto-matched, ${unmatchedCount} need manual mapping`
 			);
 		}
-
-		// Enable generate button if all connectors are matched
-		// (For MVP, we only support fully auto-matched scenarios)
-		if (unmatchedCount === 0) {
-			await this.panel.postMessage({
-				command: 'setButtonState',
-				buttonId: 'generateOutputFile',
-				disabled: false
-			});
-		}
 	}
 
-	private async handleGenerateOutputFile(): Promise<void> {
-		this.logger.debug('Generating output file');
+	/**
+	 * Handles save button click.
+	 * Generates deployment settings JSON and prompts for file location.
+	 */
+	private async handleSaveDeploymentSettings(): Promise<void> {
+		this.logger.debug('Saving deployment settings');
 
-		if (!this.sourceDeploymentSettings || !this.matchResult) {
-			void vscode.window.showErrorMessage('Load source file and select target environment first');
+		if (!this.matchResult || !this.sourceConnectionReferences.length) {
+			void vscode.window.showErrorMessage('No data to save. Please complete the workflow first.');
 			return;
 		}
 
-		// For MVP, we need all connectors to be auto-matched
 		if (this.matchResult.hasUnmatchedConnectors()) {
-			void vscode.window.showErrorMessage('Cannot generate: some connectors need manual mapping');
+			void vscode.window.showErrorMessage('Cannot save: some connectors need manual mapping');
 			return;
 		}
 
 		try {
-			// Generate promoted deployment settings
+			// Generate promoted connection references
 			const matchResult = this.matchResult;
-			const promotedConnectionRefs = this.sourceDeploymentSettings.connectionReferences.map((cr) => {
-				const connections = matchResult.getConnectionsForConnector(cr.ConnectorId);
-				const defaultConn = this.connectorMappingService.selectDefaultConnection(connections);
-
-				if (defaultConn) {
+			const promotedConnectionRefs = this.sourceConnectionReferences.map((cr) => {
+				if (cr.connectorId === null) {
 					return {
-						LogicalName: cr.LogicalName,
-						ConnectionId: defaultConn.id,
-						ConnectorId: cr.ConnectorId
+						LogicalName: cr.connectionReferenceLogicalName,
+						ConnectionId: '',
+						ConnectorId: ''
 					};
 				}
 
-				// Fallback: preserve original (shouldn't happen with auto-matched)
-				return cr;
+				const connections = matchResult.getConnectionsForConnector(cr.connectorId);
+				const defaultConn = this.connectorMappingService.selectDefaultConnection(connections);
+
+				return {
+					LogicalName: cr.connectionReferenceLogicalName,
+					ConnectionId: defaultConn?.id ?? '',
+					ConnectorId: cr.connectorId
+				};
 			});
 
-			// Sort alphabetically
+			// Sort alphabetically by logical name
 			promotedConnectionRefs.sort((a, b) => a.LogicalName.localeCompare(b.LogicalName));
 
-			// Create new deployment settings with promoted connection references
-			// (Environment variables unchanged for MVP)
-			const { DeploymentSettings } = await import('../../../../shared/domain/entities/DeploymentSettings.js');
-			const promotedSettings = new DeploymentSettings(
-				[...this.sourceDeploymentSettings.environmentVariables],
-				promotedConnectionRefs
-			);
+			// Create deployment settings object
+			const deploymentSettings = {
+				EnvironmentVariables: [],
+				ConnectionReferences: promotedConnectionRefs
+			};
 
-			// Prompt for output file location
-			const suggestedName = this.sourceFilePath
-				? this.sourceFilePath.replace('.json', '-promoted.json')
-				: 'deployment-settings-promoted.json';
+			// Get suggested filename from solution
+			const solution = this.solutions.find(s => s.id === this.solutionId);
+			const suggestedName = solution
+				? `${solution.uniqueName}.deploymentsettings.json`
+				: 'deploymentsettings.json';
 
-			const outputPath = await this.deploymentSettingsRepository.promptForFilePath(suggestedName);
-			if (!outputPath) {
-				this.logger.debug('Output file selection cancelled');
+			// Prompt for save location
+			const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+			const saveDialogOptions: vscode.SaveDialogOptions = {
+				filters: {
+					'JSON Files': ['json'],
+					'All Files': ['*']
+				},
+				title: 'Save Deployment Settings'
+			};
+
+			// Only set defaultUri if we have a workspace folder
+			if (workspaceFolder) {
+				saveDialogOptions.defaultUri = vscode.Uri.joinPath(workspaceFolder, suggestedName);
+			}
+
+			const saveUri = await vscode.window.showSaveDialog(saveDialogOptions);
+			if (!saveUri) {
+				this.logger.debug('Save cancelled');
 				return;
 			}
 
-			// Write output file
-			await this.deploymentSettingsRepository.write(outputPath, promotedSettings);
+			// Write file
+			const content = JSON.stringify(deploymentSettings, null, 2);
+			await vscode.workspace.fs.writeFile(saveUri, Buffer.from(content, 'utf8'));
 
-			this.logger.info('Promoted deployment settings generated', { outputPath });
-			void vscode.window.showInformationMessage(`Generated: ${outputPath}`);
+			this.logger.info('Deployment settings saved', { path: saveUri.fsPath });
+			void vscode.window.showInformationMessage(`Saved: ${saveUri.fsPath}`);
 
 			// Open the generated file
-			const doc = await vscode.workspace.openTextDocument(outputPath);
+			const doc = await vscode.workspace.openTextDocument(saveUri);
 			await vscode.window.showTextDocument(doc);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			this.logger.error('Failed to generate output file', { error: message });
-			void vscode.window.showErrorMessage(`Failed to generate output: ${message}`);
+			this.logger.error('Failed to save deployment settings', { error: message });
+			void vscode.window.showErrorMessage(`Failed to save: ${message}`);
 		}
 	}
 }

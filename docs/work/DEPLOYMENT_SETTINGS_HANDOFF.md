@@ -2,7 +2,7 @@
 
 **Date:** 2025-12-09
 **Branch:** `feature/deployment-settings-promotion`
-**Status:** Mid-pivot - restructuring panel for correct workflow
+**Status:** MVP Complete - panel restructured with correct workflow
 
 ---
 
@@ -45,35 +45,39 @@
 
 ---
 
-## What Needs to Change (The Pivot)
+## What Was Changed (The Pivot) - COMPLETED
 
-### Current (WRONG)
+### Before (WRONG)
 ```
 Single env selector (target) → Load file button → Match file to target → Save
 ```
 
-### Correct (TODO)
+### After (IMPLEMENTED)
 ```
 Source env selector → Solution selector → Target env selector → Auto-load APIs → Match → Save
 ```
 
-### Panel Changes Needed
+### Panel Changes Made
 
-1. **Remove:**
+1. **Removed:**
    - "Load Source File" button
    - File picker logic
    - `sourceFilePath` and `sourceDeploymentSettings` state
+   - Old `ActionButtonsSection` and `EnvironmentSelectorSection`
 
-2. **Add:**
-   - Source Environment selector (first!)
-   - Solution selector (loads after source env selected)
+2. **Added:**
+   - `DeploymentSettingsToolbarSection` - Custom toolbar with all three selectors
+   - `DeploymentSettingsBehavior.js` - JavaScript to wire selector events
+   - Source Environment selector (first, enables solution loading)
+   - Solution selector (loads after source env selected, disabled until then)
    - Target Environment selector (independent of source)
    - Auto-trigger when source+solution+target all selected
 
-3. **Update:**
-   - Status section messaging for new workflow
+3. **Updated:**
+   - Status section with stage-based workflow messages
    - State management for three selectors
-   - Data loading to query APIs instead of file
+   - Data loading queries APIs directly via `ListConnectionReferencesUseCase`
+   - CSS with toolbar and additional status state styles
 
 ---
 
@@ -81,12 +85,14 @@ Source env selector → Solution selector → Target env selector → Auto-load 
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `src/features/deploymentSettingsPromotion/presentation/panels/DeploymentSettingsPromotionPanel.ts` | Main panel | Needs restructure |
-| `src/features/deploymentSettingsPromotion/presentation/sections/DeploymentSettingsStatusSection.ts` | Status display | Needs update |
-| `src/features/deploymentSettingsPromotion/domain/services/ConnectorMappingService.ts` | Matching logic | KEEP - works |
-| `src/shared/infrastructure/ui/sections/SolutionFilterSection.ts` | Solution dropdown | Reuse |
-| `src/shared/infrastructure/ui/sections/EnvironmentSelectorSection.ts` | Env dropdown | Reuse (need 2) |
-| `docs/work/DEPLOYMENT_SETTINGS_PROMOTION_TODO.md` | Progress tracking | Updated |
+| `src/features/deploymentSettingsPromotion/presentation/panels/DeploymentSettingsPromotionPanel.ts` | Main panel | UPDATED |
+| `src/features/deploymentSettingsPromotion/presentation/sections/DeploymentSettingsStatusSection.ts` | Status display | UPDATED |
+| `src/features/deploymentSettingsPromotion/presentation/sections/DeploymentSettingsToolbarSection.ts` | Custom toolbar | NEW |
+| `src/features/deploymentSettingsPromotion/domain/services/ConnectorMappingService.ts` | Matching logic | UNCHANGED |
+| `src/features/deploymentSettingsPromotion/presentation/initialization/initializeDeploymentSettingsPromotion.ts` | DI wiring | UPDATED |
+| `resources/webview/js/behaviors/DeploymentSettingsBehavior.js` | Selector wiring | NEW |
+| `resources/webview/css/features/deployment-settings.css` | Panel styling | UPDATED |
+| `docs/work/DEPLOYMENT_SETTINGS_PROMOTION_TODO.md` | Progress tracking | UPDATED |
 
 ---
 
@@ -159,20 +165,18 @@ npm test -- --testPathPattern=deploymentSettingsPromotion  # 46 tests
 
 ## Next Steps
 
-1. Restructure `DeploymentSettingsPromotionPanel.ts`:
-   - Add source env selector, solution selector, target env selector
-   - Wire solution loading to trigger after source env selected
-   - Wire auto-load to trigger after all three selected
-   - Remove file loading logic
+1. **F5 Test the MVP** (manual testing)
+   - Verify source env selector loads environments
+   - Verify solution dropdown populates after source selection
+   - Verify auto-load triggers when all three selected
+   - Verify matching results display correctly
+   - Verify Save button generates correct JSON
 
-2. Update `DeploymentSettingsStatusSection.ts`:
-   - New initial message: "Select a source environment to begin"
-   - After source: "Select a solution and target environment"
-   - After all selected: Show matching results
-
-3. Test with F5
-
-4. Implement save with location persistence
+2. **Remaining work (future sessions):**
+   - Save location persistence per target environment
+   - Environment variables support (currently empty array in output)
+   - Manual mapping UI for unmatched connectors
+   - Deprecate old sync functionality in CR/EV panels
 
 ---
 

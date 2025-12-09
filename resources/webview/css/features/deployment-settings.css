@@ -2,6 +2,69 @@
  * Deployment Settings Promotion Panel Styles
  */
 
+/* Toolbar with three selectors and save button */
+.deployment-settings-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 8px 16px;
+	flex-wrap: wrap;
+}
+
+.selector-group {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.selector-group label {
+	font-size: 13px;
+	color: var(--vscode-foreground);
+	white-space: nowrap;
+}
+
+.selector-group select {
+	min-width: 160px;
+	padding: 4px 8px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 2px;
+	font-size: 13px;
+}
+
+.selector-group select:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.action-group {
+	margin-left: auto;
+}
+
+.action-group .action-button {
+	padding: 6px 16px;
+	font-size: 13px;
+	border: none;
+	border-radius: 2px;
+	cursor: pointer;
+}
+
+.action-group .action-button.primary {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+.action-group .action-button.primary:hover:not(:disabled) {
+	background: var(--vscode-button-hoverBackground);
+}
+
+.action-group .action-button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Status container (main content area) */
 .status-container {
 	display: flex;
 	justify-content: center;
@@ -12,7 +75,11 @@
 
 .status-instructions,
 .status-loaded,
-.status-matching {
+.status-matching,
+.status-progress,
+.status-loading,
+.status-info,
+.status-error {
 	max-width: 600px;
 	padding: 24px;
 	background: var(--vscode-editor-background);
@@ -22,16 +89,32 @@
 
 .status-instructions h2,
 .status-loaded h3,
-.status-matching h3 {
+.status-matching h3,
+.status-progress h3,
+.status-loading h3,
+.status-info h3,
+.status-error h3 {
 	margin: 0 0 16px 0;
 	color: var(--vscode-foreground);
 	font-weight: 600;
 }
 
-.status-instructions p {
+.status-instructions p,
+.status-progress p,
+.status-loading p,
+.status-info p,
+.status-error p {
 	margin: 0 0 16px 0;
 	color: var(--vscode-descriptionForeground);
 	line-height: 1.5;
+}
+
+.status-instructions p:last-child,
+.status-progress p:last-child,
+.status-loading p:last-child,
+.status-info p:last-child,
+.status-error p:last-child {
+	margin-bottom: 0;
 }
 
 .instructions-list {
@@ -49,7 +132,47 @@
 	color: var(--vscode-textLink-foreground);
 }
 
-/* File loaded status */
+/* Progress status */
+.status-progress {
+	border-left: 3px solid var(--vscode-textLink-foreground);
+}
+
+/* Loading status */
+.status-loading {
+	text-align: center;
+}
+
+.loading-spinner {
+	width: 32px;
+	height: 32px;
+	margin: 16px auto;
+	border: 3px solid var(--vscode-panel-border);
+	border-top-color: var(--vscode-textLink-foreground);
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Info status */
+.status-info {
+	border-left: 3px solid var(--vscode-textLink-foreground);
+}
+
+/* Error status */
+.status-error {
+	border-left: 3px solid var(--vscode-errorForeground);
+}
+
+.status-error h3 {
+	color: var(--vscode-errorForeground);
+}
+
+/* File loaded status (legacy, keeping for compatibility) */
 .file-name {
 	font-family: var(--vscode-editor-font-family);
 	font-size: 13px;

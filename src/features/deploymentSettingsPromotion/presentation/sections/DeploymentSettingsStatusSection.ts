@@ -1,6 +1,6 @@
 /**
  * DeploymentSettingsStatusSection - Displays status and instructions for the promotion panel.
- * Shows instructions initially, then status after file load and matching.
+ * Shows stage-specific instructions and matching results.
  */
 
 import type { ISection } from '../../../../shared/infrastructure/ui/sections/ISection';
@@ -8,16 +8,26 @@ import { SectionPosition } from '../../../../shared/infrastructure/ui/types/Sect
 import type { SectionRenderData } from '../../../../shared/infrastructure/ui/types/SectionRenderData';
 
 /**
+ * Workflow stages for deployment settings promotion.
+ */
+type DeploymentSettingsStage =
+	| 'initial'           // No selections made
+	| 'sourceSelected'    // Source env selected, waiting for solution
+	| 'solutionSelected'  // Solution selected, waiting for target
+	| 'targetSelected'    // Target selected, waiting for source/solution
+	| 'loading'           // Loading data
+	| 'matched'           // Matching complete
+	| 'error';            // Error occurred
+
+/**
  * Status data for deployment settings promotion.
  */
 export interface DeploymentSettingsStatus {
-	readonly fileLoaded: boolean;
-	readonly sourceFileName?: string;
+	readonly stage: DeploymentSettingsStage;
 	readonly connectionReferenceCount?: number;
-	readonly environmentVariableCount?: number;
-	readonly matchingComplete: boolean;
 	readonly autoMatchedCount?: number;
 	readonly unmatchedCount?: number;
+	readonly errorMessage?: string;
 }
 
 /**
@@ -26,57 +36,94 @@ export interface DeploymentSettingsStatus {
 export class DeploymentSettingsStatusSection implements ISection {
 	public readonly position = SectionPosition.Main;
 
-	/**
-	 * Renders status/instructions HTML.
-	 */
 	public render(data: SectionRenderData): string {
 		const status = data.customData?.['deploymentSettingsStatus'] as DeploymentSettingsStatus | undefined;
 
-		if (!status?.fileLoaded) {
+		if (!status) {
 			return this.renderInitialInstructions();
 		}
 
-		if (!status.matchingComplete) {
-			return this.renderFileLoadedStatus(status);
+		switch (status.stage) {
+			case 'initial':
+				return this.renderInitialInstructions();
+			case 'sourceSelected':
+				return this.renderSourceSelected();
+			case 'solutionSelected':
+				return this.renderSolutionSelected();
+			case 'targetSelected':
+				return this.renderTargetSelected();
+			case 'loading':
+				return this.renderLoading();
+			case 'matched':
+				return this.renderMatchingResults(status);
+			case 'error':
+				return this.renderError(status);
+			default:
+				return this.renderInitialInstructions();
 		}
-
-		return this.renderMatchingResults(status);
 	}
 
 	private renderInitialInstructions(): string {
 		return `
 			<div class="status-container">
 				<div class="status-instructions">
-					<h2>Deployment Settings</h2>
-					<p>Manage deployment settings for Power Platform solutions. Promote settings between environments with automatic connector matching.</p>
+					<h2>Deployment Settings Promotion</h2>
+					<p>Promote deployment settings between Power Platform environments with automatic connector matching.</p>
 					<ol class="instructions-list">
-						<li><strong>Select target environment</strong> from the dropdown above</li>
-						<li><strong>Click "Load Source File"</strong> to select your source deployment settings JSON</li>
-						<li>The tool will auto-match connectors between environments</li>
-						<li><strong>Click "Generate Output"</strong> to create promoted deployment settings</li>
+						<li><strong>Select source environment</strong> - where your solution is configured and working</li>
+						<li><strong>Select solution</strong> - the solution containing your connection references</li>
+						<li><strong>Select target environment</strong> - where you want to deploy</li>
+						<li>The tool will automatically match connectors between environments</li>
+						<li><strong>Click "Save"</strong> to generate deployment settings file</li>
 					</ol>
 				</div>
 			</div>
 		`;
 	}
 
-	private renderFileLoadedStatus(status: DeploymentSettingsStatus): string {
+	private renderSourceSelected(): string {
 		return `
 			<div class="status-container">
-				<div class="status-loaded">
-					<h3>Source File Loaded</h3>
-					<p class="file-name">${this.escapeHtml(status.sourceFileName ?? 'Unknown file')}</p>
-					<div class="status-counts">
-						<div class="count-item">
-							<span class="count-value">${status.connectionReferenceCount ?? 0}</span>
-							<span class="count-label">Connection References</span>
-						</div>
-						<div class="count-item">
-							<span class="count-value">${status.environmentVariableCount ?? 0}</span>
-							<span class="count-label">Environment Variables</span>
-						</div>
-					</div>
-					<p class="status-hint">Select a target environment to run connector matching...</p>
+				<div class="status-progress">
+					<h3>✓ Source Environment Selected</h3>
+					<p>Now select a solution from the dropdown above.</p>
+					<p class="status-hint">Solutions are loaded from your source environment.</p>
+				</div>
+			</div>
+		`;
+	}
+
+	private renderSolutionSelected(): string {
+		return `
+			<div class="status-container">
+				<div class="status-progress">
+					<h3>✓ Source & Solution Selected</h3>
+					<p>Now select a target environment to complete the workflow.</p>
+					<p class="status-hint">The target environment is where your solution will be deployed.</p>
+				</div>
+			</div>
+		`;
+	}
+
+	private renderTargetSelected(): string {
+		return `
+			<div class="status-container">
+				<div class="status-progress">
+					<h3>⚠ Target Selected</h3>
+					<p>Please select a source environment and solution to continue.</p>
+					<p class="status-hint">The workflow requires: Source → Solution → Target</p>
+				</div>
+			</div>
+		`;
+	}
+
+	private renderLoading(): string {
+		return `
+			<div class="status-container">
+				<div class="status-loading">
+					<h3>Loading...</h3>
+					<div class="loading-spinner"></div>
+					<p>Fetching connection references and matching connectors...</p>
 				</div>
 			</div>
 		`;
@@ -85,7 +132,19 @@ export class DeploymentSettingsStatusSection implements ISection {
 	private renderMatchingResults(status: DeploymentSettingsStatus): string {
 		const autoMatched = status.autoMatchedCount ?? 0;
 		const unmatched = status.unmatchedCount ?? 0;
-		const total = autoMatched + unmatched;
+		const total = status.connectionReferenceCount ?? 0;
+
+		if (total === 0) {
+			return `
+				<div class="status-container">
+					<div class="status-info">
+						<h3>No Connection References</h3>
+						<p>The selected solution has no connection references.</p>
+						<p class="status-hint">Connection references are required for deployment settings.</p>
+					</div>
+				</div>
+			`;
+		}
 
 		const allMatched = unmatched === 0;
 		const statusClass = allMatched ? 'status-success' : 'status-warning';
@@ -108,13 +167,25 @@ export class DeploymentSettingsStatusSection implements ISection {
 						` : ''}
 						<div class="match-item match-total">
 							<span class="match-count">${total}</span>
-							<span class="match-label">Total connectors</span>
+							<span class="match-label">Connection References</span>
 						</div>
 					</div>
 					${allMatched
-						? '<p class="status-action">All connectors matched! Click "Generate Output" to create promoted settings.</p>'
-						: '<p class="status-action">Some connectors could not be auto-matched. Manual mapping is not yet supported in this version.</p>'
+						? '<p class="status-action">All connectors matched! Click "Save" to generate deployment settings.</p>'
+						: '<p class="status-action">Some connectors could not be auto-matched. Manual mapping is not yet supported.</p>'
 					}
+				</div>
+			</div>
+		`;
+	}
+
+	private renderError(status: DeploymentSettingsStatus): string {
+		return `
+			<div class="status-container">
+				<div class="status-error">
+					<h3>⚠ Error</h3>
+					<p>${this.escapeHtml(status.errorMessage ?? 'An unknown error occurred')}</p>
+					<p class="status-hint">Try changing your selections or check the Output panel for details.</p>
 				</div>
 			</div>
 		`;

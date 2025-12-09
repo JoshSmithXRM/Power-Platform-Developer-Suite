@@ -620,6 +620,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		try {
 			void initializeDeploymentSettingsPromotion(context, {
 				getEnvironments: factories.getEnvironments,
+				dataverseApiServiceFactory: factories.dataverseApiServiceFactory,
 				powerAppsAdminApiFactory: factories.powerAppsAdminApiFactory,
 				logger: container.logger
 			});
