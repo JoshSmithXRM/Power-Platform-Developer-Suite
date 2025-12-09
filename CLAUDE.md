@@ -138,10 +138,17 @@ For complex/uncertain problems, trigger extended thinking modes:
 ## 🛠️ Common Commands
 
 **Development:**
-- `npm run compile` - TypeScript compilation (run after EVERY layer)
+- `npm run compile` - Full compilation with lint + tests (run before commits)
+- `npm run compile:fast` - Quick build only, no lint/tests (run after EVERY code change)
 - `npm test` - Run all tests (must pass before commits)
 - `npm run lint` - ESLint check
 - `npm run watch` - Continuous compilation during development
+
+**CRITICAL: Compile After Every Change**
+After ANY code edit (even a single line), run `npm run compile:fast` before proceeding.
+Do NOT batch multiple changes without verifying each compiles. Catch errors immediately,
+not after multiple files have been modified. This prevents wasted effort debugging
+cascading issues from earlier mistakes.
 
 **VS Code:**
 - `F5` - Launch Extension Development Host (manual testing required)
@@ -308,7 +315,8 @@ git worktree prune             # Clean up stale worktree references
 
 2. **Implementation phase** (inside-out, exploration mode)
    - Domain → Application → Infrastructure → Presentation
-   - `npm run compile` after EACH layer
+   - `npm run compile:fast` after EVERY file edit (not just per layer!)
+   - `npm run compile` (full) after completing each layer before commit
    - NO tests during exploration (focus on getting to F5 fast)
    - Commit per layer
    - F5 test and iterate until "feels right"
