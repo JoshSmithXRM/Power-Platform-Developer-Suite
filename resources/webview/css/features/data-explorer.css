@@ -92,6 +92,9 @@
 	min-width: 100%;
 	width: max-content;
 	border-collapse: collapse;
+	/* Override table-layout: fixed from datatable.css - Data Explorer needs
+	   content-based column sizing for variable-width query result columns */
+	table-layout: auto;
 }
 
 #results-table-container .virtual-table tbody tr {

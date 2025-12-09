@@ -199,20 +199,15 @@ The entire `rows` + `rowLookups` arrays are serialized to JSON and deserialized.
 
 ## Phase 2 Complete - Remaining Issues
 
-### Issue: Column Widths Cramped/Smooshed
+### Issue: Column Widths Cramped/Smooshed ✅ FIXED
 After Phase 2 fixes, table columns appear very narrow and content is truncated.
 See screenshot - all columns cramped together despite horizontal scroll being available.
 
-**Possible causes:**
-1. CSS changes to `.virtual-table-container` (added `display: flex; flex-direction: column`)
-2. CSS changes to `.virtual-scroll-wrapper` (changed from `height: 100%` to `flex: 1`)
-3. Table `width: max-content` not working as expected in new flex context
-4. Column width calculation in VirtualTableRenderer not accounting for content
+**Root cause:**
+`datatable.css` applies `table-layout: fixed` to all `.virtual-table` elements (line 231-234). This forces columns to have equal widths distributed across the table width, overriding `width: max-content` in data-explorer.css. With `table-layout: fixed`, columns don't size to their content.
 
-**Files to investigate:**
-- `resources/webview/css/features/data-explorer.css` - recent changes to flex layout
-- `resources/webview/js/renderers/VirtualTableRenderer.js` - column width logic
-- `src/shared/infrastructure/ui/tables/ColumnWidthCalculator.ts` - if used
+**Fix applied:**
+Added `table-layout: auto` override in `data-explorer.css` for `#results-table-container .virtual-table`. This allows content-based column sizing for variable-width query result columns while maintaining the fixed layout behavior in other panels that need it.
 
 ### Unstaged Notebook Changes
 Previous session modified notebook rendering but changes are unstaged:
