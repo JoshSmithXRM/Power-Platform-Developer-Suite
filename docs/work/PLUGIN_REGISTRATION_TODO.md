@@ -139,65 +139,67 @@ Before PR, return to complete these items:
 ### Requirements
 
 #### Enable/Disable Plugin Steps
-- [ ] Right-click step node → context menu with "Enable Step" or "Disable Step"
-- [ ] Only show option when `canEnable` or `canDisable` is true
-- [ ] Managed steps: no context menu options (read-only)
-- [ ] API: PATCH sdkmessageprocessingsteps with statecode 0/1
-- [ ] Targeted refresh: update only that step node after action
+- [x] Right-click step node → context menu with "Enable Step" or "Disable Step"
+- [x] Only show option when `canEnable` or `canDisable` is true
+- [x] Managed steps: no context menu options (read-only)
+- [x] API: PATCH sdkmessageprocessingsteps with statecode 0/1
+- [x] Targeted refresh: update only that step node after action
 
 #### Update Standalone Assembly
-- [ ] Right-click standalone assembly → "Update Assembly..."
-- [ ] File picker filtered to `.dll`, starts in workspace (remembers last folder)
-- [ ] API: PATCH pluginassemblies with base64 content
-- [ ] Targeted refresh: assembly node + all children (types, steps, images)
-- [ ] Managed assemblies: no context menu option
+- [x] Right-click standalone assembly → "Update Assembly..."
+- [x] File picker filtered to `.dll`, starts in workspace (remembers last folder)
+- [x] API: PATCH pluginassemblies with base64 content
+- [x] Targeted refresh: assembly node + all children (types, steps, images)
+- [x] Managed assemblies: no context menu option
 
 #### Update Plugin Package
-- [ ] Right-click package node → "Update Package..."
-- [ ] Right-click assembly-in-package → "Update Package..." (redirects to package)
-- [ ] File picker filtered to `.nupkg`, starts in workspace (remembers last folder)
-- [ ] API: PATCH pluginpackages with base64 content (version from .nupkg)
-- [ ] Targeted refresh: package node + all children
-- [ ] Managed packages: no context menu option
+- [x] Right-click package node → "Update Package..."
+- [x] Right-click assembly-in-package → "Update Package..." (redirects to package)
+- [x] File picker filtered to `.nupkg`, starts in workspace (remembers last folder)
+- [x] API: PATCH pluginpackages with base64 content (version from .nupkg)
+- [x] Targeted refresh: package node + all children
+- [x] Managed packages: no context menu option
 
 #### Cross-Cutting
-- [ ] Context menu via `data-vscode-context` on tree nodes
-- [ ] Commands registered in package.json
-- [ ] Persist last-used folder for file picker (per file type)
-- [ ] Error handling via `vscode.window.showErrorMessage`
+- [x] Context menu via `data-vscode-context` on tree nodes
+- [x] Commands registered in package.json
+- [x] Persist last-used folder for file picker (per file type)
+- [x] Error handling via `vscode.window.showErrorMessage`
 
 ### Implementation Checklist - Slice 2
 
 #### Domain Layer
-- [ ] PluginAssembly: add `canUpdate()` method
-- [ ] PluginPackage: add `canUpdate()` method
-- [ ] `npm run compile` passes
+- [x] PluginAssembly: add `canUpdate()` method
+- [x] PluginPackage: add `canUpdate()` method
+- [x] `npm run compile` passes
 
 #### Application Layer
-- [ ] EnablePluginStepUseCase
-- [ ] DisablePluginStepUseCase
-- [ ] UpdatePluginAssemblyUseCase
-- [ ] UpdatePluginPackageUseCase
-- [ ] `npm run compile` passes
+- [x] EnablePluginStepUseCase
+- [x] DisablePluginStepUseCase
+- [x] UpdatePluginAssemblyUseCase
+- [x] UpdatePluginPackageUseCase
+- [x] `npm run compile` passes
 
 #### Infrastructure Layer
-- [ ] IPluginStepRepository: add `enable()`, `disable()` methods
-- [ ] DataversePluginStepRepository: implement enable/disable
-- [ ] IPluginAssemblyRepository: add `updateContent()` method
-- [ ] DataversePluginAssemblyRepository: implement updateContent
-- [ ] IPluginPackageRepository: add `updateContent()` method
-- [ ] DataversePluginPackageRepository: implement updateContent
-- [ ] `npm run compile` passes
+- [x] IPluginStepRepository: add `enable()`, `disable()` methods
+- [x] DataversePluginStepRepository: implement enable/disable
+- [x] IPluginAssemblyRepository: add `updateContent()` method
+- [x] DataversePluginAssemblyRepository: implement updateContent
+- [x] IPluginPackageRepository: add `updateContent()` method
+- [x] DataversePluginPackageRepository: implement updateContent
+- [x] `npm run compile` passes
 
 #### Presentation Layer
-- [ ] Add `data-vscode-context` to tree nodes in plugin-registration.js
-- [ ] Register commands in package.json (enable, disable, updateAssembly, updatePackage)
-- [ ] Register webview/context menu items in package.json
-- [ ] Command handlers in extension.ts
-- [ ] Handler methods in PluginRegistrationPanelComposed
-- [ ] Targeted node refresh (updateNode message type)
-- [ ] File picker with last-folder persistence
-- [ ] `npm run compile` passes
+- [x] Add `data-vscode-context` to tree nodes in plugin-registration.js
+- [x] Register commands in package.json (enable, disable, updateAssembly, updatePackage)
+- [x] Register webview/context menu items in package.json
+- [x] Command handlers in extension.ts
+- [x] Handler methods in PluginRegistrationPanelComposed
+- [x] Targeted node refresh (updateNode message type)
+- [x] File picker with last-folder persistence
+- [x] `npm run compile` passes
+
+### Status: READY FOR F5 TESTING ✅
 
 ---
 

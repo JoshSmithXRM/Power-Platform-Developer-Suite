@@ -19,6 +19,7 @@ import { initializeConnectionReferences } from './features/connectionReferences/
 import { initializeEnvironmentVariables } from './features/environmentVariables/presentation/initialization/initializeEnvironmentVariables.js';
 import { initializePluginTraceViewer } from './features/pluginTraceViewer/presentation/initialization/initializePluginTraceViewer.js';
 import { initializePluginRegistration } from './features/pluginRegistration/presentation/initialization/initializePluginRegistration.js';
+import { PluginRegistrationPanelComposed } from './features/pluginRegistration/presentation/panels/PluginRegistrationPanelComposed.js';
 import { initializeMetadataBrowser } from './features/metadataBrowser/presentation/initialization/initializeMetadataBrowser.js';
 import { initializePersistenceInspector } from './features/persistenceInspector/presentation/initialization/initializePersistenceInspector.js';
 import { initializeDevTools } from './features/devTools/initializeDevTools.js';
@@ -506,6 +507,76 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
+	// Plugin Registration Context Menu Commands
+	const enablePluginStepCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.enablePluginStep',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const stepId = contextMenuContext?.nodeId;
+			if (!stepId) {
+				vscode.window.showWarningMessage('No step selected.');
+				return;
+			}
+			await panel.enableStep(stepId);
+		}
+	);
+
+	const disablePluginStepCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.disablePluginStep',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const stepId = contextMenuContext?.nodeId;
+			if (!stepId) {
+				vscode.window.showWarningMessage('No step selected.');
+				return;
+			}
+			await panel.disableStep(stepId);
+		}
+	);
+
+	const updatePluginAssemblyCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.updatePluginAssembly',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const assemblyId = contextMenuContext?.nodeId;
+			if (!assemblyId) {
+				vscode.window.showWarningMessage('No assembly selected.');
+				return;
+			}
+			await panel.updateAssembly(assemblyId);
+		}
+	);
+
+	const updatePluginPackageCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.updatePluginPackage',
+		async (contextMenuContext?: { nodeId?: string; packageId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			// packageId is set when clicking on an assembly-in-package, nodeId when clicking on package directly
+			const packageId = contextMenuContext?.packageId ?? contextMenuContext?.nodeId;
+			if (!packageId) {
+				vscode.window.showWarningMessage('No package selected.');
+				return;
+			}
+			await panel.updatePackage(packageId);
+		}
+	);
+
 	const metadataBrowserCommand = vscode.commands.registerCommand('power-platform-dev-suite.metadataBrowser', async (environmentItem?: { envId: string }) => {
 		try {
 			void initializeMetadataBrowser(context, factories.getEnvironments, factories.dataverseApiServiceFactory, container.environmentRepository, container.logger, environmentItem?.envId);
@@ -669,6 +740,10 @@ export function activate(context: vscode.ExtensionContext): void {
 		pluginTraceViewerPickEnvironmentCommand,
 		pluginRegistrationCommand,
 		pluginRegistrationPickEnvironmentCommand,
+		enablePluginStepCommand,
+		disablePluginStepCommand,
+		updatePluginAssemblyCommand,
+		updatePluginPackageCommand,
 		metadataBrowserCommand,
 		metadataBrowserPickEnvironmentCommand,
 		dataExplorerCommand,

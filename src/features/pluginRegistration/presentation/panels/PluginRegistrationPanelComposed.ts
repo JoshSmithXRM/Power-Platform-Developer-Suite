@@ -44,6 +44,29 @@ import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRep
 import { StepImageViewModelMapper } from '../../application/mappers/StepImageViewModelMapper';
 
 /**
+ * Bundle of use cases for plugin registration operations.
+ */
+export interface PluginRegistrationUseCases {
+	readonly loadTree: LoadPluginRegistrationTreeUseCase;
+	readonly enableStep: EnablePluginStepUseCase;
+	readonly disableStep: DisablePluginStepUseCase;
+	readonly updateAssembly: UpdatePluginAssemblyUseCase;
+	readonly updatePackage: UpdatePluginPackageUseCase;
+}
+
+/**
+ * Bundle of repositories for refresh operations.
+ */
+export interface PluginRegistrationRepositories {
+	readonly step: IPluginStepRepository;
+	readonly assembly: IPluginAssemblyRepository;
+	readonly package: IPluginPackageRepository;
+	readonly pluginType: IPluginTypeRepository;
+	readonly image: IStepImageRepository;
+	readonly solution: ISolutionRepository;
+}
+
+/**
  * Commands supported by Plugin Registration panel.
  */
 type PluginRegistrationCommands =
@@ -67,6 +90,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
 	private readonly loadingBehavior: LoadingStateBehavior;
 	private readonly treeMapper: PluginRegistrationTreeMapper;
+	private readonly stepMapper: PluginStepViewModelMapper;
+	private readonly assemblyMapper: PluginAssemblyViewModelMapper;
+	private readonly packageMapper: PluginPackageViewModelMapper;
+	private readonly pluginTypeMapper: PluginTypeViewModelMapper;
+	private readonly imageMapper: StepImageViewModelMapper;
 
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
@@ -74,10 +102,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private constructor(
 		private readonly panel: SafeWebviewPanel,
 		private readonly extensionUri: vscode.Uri,
+		private readonly extensionContext: vscode.ExtensionContext,
 		private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
-		private readonly loadTreeUseCase: LoadPluginRegistrationTreeUseCase,
-		private readonly solutionRepository: ISolutionRepository,
+		private readonly useCases: PluginRegistrationUseCases,
+		private readonly repositories: PluginRegistrationRepositories,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		private readonly logger: ILogger,
 		environmentId: string
@@ -85,6 +114,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		super();
 		this.currentEnvironmentId = environmentId;
 		this.treeMapper = new PluginRegistrationTreeMapper();
+		this.stepMapper = new PluginStepViewModelMapper();
+		this.assemblyMapper = new PluginAssemblyViewModelMapper();
+		this.packageMapper = new PluginPackageViewModelMapper();
+		this.pluginTypeMapper = new PluginTypeViewModelMapper();
+		this.imageMapper = new StepImageViewModelMapper();
 
 		logger.debug('PluginRegistrationPanel: Initializing');
 
@@ -120,10 +154,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 	public static async createOrShow(
 		extensionUri: vscode.Uri,
+		extensionContext: vscode.ExtensionContext,
 		getEnvironments: () => Promise<EnvironmentOption[]>,
 		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
-		loadTreeUseCase: LoadPluginRegistrationTreeUseCase,
-		solutionRepository: ISolutionRepository,
+		useCases: PluginRegistrationUseCases,
+		repositories: PluginRegistrationRepositories,
 		urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
 		initialEnvironmentId?: string
@@ -140,10 +175,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					new PluginRegistrationPanelComposed(
 						panel,
 						extensionUri,
+						extensionContext,
 						getEnvironments,
 						getEnvironmentById,
-						loadTreeUseCase,
-						solutionRepository,
+						useCases,
+						repositories,
 						urlBuilder,
 						logger,
 						envId
@@ -157,6 +193,17 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			},
 			PluginRegistrationPanelComposed.panels
 		);
+	}
+
+	/**
+	 * Get the currently active panel for command routing.
+	 * Returns the panel if there's exactly one, or the most recently focused one.
+	 */
+	public static getActivePanel(): PluginRegistrationPanelComposed | undefined {
+		// For now, return the first panel if any exist
+		// In practice, there's usually only one per environment
+		const panels = Array.from(PluginRegistrationPanelComposed.panels.values());
+		return panels.length > 0 ? panels[0] : undefined;
 	}
 
 	private async initializeAndLoadData(): Promise<void> {
@@ -197,7 +244,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 	private async loadSolutions(): Promise<SolutionOption[]> {
 		try {
-			return await this.solutionRepository.findAllForDropdown(this.currentEnvironmentId);
+			return await this.repositories.solution.findAllForDropdown(this.currentEnvironmentId);
 		} catch (error) {
 			this.logger.error('Failed to load solutions', error);
 			return [];
@@ -346,7 +393,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 						});
 					};
 
-					const result = await this.loadTreeUseCase.execute(
+					const result = await this.useCases.loadTree.execute(
 						this.currentEnvironmentId,
 						this.currentSolutionId === DEFAULT_SOLUTION_ID ? undefined : this.currentSolutionId,
 						onProgress
@@ -438,5 +485,338 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private handleNodeSelection(nodeId: string): void {
 		this.logger.debug('Node selected', { nodeId });
 		// Future: Show detail panel for selected node
+	}
+
+	// ========================================
+	// Public Action Methods (for context menu commands)
+	// ========================================
+
+	/**
+	 * Enable a plugin step. Called from context menu command.
+	 */
+	public async enableStep(stepId: string): Promise<void> {
+		this.logger.info('Enabling plugin step', { stepId });
+
+		try {
+			await this.useCases.enableStep.execute(this.currentEnvironmentId, stepId);
+
+			// Fetch updated step and its images, then refresh node
+			const updatedStep = await this.repositories.step.findById(this.currentEnvironmentId, stepId);
+			if (updatedStep) {
+				const images = await this.repositories.image.findByStepId(
+					this.currentEnvironmentId,
+					stepId
+				);
+				const imageViewModels = images.map((img) =>
+					this.imageMapper.toTreeItem(img, stepId)
+				);
+				const updatedNode = this.stepMapper.toTreeItem(
+					updatedStep,
+					updatedStep.getPluginTypeId(),
+					imageViewModels
+				);
+				await this.panel.postMessage({
+					command: 'updateNode',
+					data: { nodeId: stepId, updatedNode },
+				});
+			}
+
+			void vscode.window.showInformationMessage('Plugin step enabled.');
+		} catch (error: unknown) {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			this.logger.error('Failed to enable plugin step', error);
+			void vscode.window.showErrorMessage(`Failed to enable step: ${errorMessage}`);
+		}
+	}
+
+	/**
+	 * Disable a plugin step. Called from context menu command.
+	 */
+	public async disableStep(stepId: string): Promise<void> {
+		this.logger.info('Disabling plugin step', { stepId });
+
+		try {
+			await this.useCases.disableStep.execute(this.currentEnvironmentId, stepId);
+
+			// Fetch updated step and its images, then refresh node
+			const updatedStep = await this.repositories.step.findById(this.currentEnvironmentId, stepId);
+			if (updatedStep) {
+				const images = await this.repositories.image.findByStepId(
+					this.currentEnvironmentId,
+					stepId
+				);
+				const imageViewModels = images.map((img) =>
+					this.imageMapper.toTreeItem(img, stepId)
+				);
+				const updatedNode = this.stepMapper.toTreeItem(
+					updatedStep,
+					updatedStep.getPluginTypeId(),
+					imageViewModels
+				);
+				await this.panel.postMessage({
+					command: 'updateNode',
+					data: { nodeId: stepId, updatedNode },
+				});
+			}
+
+			void vscode.window.showInformationMessage('Plugin step disabled.');
+		} catch (error: unknown) {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			this.logger.error('Failed to disable plugin step', error);
+			void vscode.window.showErrorMessage(`Failed to disable step: ${errorMessage}`);
+		}
+	}
+
+	/**
+	 * Update a standalone plugin assembly. Called from context menu command.
+	 */
+	public async updateAssembly(assemblyId: string): Promise<void> {
+		this.logger.info('Updating plugin assembly', { assemblyId });
+
+		// Show file picker
+		const fileUri = await this.pickAssemblyFile();
+		if (!fileUri) {
+			return; // User cancelled
+		}
+
+		try {
+			// Read file and convert to base64
+			const fileContent = await vscode.workspace.fs.readFile(fileUri);
+			const base64Content = Buffer.from(fileContent).toString('base64');
+
+			await this.useCases.updateAssembly.execute(
+				this.currentEnvironmentId,
+				assemblyId,
+				base64Content
+			);
+
+			// Refresh the subtree (assembly + all children)
+			await this.refreshAssemblySubtree(assemblyId);
+
+			void vscode.window.showInformationMessage('Plugin assembly updated.');
+		} catch (error: unknown) {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			this.logger.error('Failed to update plugin assembly', error);
+			void vscode.window.showErrorMessage(`Failed to update assembly: ${errorMessage}`);
+		}
+	}
+
+	/**
+	 * Update a plugin package. Called from context menu command.
+	 */
+	public async updatePackage(packageId: string): Promise<void> {
+		this.logger.info('Updating plugin package', { packageId });
+
+		// Show file picker
+		const fileUri = await this.pickPackageFile();
+		if (!fileUri) {
+			return; // User cancelled
+		}
+
+		try {
+			// Read file and convert to base64
+			const fileContent = await vscode.workspace.fs.readFile(fileUri);
+			const base64Content = Buffer.from(fileContent).toString('base64');
+
+			await this.useCases.updatePackage.execute(
+				this.currentEnvironmentId,
+				packageId,
+				base64Content
+			);
+
+			// Refresh the subtree (package + all children)
+			await this.refreshPackageSubtree(packageId);
+
+			void vscode.window.showInformationMessage('Plugin package updated.');
+		} catch (error: unknown) {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			this.logger.error('Failed to update plugin package', error);
+			void vscode.window.showErrorMessage(`Failed to update package: ${errorMessage}`);
+		}
+	}
+
+	// ========================================
+	// File Picker Helpers
+	// ========================================
+
+	private async pickAssemblyFile(): Promise<vscode.Uri | undefined> {
+		const lastFolder = this.extensionContext.workspaceState.get<string>(
+			'pluginRegistration.lastDllFolder'
+		);
+
+		const options: vscode.OpenDialogOptions = {
+			canSelectMany: false,
+			filters: { 'DLL Files': ['dll'] },
+			title: 'Select Plugin Assembly',
+		};
+
+		// Set defaultUri only if we have a valid folder
+		if (lastFolder) {
+			options.defaultUri = vscode.Uri.file(lastFolder);
+		} else if (vscode.workspace.workspaceFolders?.[0]) {
+			options.defaultUri = vscode.workspace.workspaceFolders[0].uri;
+		}
+
+		const result = await vscode.window.showOpenDialog(options);
+
+		if (result?.[0]) {
+			// Save folder for next time
+			const folder = vscode.Uri.joinPath(result[0], '..').fsPath;
+			await this.extensionContext.workspaceState.update(
+				'pluginRegistration.lastDllFolder',
+				folder
+			);
+			return result[0];
+		}
+		return undefined;
+	}
+
+	private async pickPackageFile(): Promise<vscode.Uri | undefined> {
+		const lastFolder = this.extensionContext.workspaceState.get<string>(
+			'pluginRegistration.lastNupkgFolder'
+		);
+
+		const options: vscode.OpenDialogOptions = {
+			canSelectMany: false,
+			filters: { 'NuGet Packages': ['nupkg'] },
+			title: 'Select Plugin Package',
+		};
+
+		// Set defaultUri only if we have a valid folder
+		if (lastFolder) {
+			options.defaultUri = vscode.Uri.file(lastFolder);
+		} else if (vscode.workspace.workspaceFolders?.[0]) {
+			options.defaultUri = vscode.workspace.workspaceFolders[0].uri;
+		}
+
+		const result = await vscode.window.showOpenDialog(options);
+
+		if (result?.[0]) {
+			// Save folder for next time
+			const folder = vscode.Uri.joinPath(result[0], '..').fsPath;
+			await this.extensionContext.workspaceState.update(
+				'pluginRegistration.lastNupkgFolder',
+				folder
+			);
+			return result[0];
+		}
+		return undefined;
+	}
+
+	// ========================================
+	// Subtree Refresh Helpers
+	// ========================================
+
+	private async refreshAssemblySubtree(assemblyId: string): Promise<void> {
+		// Fetch assembly and all its children
+		const assembly = await this.repositories.assembly.findById(
+			this.currentEnvironmentId,
+			assemblyId
+		);
+		if (!assembly) return;
+
+		const pluginTypes = await this.repositories.pluginType.findByAssemblyId(
+			this.currentEnvironmentId,
+			assemblyId
+		);
+
+		// Build child tree for each plugin type
+		const typeViewModels = await Promise.all(
+			pluginTypes.map(async (pluginType) => {
+				const pluginTypeId = pluginType.getId();
+				const steps = await this.repositories.step.findByPluginTypeId(
+					this.currentEnvironmentId,
+					pluginTypeId
+				);
+
+				const stepViewModels = await Promise.all(
+					steps.map(async (step) => {
+						const stepId = step.getId();
+						const images = await this.repositories.image.findByStepId(
+							this.currentEnvironmentId,
+							stepId
+						);
+						const imageViewModels = images.map((img) =>
+							this.imageMapper.toTreeItem(img, stepId)
+						);
+						return this.stepMapper.toTreeItem(step, pluginTypeId, imageViewModels);
+					})
+				);
+
+				return this.pluginTypeMapper.toTreeItem(pluginType, assemblyId, stepViewModels);
+			})
+		);
+
+		const activeStepCount = 0; // Not needed for refresh since we have fresh data
+		const updatedSubtree = this.assemblyMapper.toTreeItem(
+			assembly,
+			typeViewModels,
+			activeStepCount,
+			assembly.getPackageId()
+		);
+
+		await this.panel.postMessage({
+			command: 'updateSubtree',
+			data: { nodeId: assemblyId, updatedSubtree },
+		});
+	}
+
+	private async refreshPackageSubtree(packageId: string): Promise<void> {
+		// Fetch package and all its children (assemblies → types → steps → images)
+		const pkg = await this.repositories.package.findById(this.currentEnvironmentId, packageId);
+		if (!pkg) return;
+
+		const assemblies = await this.repositories.assembly.findByPackageId(
+			this.currentEnvironmentId,
+			packageId
+		);
+
+		// Build child tree for each assembly
+		const assemblyViewModels = await Promise.all(
+			assemblies.map(async (assembly) => {
+				const assemblyId = assembly.getId();
+				const pluginTypes = await this.repositories.pluginType.findByAssemblyId(
+					this.currentEnvironmentId,
+					assemblyId
+				);
+
+				const typeViewModels = await Promise.all(
+					pluginTypes.map(async (pluginType) => {
+						const pluginTypeId = pluginType.getId();
+						const steps = await this.repositories.step.findByPluginTypeId(
+							this.currentEnvironmentId,
+							pluginTypeId
+						);
+
+						const stepViewModels = await Promise.all(
+							steps.map(async (step) => {
+								const stepId = step.getId();
+								const images = await this.repositories.image.findByStepId(
+									this.currentEnvironmentId,
+									stepId
+								);
+								const imageViewModels = images.map((img) =>
+									this.imageMapper.toTreeItem(img, stepId)
+								);
+								return this.stepMapper.toTreeItem(step, pluginTypeId, imageViewModels);
+							})
+						);
+
+						return this.pluginTypeMapper.toTreeItem(pluginType, assemblyId, stepViewModels);
+					})
+				);
+
+				const activeStepCount = 0;
+				return this.assemblyMapper.toTreeItem(assembly, typeViewModels, activeStepCount, packageId);
+			})
+		);
+
+		const assemblyCount = assemblies.length;
+		const updatedSubtree = this.packageMapper.toTreeItem(pkg, assemblyViewModels, assemblyCount);
+
+		await this.panel.postMessage({
+			command: 'updateSubtree',
+			data: { nodeId: packageId, updatedSubtree },
+		});
 	}
 }

@@ -52,6 +52,18 @@ export async function initializePluginRegistration(
 	const { LoadPluginRegistrationTreeUseCase } = await import(
 		'../../application/useCases/LoadPluginRegistrationTreeUseCase.js'
 	);
+	const { EnablePluginStepUseCase } = await import(
+		'../../application/useCases/EnablePluginStepUseCase.js'
+	);
+	const { DisablePluginStepUseCase } = await import(
+		'../../application/useCases/DisablePluginStepUseCase.js'
+	);
+	const { UpdatePluginAssemblyUseCase } = await import(
+		'../../application/useCases/UpdatePluginAssemblyUseCase.js'
+	);
+	const { UpdatePluginPackageUseCase } = await import(
+		'../../application/useCases/UpdatePluginPackageUseCase.js'
+	);
 	const { PluginRegistrationPanelComposed } = await import(
 		'../panels/PluginRegistrationPanelComposed.js'
 	);
@@ -69,7 +81,7 @@ export async function initializePluginRegistration(
 	const stepRepository = new DataversePluginStepRepository(dataverseApiService, logger);
 	const imageRepository = new DataverseStepImageRepository(dataverseApiService, logger);
 
-	// Create use case
+	// Create use cases
 	const loadTreeUseCase = new LoadPluginRegistrationTreeUseCase(
 		packageRepository,
 		assemblyRepository,
@@ -79,12 +91,36 @@ export async function initializePluginRegistration(
 		logger
 	);
 
+	const enableStepUseCase = new EnablePluginStepUseCase(stepRepository, logger);
+	const disableStepUseCase = new DisablePluginStepUseCase(stepRepository, logger);
+	const updateAssemblyUseCase = new UpdatePluginAssemblyUseCase(assemblyRepository, logger);
+	const updatePackageUseCase = new UpdatePluginPackageUseCase(packageRepository, logger);
+
+	// Bundle use cases and repositories for cleaner panel constructor
+	const useCases = {
+		loadTree: loadTreeUseCase,
+		enableStep: enableStepUseCase,
+		disableStep: disableStepUseCase,
+		updateAssembly: updateAssemblyUseCase,
+		updatePackage: updatePackageUseCase,
+	};
+
+	const repositories = {
+		step: stepRepository,
+		assembly: assemblyRepository,
+		package: packageRepository,
+		pluginType: pluginTypeRepository,
+		image: imageRepository,
+		solution: solutionRepository,
+	};
+
 	await PluginRegistrationPanelComposed.createOrShow(
 		context.extensionUri,
+		context,
 		getEnvironments,
 		getEnvironmentById,
-		loadTreeUseCase,
-		solutionRepository,
+		useCases,
+		repositories,
 		urlBuilder,
 		logger,
 		initialEnvironmentId
