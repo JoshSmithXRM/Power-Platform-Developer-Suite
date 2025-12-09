@@ -7,6 +7,7 @@ Prepares all required files for a new version release.
 ## PURPOSE
 
 This command ensures all release artifacts are properly created before merging to main:
+- **Code review passed** (mandatory gate)
 - Version bump in package.json
 - CHANGELOG.md updated with release date
 - Work tracking documents cleaned up
@@ -35,7 +36,29 @@ Validate version format: X.Y.Z (semver)
 
 ---
 
-## STEP 2: CHECK PREREQUISITES
+## STEP 2: RUN CODE REVIEW (Mandatory)
+
+**Code review is mandatory before any PR to main.** This step ensures architectural compliance, type safety, and code quality.
+
+1. **Invoke code-guardian agent:**
+   Use the Task tool with `subagent_type='code-guardian'` to review all changes in the current branch compared to main.
+
+2. **Review scope:**
+   - Clean Architecture compliance (layer separation, dependency direction)
+   - Type safety (no `any`, explicit returns)
+   - Test coverage for changes
+   - Code quality (no duplication, proper abstractions)
+   - Security concerns
+
+3. **Decision gate:**
+   - If **APPROVED**: Continue to next step
+   - If **CHANGES REQUESTED**: STOP and report required changes. User must fix issues and re-run `/prepare-release`
+
+**Note:** This step cannot be skipped. Per CLAUDE.md: "Before PR | `/code-review` (mandatory)"
+
+---
+
+## STEP 3: CHECK PREREQUISITES
 
 Run these checks and STOP if any fail:
 
@@ -70,7 +93,7 @@ Run these checks and STOP if any fail:
 
 ---
 
-## STEP 3: VERIFY CHANGELOG
+## STEP 4: VERIFY CHANGELOG
 
 Read `CHANGELOG.md` and check:
 
@@ -85,7 +108,7 @@ Read `CHANGELOG.md` and check:
 
 ---
 
-## STEP 4: CHECK/UPDATE PACKAGE.JSON VERSION
+## STEP 5: CHECK/UPDATE PACKAGE.JSON VERSION
 
 Read `package.json` and check version field:
 
@@ -97,7 +120,7 @@ Read `package.json` and check version field:
 
 ---
 
-## STEP 5: VERIFY README VERSION BADGE
+## STEP 6: VERIFY README VERSION BADGE
 
 Check `README.md` for version badge:
 
@@ -110,7 +133,7 @@ Check `README.md` for version badge:
 
 ---
 
-## STEP 6: CLEAN UP WORK TRACKING DOCUMENTS
+## STEP 7: CLEAN UP WORK TRACKING DOCUMENTS
 
 Check for work tracking documents in `docs/work/`:
 
@@ -124,7 +147,7 @@ Check for work tracking documents in `docs/work/`:
 
 ---
 
-## STEP 7: COMMIT CHANGES
+## STEP 8: COMMIT CHANGES
 
 If any files were modified (package.json, CHANGELOG.md):
 
@@ -141,7 +164,7 @@ If any files were modified (package.json, CHANGELOG.md):
 
 ---
 
-## STEP 8: SUMMARY
+## STEP 9: SUMMARY
 
 Show completion summary:
 
@@ -167,6 +190,11 @@ Next steps:
 
 ## ERROR HANDLING
 
+**"Code review: CHANGES REQUESTED"**
+- Address all issues raised by code-guardian
+- Re-run `/prepare-release` after fixes
+- Code review must pass before release can proceed
+
 **"CHANGELOG missing version section"**
 - User must add changes to CHANGELOG.md first
 - Show example of expected format
@@ -186,10 +214,15 @@ Next steps:
 ```
 User: /prepare-release 0.4.0
 
-Claude: Checking prerequisites...
+Claude: Running code review (mandatory)...
+[Invokes code-guardian agent to review changes]
+✅ Code Review: APPROVED
+
+Checking prerequisites...
 ✅ No uncommitted changes
 ✅ Compilation successful
 ✅ All tests pass
+✅ Coverage thresholds met
 
 Checking CHANGELOG.md...
 ✅ Found version section [0.4.0]
@@ -227,8 +260,8 @@ This avoids duplication while giving users a quick overview on the release page.
 
 ## RELATED COMMANDS
 
-- `/code-review` - Review code before release
-- `/comprehensive-review` - Full production readiness assessment
+- `/code-review` - Standalone code review (now built into prepare-release as Step 2)
+- `/comprehensive-review` - Full production readiness assessment (quarterly, pre-production)
 
 ---
 

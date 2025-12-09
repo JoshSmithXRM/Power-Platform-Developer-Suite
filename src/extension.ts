@@ -23,6 +23,8 @@ import { initializePersistenceInspector } from './features/persistenceInspector/
 import { initializeDataExplorer } from './features/dataExplorer/presentation/initialization/initializeDataExplorer.js';
 import { initializeWebResources } from './features/webResources/presentation/initialization/initializeWebResources.js';
 import { registerDataverseNotebooks } from './features/dataExplorer/notebooks/registerNotebooks.js';
+import { registerDataExplorerIntelliSense } from './features/dataExplorer/presentation/initialization/registerDataExplorerIntelliSense.js';
+import { DataverseApiService } from './shared/infrastructure/services/DataverseApiService.js';
 
 /**
  * Shows environment picker and executes callback with selected environment ID.
@@ -103,6 +105,13 @@ export function activate(context: vscode.ExtensionContext): void {
 	}).catch((error) => {
 		container.logger.error('Failed to register Power Platform Developer Suite Notebooks', error);
 	});
+
+	// Register IntelliSense for SQL/FetchXML files and notebook cells
+	// This must be registered during activation so notebooks have IntelliSense
+	// even if the Data Explorer panel is never opened
+	const { getAccessToken, getDataverseUrl } = factories.dataverseApiServiceFactory;
+	const intelliSenseApiService = new DataverseApiService(getAccessToken, getDataverseUrl, container.logger);
+	registerDataExplorerIntelliSense(context, intelliSenseApiService, container.logger);
 
 	// Register Environment Setup commands
 	const addEnvironmentCommand = vscode.commands.registerCommand('power-platform-dev-suite.addEnvironment', () => {

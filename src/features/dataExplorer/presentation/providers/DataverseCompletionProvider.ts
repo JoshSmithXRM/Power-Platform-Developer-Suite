@@ -77,7 +77,7 @@ export class DataverseCompletionProvider implements vscode.CompletionItemProvide
 		position: vscode.Position,
 		token: vscode.CancellationToken,
 		_context: vscode.CompletionContext
-	): Promise<vscode.CompletionItem[] | null> {
+	): Promise<vscode.CompletionItem[] | vscode.CompletionList | null> {
 		// Check for cancellation early
 		if (token.isCancellationRequested) {
 			return null;
@@ -123,14 +123,21 @@ export class DataverseCompletionProvider implements vscode.CompletionItemProvide
 		environmentId: string,
 		prefix: string,
 		token: vscode.CancellationToken
-	): Promise<vscode.CompletionItem[]> {
+	): Promise<vscode.CompletionList> {
 		const suggestions = await this.getEntitySuggestions.execute(environmentId, prefix);
 
 		if (token.isCancellationRequested) {
-			return [];
+			return new vscode.CompletionList([], false);
 		}
 
-		return EntitySuggestionCompletionMapper.toCompletionItems(suggestions);
+		const items = EntitySuggestionCompletionMapper.toCompletionItems(suggestions);
+
+		// isIncomplete: true tells VS Code to re-query on each keystroke
+		// This ensures all entities are searchable even with 1000+ items
+		// Without this, VS Code may cache/limit results aggressively
+		const isIncomplete = prefix.length < 3;
+
+		return new vscode.CompletionList(items, isIncomplete);
 	}
 
 	private async getAttributeCompletions(
@@ -138,7 +145,7 @@ export class DataverseCompletionProvider implements vscode.CompletionItemProvide
 		entityName: string,
 		prefix: string,
 		token: vscode.CancellationToken
-	): Promise<vscode.CompletionItem[]> {
+	): Promise<vscode.CompletionList> {
 		const suggestions = await this.getAttributeSuggestions.execute(
 			environmentId,
 			entityName,
@@ -146,10 +153,15 @@ export class DataverseCompletionProvider implements vscode.CompletionItemProvide
 		);
 
 		if (token.isCancellationRequested) {
-			return [];
+			return new vscode.CompletionList([], false);
 		}
 
-		return AttributeSuggestionCompletionMapper.toCompletionItems(suggestions);
+		const items = AttributeSuggestionCompletionMapper.toCompletionItems(suggestions);
+
+		// isIncomplete for attributes too - some entities have 200+ attributes
+		const isIncomplete = prefix.length < 3;
+
+		return new vscode.CompletionList(items, isIncomplete);
 	}
 
 	/**

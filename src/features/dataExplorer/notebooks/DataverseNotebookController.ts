@@ -4,9 +4,10 @@ import type { ILogger } from '../../../infrastructure/logging/ILogger';
 import type { ExecuteFetchXmlQueryUseCase } from '../application/useCases/ExecuteFetchXmlQueryUseCase';
 import type { ExecuteSqlQueryUseCase } from '../application/useCases/ExecuteSqlQueryUseCase';
 import type { QueryResultViewModelMapper } from '../application/mappers/QueryResultViewModelMapper';
-import type { QueryResultViewModel, QueryRowViewModel, RowLookupsViewModel } from '../application/viewModels/QueryResultViewModel';
+import type { QueryResultViewModel } from '../application/viewModels/QueryResultViewModel';
 import { FetchXmlValidationError } from '../domain/errors/FetchXmlValidationError';
 import { SqlParseError } from '../domain/errors/SqlParseError';
+import { generateVirtualScrollScript } from '../../../shared/infrastructure/ui/virtualScroll/VirtualScrollScriptGenerator';
 
 /**
  * Environment info for notebook environment picker.
@@ -472,8 +473,23 @@ export class DataverseNotebookController {
 	}
 
 	/**
-	 * Renders query results as an HTML table.
-	 * Matches the Data Explorer panel's table styling for consistency.
+	 * Row height in pixels for virtual scrolling calculations.
+	 */
+	private static readonly ROW_HEIGHT = 36;
+
+	/**
+	 * Number of rows to render above/below visible area.
+	 */
+	private static readonly OVERSCAN = 5;
+
+	/**
+	 * Height of the virtual scroll container in pixels.
+	 */
+	private static readonly CONTAINER_HEIGHT = 400;
+
+	/**
+	 * Renders query results using virtual scrolling.
+	 * Only renders visible rows to handle large datasets efficiently.
 	 *
 	 * @param viewModel - Query results to render
 	 * @param environmentUrl - Dataverse URL for building record links
@@ -482,8 +498,12 @@ export class DataverseNotebookController {
 		viewModel: QueryResultViewModel,
 		environmentUrl: string | undefined
 	): string {
-		const rowCount = viewModel.rows.length;
+		const totalRowCount = viewModel.rows.length;
 		const executionTime = viewModel.executionTimeMs;
+
+		if (totalRowCount === 0) {
+			return this.renderEmptyResults(viewModel.columns.length, executionTime);
+		}
 
 		// Build header
 		const headerCells = viewModel.columns
@@ -493,116 +513,189 @@ export class DataverseNotebookController {
 			})
 			.join('');
 
-		// Determine primary key column (entityname + "id")
-		const primaryKeyColumn = viewModel.entityLogicalName
-			? `${viewModel.entityLogicalName}id`
-			: null;
+		// Prepare row data for virtual scrolling (stored in JS, not DOM)
+		// Transform to simple format to minimize memory
+		const rowData = this.prepareRowDataForVirtualTable(viewModel, environmentUrl);
 
-		// Build rows with alternating colors
-		const bodyRows = viewModel.rows
-			.map((row, rowIndex) => {
-				const rowLookups = viewModel.rowLookups[rowIndex];
-				const rowClass = rowIndex % 2 === 0 ? 'row-even' : 'row-odd';
-				const cells = viewModel.columns
-					.map((col) => this.renderCell(
-						row,
-						rowLookups,
-						col.name,
-						environmentUrl,
-						primaryKeyColumn,
-						viewModel.entityLogicalName
-					))
-					.join('');
-				return `<tr class="data-row ${rowClass}">${cells}</tr>`;
-			})
-			.join('');
-
-		// Status bar matching Data Explorer panel
+		// Status bar
 		const statusBar = `<div class="status-bar">
-			<span class="results-count">${rowCount} row${rowCount !== 1 ? 's' : ''}</span>
+			<span class="results-count">${totalRowCount} row${totalRowCount !== 1 ? 's' : ''}</span>
 			<span class="execution-time">${executionTime}ms</span>
 			${viewModel.hasMoreRecords ? '<span class="more-records">More records available</span>' : ''}
 		</div>`;
 
 		return `
 			<style>
-				/* Container */
+				${this.getNotebookStyles()}
+			</style>
+			<div class="results-container">
+				<div class="virtual-scroll-container" id="scrollContainer">
+					<table class="results-table">
+						<thead>
+							<tr>${headerCells}</tr>
+						</thead>
+						<tbody id="tableBody">
+							<!-- Rows rendered by JavaScript using spacer row approach -->
+						</tbody>
+					</table>
+				</div>
+				${statusBar}
+			</div>
+			<script>
+				${this.getVirtualScrollScript(rowData, viewModel.columns.length)}
+			</script>
+		`;
+	}
+
+	/**
+	 * Prepares row data for virtual table rendering.
+	 * Converts ViewModel rows to a compact format with pre-rendered cell HTML.
+	 */
+	private prepareRowDataForVirtualTable(
+		viewModel: QueryResultViewModel,
+		environmentUrl: string | undefined
+	): string[][] {
+		const primaryKeyColumn = viewModel.entityLogicalName
+			? `${viewModel.entityLogicalName}id`
+			: null;
+
+		return viewModel.rows.map((row, rowIndex) => {
+			const rowLookups = viewModel.rowLookups[rowIndex];
+			return viewModel.columns.map((col) => {
+				const value = row[col.name] ?? '';
+				const lookup = rowLookups?.[col.name];
+
+				// Lookup cell with link
+				if (lookup && environmentUrl) {
+					const recordUrl = this.buildRecordUrl(environmentUrl, lookup.entityType, lookup.id);
+					return `<a href="${this.escapeHtml(recordUrl)}" target="_blank">${this.escapeHtml(value)}</a>`;
+				}
+
+				// Primary key cell with link
+				if (
+					primaryKeyColumn &&
+					viewModel.entityLogicalName &&
+					environmentUrl &&
+					col.name.toLowerCase() === primaryKeyColumn.toLowerCase() &&
+					value &&
+					this.isGuid(value)
+				) {
+					const recordUrl = this.buildRecordUrl(environmentUrl, viewModel.entityLogicalName, value);
+					return `<a href="${this.escapeHtml(recordUrl)}" target="_blank">${this.escapeHtml(value)}</a>`;
+				}
+
+				// Plain text cell
+				return this.escapeHtml(value);
+			});
+		});
+	}
+
+	/**
+	 * Returns CSS styles for notebook virtual table.
+	 */
+	private getNotebookStyles(): string {
+		return `
+			.results-container {
+				font-family: var(--vscode-font-family);
+				color: var(--vscode-foreground);
+				background: var(--vscode-editor-background);
+			}
+			.virtual-scroll-container {
+				height: ${DataverseNotebookController.CONTAINER_HEIGHT}px;
+				overflow-y: auto;
+				overflow-x: auto;
+				position: relative;
+			}
+			.results-table {
+				width: max-content;
+				min-width: 100%;
+				border-collapse: collapse;
+			}
+			.header-cell {
+				padding: 8px 12px;
+				text-align: left;
+				font-weight: 600;
+				background: var(--vscode-button-background);
+				color: var(--vscode-button-foreground);
+				border-bottom: 2px solid var(--vscode-panel-border);
+				border-right: 1px solid rgba(255, 255, 255, 0.1);
+				white-space: nowrap;
+				position: sticky;
+				top: 0;
+				z-index: 10;
+			}
+			.header-cell.last { border-right: none; }
+			.data-row {
+				height: ${DataverseNotebookController.ROW_HEIGHT}px;
+				border-bottom: 1px solid var(--vscode-panel-border);
+			}
+			.data-row.row-even { background: var(--vscode-list-inactiveSelectionBackground); }
+			.data-row.row-odd { background: transparent; }
+			.data-row:hover { background: var(--vscode-list-hoverBackground); }
+			.data-cell {
+				padding: 8px 12px;
+				white-space: nowrap;
+				vertical-align: middle;
+			}
+			.data-cell a {
+				color: var(--vscode-textLink-foreground);
+				text-decoration: none;
+			}
+			.data-cell a:hover {
+				color: var(--vscode-textLink-activeForeground);
+				text-decoration: underline;
+			}
+			.virtual-spacer td {
+				padding: 0 !important;
+				border: none !important;
+			}
+			.status-bar {
+				display: flex;
+				align-items: center;
+				gap: 20px;
+				padding: 10px 16px;
+				background: var(--vscode-editorWidget-background);
+				border-top: 1px solid var(--vscode-panel-border);
+				font-size: 12px;
+				color: var(--vscode-descriptionForeground);
+			}
+			.results-count { font-weight: 500; }
+			.execution-time { font-family: var(--vscode-editor-font-family); }
+			.more-records { color: var(--vscode-editorWarning-foreground); }
+		`;
+	}
+
+	/**
+	 * Returns inline JavaScript for virtual scrolling.
+	 * Uses shared VirtualScrollScriptGenerator for single source of truth.
+	 */
+	private getVirtualScrollScript(rowData: string[][], columnCount: number): string {
+		return generateVirtualScrollScript(JSON.stringify(rowData), {
+			rowHeight: DataverseNotebookController.ROW_HEIGHT,
+			overscan: DataverseNotebookController.OVERSCAN,
+			scrollContainerId: 'scrollContainer',
+			tbodyId: 'tableBody',
+			columnCount
+		});
+	}
+
+	/**
+	 * Renders empty results message.
+	 */
+	private renderEmptyResults(columnCount: number, executionTime: number): string {
+		return `
+			<style>
 				.results-container {
 					font-family: var(--vscode-font-family);
 					color: var(--vscode-foreground);
 					background: var(--vscode-editor-background);
 				}
-
-				/* Table wrapper for horizontal scroll */
-				.table-wrapper {
-					overflow-x: auto;
+				.no-results {
+					padding: 40px 20px;
+					text-align: center;
+					color: var(--vscode-descriptionForeground);
+					font-style: italic;
 				}
-
-				/* Table - auto layout for content-sized columns */
-				.results-table {
-					width: max-content;
-					min-width: 100%;
-					border-collapse: collapse;
-				}
-
-				/* Header - blue background like Data Explorer */
-				.header-cell {
-					padding: 8px 12px;
-					text-align: left;
-					font-weight: 600;
-					background: var(--vscode-button-background);
-					color: var(--vscode-button-foreground);
-					border-bottom: 2px solid var(--vscode-panel-border);
-					border-right: 1px solid rgba(255, 255, 255, 0.1);
-					white-space: nowrap;
-					position: sticky;
-					top: 0;
-					z-index: 10;
-				}
-
-				.header-cell.last {
-					border-right: none;
-				}
-
-				/* Data rows */
-				.data-row {
-					border-bottom: 1px solid var(--vscode-panel-border);
-				}
-
-				/* Alternating row colors */
-				.data-row.row-even {
-					background: var(--vscode-list-inactiveSelectionBackground);
-				}
-
-				.data-row.row-odd {
-					background: transparent;
-				}
-
-				.data-row:hover {
-					background: var(--vscode-list-hoverBackground);
-				}
-
-				/* Data cells - auto-size to content */
-				.data-cell {
-					padding: 8px 12px;
-					white-space: nowrap;
-					vertical-align: middle;
-					color: var(--vscode-foreground);
-				}
-
-				/* Link cells - matches data-explorer.css */
-				.link-cell a {
-					color: var(--vscode-textLink-foreground);
-					text-decoration: none;
-					cursor: pointer;
-				}
-
-				.link-cell a:hover {
-					color: var(--vscode-textLink-activeForeground);
-					text-decoration: underline;
-				}
-
-				/* Status bar - matches data-explorer.css .results-status-bar */
 				.status-bar {
 					display: flex;
 					align-items: center;
@@ -612,94 +705,16 @@ export class DataverseNotebookController {
 					border-top: 1px solid var(--vscode-panel-border);
 					font-size: 12px;
 					color: var(--vscode-descriptionForeground);
-					margin-top: 0;
-				}
-
-				.results-count {
-					font-weight: 500;
-				}
-
-				.execution-time {
-					font-family: var(--vscode-editor-font-family);
-				}
-
-				.more-records {
-					color: var(--vscode-editorWarning-foreground);
-				}
-
-				/* Empty state */
-				.no-results {
-					padding: 40px 20px;
-					text-align: center;
-					color: var(--vscode-descriptionForeground);
-					font-style: italic;
 				}
 			</style>
 			<div class="results-container">
-				<div class="table-wrapper">
-					<table class="results-table">
-						<thead>
-							<tr>${headerCells}</tr>
-						</thead>
-						<tbody>
-							${bodyRows || '<tr><td colspan="' + viewModel.columns.length + '" class="no-results">No results returned</td></tr>'}
-						</tbody>
-					</table>
+				<div class="no-results">No results returned</div>
+				<div class="status-bar">
+					<span class="results-count">0 rows</span>
+					<span class="execution-time">${executionTime}ms</span>
 				</div>
-				${statusBar}
 			</div>
 		`;
-	}
-
-	/**
-	 * Renders a single table cell, with clickable link if it's a lookup or primary key.
-	 *
-	 * @param row - Row data
-	 * @param lookups - Lookup metadata for the row
-	 * @param columnName - Column to render
-	 * @param environmentUrl - Dataverse URL for building record links
-	 * @param primaryKeyColumn - Primary key column name (e.g., "accountid")
-	 * @param entityLogicalName - Entity logical name for primary key links
-	 */
-	private renderCell(
-		row: QueryRowViewModel,
-		lookups: RowLookupsViewModel | undefined,
-		columnName: string,
-		environmentUrl: string | undefined,
-		primaryKeyColumn: string | null,
-		entityLogicalName: string | null
-	): string {
-		const value = row[columnName] ?? '';
-
-		// Check if this is a lookup field with a valid environment URL
-		const lookup = lookups?.[columnName];
-		if (lookup && environmentUrl) {
-			const recordUrl = this.buildRecordUrl(environmentUrl, lookup.entityType, lookup.id);
-			return `<td class="data-cell link-cell">
-				<a href="${recordUrl}" title="Open ${lookup.entityType} record in browser">
-					${this.escapeHtml(value)}
-				</a>
-			</td>`;
-		}
-
-		// Check if this is the primary key column (e.g., accountid for account entity)
-		if (
-			primaryKeyColumn &&
-			entityLogicalName &&
-			environmentUrl &&
-			columnName.toLowerCase() === primaryKeyColumn.toLowerCase() &&
-			value &&
-			this.isGuid(value)
-		) {
-			const recordUrl = this.buildRecordUrl(environmentUrl, entityLogicalName, value);
-			return `<td class="data-cell link-cell">
-				<a href="${recordUrl}" title="Open ${entityLogicalName} record in browser">
-					${this.escapeHtml(value)}
-				</a>
-			</td>`;
-		}
-
-		return `<td class="data-cell">${this.escapeHtml(value)}</td>`;
 	}
 
 	/**

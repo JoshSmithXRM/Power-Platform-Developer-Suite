@@ -777,10 +777,9 @@ import { XmlHighlighter } from '../utils/XmlHighlighter.js';
 				showError(null);
 				break;
 
-			// Query results handling
-			case 'queryResultsUpdated':
-				updateQueryResults(message.data);
-				break;
+			// NOTE: queryResultsUpdated is handled by DataExplorerBehavior with virtual scrolling
+			// Do NOT handle it here - VisualQueryBuilderBehavior was building full HTML tables
+			// for ALL rows which caused massive memory usage with large datasets
 
 			case 'queryError':
 				showQueryError(message.data);

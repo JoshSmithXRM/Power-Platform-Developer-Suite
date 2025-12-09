@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2025-12-09
+
+### Fixed
+
+- **Data Explorer - Memory Usage with Large Datasets** - Fixed critical bug causing 4GB+ memory usage when displaying 5000 rows
+  - Removed duplicate message processing (VisualQueryBuilderBehavior was building full HTML table before VirtualTableRenderer)
+  - Replaced O(n) `indexOf` lookups with O(1) WeakMap for row index tracking
+  - Eliminated unnecessary array copies in VirtualTableRenderer (use reference, copy only on sort)
+  - Fixed CSS flex chain for proper virtual scroll container sizing
+  - Result: Memory reduced from 4GB to ~300MB, smooth scrolling restored
+
+- **Notebooks - Virtual Scrolling for Large Results** - Added virtual scrolling to notebook query outputs
+  - Notebooks now handle 5000+ row results efficiently (renders only visible ~15-20 rows)
+  - Fixed column width issue caused by `position: absolute` on rows breaking table layout
+  - Uses spacer row approach (same pattern as Data Explorer) for proper column sizing
+  - Extracted shared `VirtualScrollScriptGenerator` for single source of truth
+
+- **Data Explorer - Duplicate Virtual Name Columns** - Fixed bug where querying both a lookup column and its virtual name column (e.g., `createdby` and `createdbyname`) caused duplicate columns and empty values
+  - Virtual name columns queried explicitly were overwriting values derived from the lookup
+  - Now correctly uses the lookup-derived name value and prevents duplicate column creation
+
+- **Notebooks - IntelliSense Not Working** - Fixed bug where IntelliSense was not available in notebooks unless Data Explorer panel was opened first
+  - IntelliSense is now registered during extension activation, not when panel opens
+  - Notebooks now have entity/attribute suggestions immediately
+
+- **IntelliSense - Missing Entities** - Fixed bug where entities like `sdkmessageprocessingstep` weren't appearing in IntelliSense
+  - Changed entity/attribute filtering from `startsWith` to `includes` for broader matching
+  - Added `filterText` to completion items for VS Code fuzzy matching on both logical and display names
+  - Returns `CompletionList` with `isIncomplete: true` to force VS Code to re-query on each keystroke
+
+### Changed
+
+- **Documentation - Squash Merge Strategy** - Documented Git branching and merge strategy
+  - Added "Git Branch & Merge Strategy" section to CLAUDE.md
+  - Added "Squash Merge Strategy" section to CONTRIBUTING.md
+  - Clarifies that all PRs are squash merged to keep main branch history clean
+
 ## [0.3.1] - 2025-12-08
 
 ### Changed

@@ -206,6 +206,35 @@ For complex/uncertain problems, trigger extended thinking modes:
 
 ---
 
+## 🔀 Git Branch & Merge Strategy
+
+### Branching
+- **main**: Protected branch, always deployable
+- **feature/xxx, fix/xxx, refactor/xxx**: Development branches
+
+### Merge Strategy: Squash Merge
+**We use squash merge for all PRs to main.** This keeps main's history clean and readable.
+
+**Why squash merge:**
+- Main branch has one commit per feature/fix (clean, readable history)
+- Feature branches can have messy exploratory commits (that's fine!)
+- Easy to revert entire features if needed
+- Changelog maps 1:1 with commits on main
+
+**What this means for you:**
+- Commit freely on feature branches (WIP, fixups, experiments - all OK)
+- Don't worry about "perfect" commit history on feature branches
+- PR title becomes the squashed commit message (make it good!)
+- All feature branch commits collapse into one commit on main
+
+**PR titles should follow commit message format:**
+```
+feat: add plugin registration panel
+fix: prevent null reference in environment activation
+```
+
+---
+
 ## 🌳 Git Worktrees (Parallel Development)
 
 Use git worktrees for parallel feature development in separate Claude Code sessions.

@@ -254,8 +254,23 @@ Closes #123
 1. **Automated checks** run on every PR (GitHub Actions)
 2. **Maintainer review** - Code quality, architecture compliance
 3. **Feedback** - Address review comments
-4. **Approval** - Once approved, PR will be merged
+4. **Approval** - Once approved, PR will be **squash merged**
 5. **Cleanup** - Delete your branch after merge
+
+### Squash Merge Strategy
+
+**All PRs are squash merged to main.** This keeps the main branch history clean.
+
+**What this means:**
+- Your feature branch commits collapse into a single commit on main
+- The PR title becomes the commit message (make it descriptive!)
+- Commit freely on feature branches - WIP, fixups, experiments are fine
+- Main branch stays clean with one commit per feature/fix
+
+**Don't worry about:**
+- "Perfect" commit history on feature branches
+- Squashing or rebasing your own commits
+- Messy exploratory commits during development
 
 **What reviewers look for:**
 - Clean Architecture compliance

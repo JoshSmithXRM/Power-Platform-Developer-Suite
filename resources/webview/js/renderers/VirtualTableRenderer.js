@@ -12,6 +12,10 @@
  * - Server search indicator for large datasets
  *
  * Works with VirtualDataTableSection TypeScript component.
+ *
+ * IMPORTANT: The core spacer row algorithm is shared with notebook virtual scrolling.
+ * If you change renderVisibleRows() or createSpacerRow(), also update:
+ * src/shared/infrastructure/ui/virtualScroll/VirtualScrollScriptGenerator.ts
  */
 
 (function () {
@@ -42,6 +46,18 @@
 		column: null,
 		direction: 'asc'
 	};
+
+	// Lookup context for lazy CellLink computation (Data Explorer)
+	// This avoids creating CellLinks for all 5000 rows upfront
+	let lookupContext = {
+		rowLookups: null,        // Array of lookup info per row (same index as allRows)
+		entityLogicalName: null, // For primary key column links
+		primaryKeyColumn: null   // e.g., "accountid" for account entity
+	};
+
+	// WeakMap for O(1) row-to-index lookup (avoids O(n) indexOf calls)
+	// Built once when data arrives, used during render for lookup context
+	let rowToOriginalIndex = new WeakMap();
 
 	/**
 	 * Calculates how many visible rows fit in the container's data viewport.
@@ -110,7 +126,7 @@
 		if (rowsJson) {
 			try {
 				allRows = JSON.parse(rowsJson);
-				filteredRows = [...allRows];
+				filteredRows = allRows; // Reference, not copy - sorting creates copy when needed
 			} catch (e) {
 				console.error('VirtualTableRenderer: Failed to parse row data', e);
 			}
@@ -282,7 +298,7 @@
 		paginationState.lastSearchQuery = query;
 
 		if (!query) {
-			filteredRows = [...allRows];
+			filteredRows = allRows; // Reference, not copy - sorting creates copy when needed
 			paginationState.isServerSearching = false;
 		} else {
 			filteredRows = allRows.filter(row => {
@@ -591,10 +607,135 @@
 	}
 
 	/**
+	 * Creates a copy button element from CellCopyAction data.
+	 * Used for "copy record URL" functionality in Data Explorer results.
+	 *
+	 * @param {Object} copyAction - CellCopyAction structure { command, commandData, title? }
+	 * @returns {HTMLButtonElement} Copy button element
+	 */
+	function createCopyButton(copyAction) {
+		const button = document.createElement('button');
+		button.className = 'record-copy-btn';
+		button.title = copyAction.title || 'Copy';
+
+		// Set data-command attribute
+		if (copyAction.command) {
+			button.setAttribute('data-command', copyAction.command);
+		}
+
+		// Set additional data attributes from commandData
+		if (copyAction.commandData && typeof copyAction.commandData === 'object') {
+			Object.entries(copyAction.commandData).forEach(([key, value]) => {
+				button.setAttribute('data-' + key, String(value));
+			});
+		}
+
+		// Create the icon span
+		const icon = document.createElement('span');
+		icon.className = 'codicon codicon-copy';
+		button.appendChild(icon);
+
+		return button;
+	}
+
+	/**
+	 * Creates a record cell content container with link and optional copy button.
+	 * Matches the Data Explorer record-cell-content pattern.
+	 *
+	 * @param {string} text - Display text
+	 * @param {Object} linkData - CellLink data for the link
+	 * @param {Object|undefined} copyAction - Optional CellCopyAction for copy button
+	 * @returns {HTMLSpanElement} Container with link and optional copy button
+	 */
+	function createRecordCellContent(text, linkData, copyAction) {
+		const container = document.createElement('span');
+		container.className = 'record-cell-content';
+
+		// Add the link
+		container.appendChild(createLinkElement(text, linkData));
+
+		// Add copy button if action data is provided
+		if (copyAction && typeof copyAction === 'object') {
+			container.appendChild(createCopyButton(copyAction));
+		}
+
+		return container;
+	}
+
+	/**
+	 * Computes CellLink and CopyAction for a cell lazily from lookupContext.
+	 * Only called during render for visible rows (~50) instead of all rows (5000+).
+	 *
+	 * @param {string} colKey - Column key
+	 * @param {string} value - Cell value
+	 * @param {number} rowIndex - Index in allRows (for lookupContext.rowLookups)
+	 * @returns {{cellLink: Object|null, cellCopyAction: Object|null}}
+	 */
+	function computeCellLinkFromContext(colKey, value, rowIndex) {
+		// If no lookup context, no links to compute
+		if (!lookupContext.rowLookups && !lookupContext.primaryKeyColumn) {
+			return { cellLink: null, cellCopyAction: null };
+		}
+
+		// Check for lookup in rowLookups
+		const rowLookups = lookupContext.rowLookups?.[rowIndex];
+		const lookup = rowLookups?.[colKey];
+
+		if (lookup && lookup.entityType && lookup.id) {
+			return {
+				cellLink: {
+					command: 'openRecord',
+					commandData: { entity: lookup.entityType, id: lookup.id },
+					className: 'record-link',
+					title: 'Open in browser'
+				},
+				cellCopyAction: {
+					command: 'copyRecordUrl',
+					commandData: { entity: lookup.entityType, id: lookup.id },
+					title: 'Copy record URL'
+				}
+			};
+		}
+
+		// Check for primary key column (e.g., accountid for account entity)
+		if (lookupContext.primaryKeyColumn &&
+			colKey.toLowerCase() === lookupContext.primaryKeyColumn.toLowerCase() &&
+			value && isGuid(value)) {
+			return {
+				cellLink: {
+					command: 'openRecord',
+					commandData: { entity: lookupContext.entityLogicalName, id: value },
+					className: 'record-link',
+					title: 'Open in browser'
+				},
+				cellCopyAction: {
+					command: 'copyRecordUrl',
+					commandData: { entity: lookupContext.entityLogicalName, id: value },
+					title: 'Copy record URL'
+				}
+			};
+		}
+
+		return { cellLink: null, cellCopyAction: null };
+	}
+
+	/**
+	 * Checks if a string is a valid GUID format.
+	 * @param {string} str - String to check
+	 * @returns {boolean} True if valid GUID
+	 */
+	function isGuid(str) {
+		if (!str || typeof str !== 'string') {
+			return false;
+		}
+		return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+	}
+
+	/**
 	 * Creates a single row element using safe DOM manipulation.
 	 *
 	 * @param {Object} row - Row data object
-	 * @param {number} index - Row index
+	 * @param {number} index - Row index in filteredRows
 	 * @returns {HTMLTableRowElement} Row element
 	 */
 	function createRowElement(row, index) {
@@ -612,6 +753,10 @@
 		if (isSingleSelected || isMultiSelected) {
 			tr.classList.add('row-selected');
 		}
+
+		// Get original row index from WeakMap for O(1) lookup
+		// (filteredRows may be filtered/sorted, but we need original index for lookupContext)
+		const originalRowIndex = rowToOriginalIndex.get(row) ?? -1;
 
 		columns.forEach(col => {
 			const td = document.createElement('td');
@@ -634,11 +779,25 @@
 				td.setAttribute('data-sort-value', String(sortValue));
 			}
 
-			// Check for structured link data (preferred - no HTML parsing)
-			const cellLink = row[col.key + 'Link'];
+			// Check for pre-computed link data first (Web Resources, other panels)
+			let cellLink = row[col.key + 'Link'];
+			let cellCopyAction = row[col.key + 'CopyAction'];
+
+			// If no pre-computed links, compute lazily from context (Data Explorer)
+			if (!cellLink && originalRowIndex >= 0) {
+				const computed = computeCellLinkFromContext(col.key, plainText, originalRowIndex);
+				cellLink = computed.cellLink;
+				cellCopyAction = computed.cellCopyAction;
+			}
+
 			if (cellLink && typeof cellLink === 'object') {
-				// Create link from structured data - safe, no HTML parsing
-				td.appendChild(createLinkElement(plainText, cellLink));
+				// If there's also a copy action, create record cell content with link + button
+				if (cellCopyAction && typeof cellCopyAction === 'object') {
+					td.appendChild(createRecordCellContent(plainText, cellLink, cellCopyAction));
+				} else {
+					// Create link from structured data - safe, no HTML parsing
+					td.appendChild(createLinkElement(plainText, cellLink));
+				}
 			} else {
 				// Plain text - use textContent for automatic escaping
 				td.textContent = plainText;
@@ -724,6 +883,10 @@
 		// Find column config to get type
 		const colConfig = columns.find(c => c.key === column);
 		const columnType = colConfig?.type || 'text';
+
+		// Create copy before sorting to avoid mutating allRows reference
+		// This is the ONLY place we need to copy - filter() already creates new arrays
+		filteredRows = [...filteredRows];
 
 		filteredRows.sort((a, b) => {
 			// Use sort value if available (for dates/numbers)
@@ -828,6 +991,10 @@
 	 * Called when backend sends new data via postMessage.
 	 *
 	 * @param {Object} data - Virtual table data from backend
+	 * @param {Array} data.rows - Row data array
+	 * @param {Array} data.columns - Column definitions
+	 * @param {Array} [data.rowLookups] - Optional lookup info per row for lazy CellLink computation
+	 * @param {string} [data.entityLogicalName] - Optional entity name for primary key links
 	 */
 	function updateVirtualTable(data) {
 		if (!data) {
@@ -845,7 +1012,21 @@
 		}
 
 		allRows = data.rows;
-		filteredRows = [...allRows];
+		filteredRows = allRows; // Reference, not copy - sorting creates copy when needed
+
+		// Build row-to-index map for O(1) lookup (instead of O(n) indexOf)
+		rowToOriginalIndex = new WeakMap();
+		for (let i = 0; i < allRows.length; i++) {
+			rowToOriginalIndex.set(allRows[i], i);
+		}
+
+		// Store lookup context for lazy CellLink computation
+		// This avoids creating CellLinks for all rows upfront (major memory savings)
+		lookupContext.rowLookups = data.rowLookups || null;
+		lookupContext.entityLogicalName = data.entityLogicalName || null;
+		lookupContext.primaryKeyColumn = data.entityLogicalName
+			? `${data.entityLogicalName}id`
+			: null;
 
 		// Clear selection on new data (both single and multi-select)
 		selectedRowId = null;
@@ -878,8 +1059,9 @@
 			// Clear loading state now that data has arrived
 			tbody.removeAttribute('data-loading');
 
-			// Update data attributes
-			tbody.setAttribute('data-rows', JSON.stringify(allRows));
+			// NOTE: We intentionally do NOT store rows in data-rows attribute
+			// Storing 5k+ rows as JSON in DOM attribute causes massive memory bloat
+			// Row data lives only in JavaScript memory (allRows/filteredRows arrays)
 
 			const visibleCount = calculateVisibleRowCount(scrollContainer);
 			visibleStart = 0;
@@ -1021,6 +1203,8 @@
 
 	// Expose update function globally for message handling
 	window.VirtualTableRenderer = {
+		// Initialize handlers (scroll, search, sort, selection) - call after dynamically creating table
+		initialize: initialize,
 		update: updateVirtualTable,
 		refresh: function () {
 			const tbody = document.getElementById('virtualTableBody');

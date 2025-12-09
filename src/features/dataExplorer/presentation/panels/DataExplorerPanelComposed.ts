@@ -470,6 +470,18 @@ export class DataExplorerPanelComposed extends EnvironmentScopedPanel<DataExplor
 					.asWebviewUri(
 						vscode.Uri.joinPath(
 							this.extensionUri,
+							'resources',
+							'webview',
+							'js',
+							'renderers',
+							'VirtualTableRenderer.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
 							'dist',
 							'webview',
 							'DataTableBehavior.js'

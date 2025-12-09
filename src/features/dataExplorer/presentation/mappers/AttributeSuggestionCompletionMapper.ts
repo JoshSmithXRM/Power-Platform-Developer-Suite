@@ -29,6 +29,9 @@ export class AttributeSuggestionCompletionMapper {
 		item.insertText = attr.logicalName;
 		item.sortText = sortIndex.toString().padStart(5, '0');
 
+		// Allow VS Code to match on both logical name and display name
+		item.filterText = `${attr.logicalName} ${attr.displayName}`;
+
 		return item;
 	}
 

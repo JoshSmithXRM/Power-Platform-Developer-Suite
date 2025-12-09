@@ -319,6 +319,97 @@ describe('QueryResultViewModelMapper - All Column Types', () => {
 		});
 	});
 
+	describe('Duplicate column prevention', () => {
+		/**
+		 * Regression test for bug: When querying a lookup's virtual name column directly
+		 * (e.g., createdbyname) alongside the lookup column (createdby), we were creating
+		 * a duplicate column because we added a virtual "createdbyname" for the lookup
+		 * without checking if it already existed.
+		 */
+		it('should not create duplicate columns when user queries both lookup and its name column', () => {
+			const lookupValue: QueryLookupValue = {
+				id: '12345678-1234-1234-1234-123456789012',
+				name: 'John Smith',
+				entityType: 'systemuser',
+			};
+
+			// User queries BOTH createdby (lookup) AND createdbyname (virtual name column)
+			// The name column has dataType 'unknown' because Dataverse returns null for virtual columns
+			// when queried explicitly (they're not real queryable columns)
+			const columns = [
+				new QueryResultColumn('createdby', 'createdby', 'lookup'),
+				new QueryResultColumn('createdbyname', 'createdbyname', 'unknown'), // NOT 'string'!
+			];
+			const rows = [QueryResultRow.fromRecord({
+				createdby: lookupValue as never,
+				createdbyname: null, // Dataverse returns null for virtual column queries
+			})];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have exactly 2 columns, NOT 3
+			// Bug was: createdby, createdbyname (from user), createdbyname (virtual) = 3 columns
+			expect(viewModel.columns).toHaveLength(2);
+			expect(viewModel.columns.map(c => c.name)).toEqual(['createdby', 'createdbyname']);
+
+			// Values should use the lookup-derived name, NOT the null column value
+			expect(viewModel.rows[0]!['createdby']).toBe('12345678-1234-1234-1234-123456789012');
+			expect(viewModel.rows[0]!['createdbyname']).toBe('John Smith'); // From lookup, not null
+		});
+
+		it('should still add virtual name column when user only queries the lookup', () => {
+			const lookupValue: QueryLookupValue = {
+				id: '12345678-1234-1234-1234-123456789012',
+				name: 'John Smith',
+				entityType: 'systemuser',
+			};
+
+			// User only queries createdby (lookup), not createdbyname
+			const columns = [
+				new QueryResultColumn('createdby', 'createdby', 'lookup'),
+			];
+			const rows = [QueryResultRow.fromRecord({
+				createdby: lookupValue as never,
+			})];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have 2 columns: createdby + virtual createdbyname
+			expect(viewModel.columns).toHaveLength(2);
+			expect(viewModel.columns.map(c => c.name)).toEqual(['createdby', 'createdbyname']);
+		});
+
+		it('should not create duplicate columns for optionset when name column already queried', () => {
+			const optionsetValue: QueryFormattedValue = {
+				value: 1,
+				formattedValue: 'Active',
+			};
+
+			// User queries BOTH statuscode AND statuscodename
+			// The name column may have dataType 'unknown' if Dataverse returns null
+			const columns = [
+				new QueryResultColumn('statuscode', 'statuscode', 'optionset'),
+				new QueryResultColumn('statuscodename', 'statuscodename', 'unknown'),
+			];
+			const rows = [QueryResultRow.fromRecord({
+				statuscode: optionsetValue as never,
+				statuscodename: null, // Dataverse may return null for virtual column queries
+			})];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have exactly 2 columns, NOT 3
+			expect(viewModel.columns).toHaveLength(2);
+			expect(viewModel.columns.map(c => c.name)).toEqual(['statuscode', 'statuscodename']);
+
+			// Value should come from optionset, not null
+			expect(viewModel.rows[0]!['statuscodename']).toBe('Active');
+		});
+	});
+
 	describe('NULL handling for all types', () => {
 		it('should handle null string', () => {
 			const columns = [new QueryResultColumn('name', 'name', 'string')];

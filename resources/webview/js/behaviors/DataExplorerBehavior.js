@@ -183,7 +183,11 @@ function setEditorEnabled(enabled) {
 }
 
 /**
- * Updates the query results table.
+ * Updates the query results using VirtualTableRenderer for efficient rendering of large datasets.
+ *
+ * MEMORY OPTIMIZATION: CellLinks are computed lazily by VirtualTableRenderer during render,
+ * only for visible rows (~50) instead of all rows (5000+). This avoids creating a copy of
+ * the entire dataset with CellLink objects attached.
  */
 function updateQueryResults(data) {
 	const container = document.getElementById('results-table-container');
@@ -195,6 +199,9 @@ function updateQueryResults(data) {
 
 	const { columns, rows, rowLookups, executionTimeMs, totalRecordCount, hasMoreRecords, entityLogicalName } = data;
 
+	// Update status bar
+	updateStatusBar(rows?.length || 0, executionTimeMs, totalRecordCount, hasMoreRecords);
+
 	// Handle empty results
 	if (!rows || rows.length === 0) {
 		container.innerHTML = `
@@ -202,85 +209,123 @@ function updateQueryResults(data) {
 				<p>No records found</p>
 			</div>
 		`;
-		updateStatusBar(0, executionTimeMs, totalRecordCount, hasMoreRecords);
 		return;
 	}
 
-	// Determine the primary key column name (entityname + "id")
-	const primaryKeyColumn = entityLogicalName ? `${entityLogicalName}id` : null;
+	// Transform columns to VirtualTableRenderer format
+	const virtualColumns = columns.map(col => ({
+		key: col.name,
+		header: col.header,
+		label: col.header,
+		type: col.dataType || 'text'
+	}));
 
-	// Build table HTML with search bar
-	let tableHtml = `
-		<div class="search-container" data-selection-zone="results-search">
-			<input type="text" id="resultsSearchInput" placeholder="🔍 Filter results..." />
-		</div>
-	`;
-	tableHtml += '<table class="data-table">';
-
-	// Header
-	tableHtml += '<thead><tr>';
-	for (const col of columns) {
-		tableHtml += `<th data-sort="${escapeHtml(col.name)}">${escapeHtml(col.header)}</th>`;
-	}
-	tableHtml += '</tr></thead>';
-
-	// Body
-	tableHtml += '<tbody>';
-	for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-		const row = rows[rowIndex];
-		const lookups = rowLookups?.[rowIndex] || {};
-		tableHtml += '<tr>';
-		for (const col of columns) {
-			const value = row[col.name] || '';
-			const lookup = lookups[col.name];
-
-			// Check if this is a lookup field (has entityType and id)
-			if (lookup && lookup.entityType && lookup.id) {
-				// Render as clickable link with copy button
-				tableHtml += `<td><span class="record-cell-content">
-					<a href="#" class="record-link" data-entity="${escapeHtml(lookup.entityType)}" data-id="${escapeHtml(lookup.id)}" title="Open in browser">${escapeHtml(value)}</a>
-					<button class="record-copy-btn" data-entity="${escapeHtml(lookup.entityType)}" data-id="${escapeHtml(lookup.id)}" title="Copy record URL">
-						<span class="codicon codicon-copy"></span>
-					</button>
-				</span></td>`;
-			}
-			// Check if this is the primary key column (e.g., contactid for contact entity)
-			else if (primaryKeyColumn && col.name.toLowerCase() === primaryKeyColumn.toLowerCase() && value && isGuid(value)) {
-				// Render primary key as clickable link to the record itself
-				tableHtml += `<td><span class="record-cell-content">
-					<a href="#" class="record-link" data-entity="${escapeHtml(entityLogicalName)}" data-id="${escapeHtml(value)}" title="Open in browser">${escapeHtml(value)}</a>
-					<button class="record-copy-btn" data-entity="${escapeHtml(entityLogicalName)}" data-id="${escapeHtml(value)}" title="Copy record URL">
-						<span class="codicon codicon-copy"></span>
-					</button>
-				</span></td>`;
-			} else {
-				tableHtml += `<td>${escapeHtml(value)}</td>`;
-			}
-		}
-		tableHtml += '</tr>';
-	}
-	tableHtml += '</tbody>';
-
-	tableHtml += '</table>';
-
+	// Create virtual table HTML structure (without row data to avoid memory bloat)
+	const tableHtml = createVirtualTableStructure(virtualColumns);
 	container.innerHTML = tableHtml;
 
-	// Update status bar
-	updateStatusBar(rows.length, executionTimeMs, totalRecordCount, hasMoreRecords);
+	// Initialize VirtualTableRenderer - must call initialize() first since elements were just created
+	// VirtualTableRenderer.initialize() sets up scroll, search, sorting, and cell selection handlers
+	if (window.VirtualTableRenderer) {
+		// Initialize handlers for the newly created virtual table
+		window.VirtualTableRenderer.initialize();
 
-	// Apply row striping
+		// Pass rows directly WITHOUT copying - CellLinks computed lazily during render
+		// Also pass lookup context for lazy CellLink computation
+		window.VirtualTableRenderer.update({
+			rows: rows,
+			columns: virtualColumns,
+			rowLookups: rowLookups,           // Lookup context for lazy CellLink computation
+			entityLogicalName: entityLogicalName, // For primary key column links
+			pagination: {
+				cachedCount: rows.length,
+				totalCount: totalRecordCount || rows.length,
+				isLoading: false,
+				isFullyCached: true
+			}
+		});
+	}
+
+	// Wire up record link clicks for the virtual table
 	const table = container.querySelector('table');
 	if (table) {
-		applyRowStriping(table);
-		// Wire up sorting for the new table
-		wireSorting(table);
-		// Wire up record link clicks
-		wireRecordLinks(table);
-		// Wire up search filter
-		wireResultsSearch(table);
-		// Initialize cell selection for the dynamically created table
-		initializeCellSelection(table, columns, rows);
+		wireVirtualTableRecordLinks(table);
 	}
+}
+
+/**
+ * Creates the HTML structure for the virtual table.
+ * VirtualTableRenderer.js will take over rendering rows.
+ *
+ * IMPORTANT: We do NOT store data in HTML attributes to avoid:
+ * 1. Memory bloat from escaped JSON (escapeHtml turns " into &quot;)
+ * 2. JSON parse failures (HTML entities break JSON.parse)
+ * All data is passed directly to VirtualTableRenderer.update().
+ */
+function createVirtualTableStructure(columns) {
+	const ROW_HEIGHT = 36;
+
+	// Build header
+	let headerHtml = '';
+	for (const col of columns) {
+		headerHtml += `<th data-sort="${escapeHtml(col.key)}">${escapeHtml(col.header)}</th>`;
+	}
+
+	return `
+		<div class="search-container" data-selection-zone="results-search">
+			<input type="text" id="searchInput" placeholder="🔍 Filter results..." />
+		</div>
+		<div class="table-container virtual-table-container" data-selection-zone="table">
+			<div id="virtualScrollWrapper" class="virtual-scroll-wrapper">
+				<table class="virtual-table data-table">
+					<thead>
+						<tr>${headerHtml}</tr>
+					</thead>
+					<tbody
+						id="virtualTableBody"
+						data-row-height="${ROW_HEIGHT}"
+					>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	`;
+}
+
+/**
+ * Wires up click handlers for record links in virtual table.
+ * Uses event delegation since rows are dynamically rendered.
+ */
+function wireVirtualTableRecordLinks(table) {
+	// Use event delegation on the table for links and copy buttons
+	table.addEventListener('click', (event) => {
+		const target = event.target.closest('a.record-link, button.record-copy-btn');
+		if (!target) {
+			return;
+		}
+
+		event.preventDefault();
+		event.stopPropagation();
+
+		const entityType = target.getAttribute('data-entity');
+		const recordId = target.getAttribute('data-id');
+
+		if (!entityType || !recordId) {
+			return;
+		}
+
+		if (target.matches('a.record-link')) {
+			window.vscode.postMessage({
+				command: 'openRecord',
+				data: { entityType, recordId }
+			});
+		} else if (target.matches('button.record-copy-btn')) {
+			window.vscode.postMessage({
+				command: 'copyRecordUrl',
+				data: { entityType, recordId }
+			});
+		}
+	});
 }
 
 /**
