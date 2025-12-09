@@ -29,7 +29,7 @@ export class PluginAssemblyViewModelMapper {
 			parentId: parentPackageId,
 			type: 'assembly',
 			name: assembly.getName(),
-			displayName: `${assembly.getName()} (${assembly.getDisplayVersion()})`,
+			displayName: assembly.getName(),
 			icon: '⚙️',
 			metadata,
 			isManaged: assembly.isInManagedState(),

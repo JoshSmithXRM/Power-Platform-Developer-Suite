@@ -12,8 +12,6 @@ export class PluginStepViewModelMapper {
 		pluginTypeId: string,
 		images: TreeItemViewModel[]
 	): TreeItemViewModel {
-		const entityDisplay = step.getPrimaryEntityLogicalName() ?? 'none';
-
 		const metadata: StepMetadata = {
 			type: 'step',
 			messageName: step.getMessageName(),
@@ -35,7 +33,7 @@ export class PluginStepViewModelMapper {
 			parentId: pluginTypeId,
 			type: 'step',
 			name: step.getName(),
-			displayName: `${step.getMessageName()}: ${entityDisplay}`,
+			displayName: step.getName(),
 			icon: step.isEnabled() ? '⚡' : '⚫',
 			metadata,
 			isManaged: step.isInManagedState(),

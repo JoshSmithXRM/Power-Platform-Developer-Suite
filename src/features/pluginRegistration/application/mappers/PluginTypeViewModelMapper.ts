@@ -20,15 +20,12 @@ export class PluginTypeViewModelMapper {
 			workflowActivityGroupName: pluginType.getWorkflowActivityGroupName(),
 		};
 
-		// Display name: prefer FriendlyName over TypeName
-		const displayName = pluginType.getFriendlyName() || pluginType.getName();
-
 		return {
 			id: pluginType.getId(),
 			parentId: assemblyId,
 			type: 'pluginType',
 			name: pluginType.getName(),
-			displayName,
+			displayName: pluginType.getName(),
 			icon: '🔌',
 			metadata,
 			isManaged: false,
