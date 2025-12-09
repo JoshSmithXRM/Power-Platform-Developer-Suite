@@ -22,9 +22,9 @@
 ## Workflow (Corrected Understanding)
 
 ```
-1. Select Solution (scopes all data)
-2. Select Source Environment (where solution is configured and working)
-3. Select Target Environment (where solution will be deployed)
+1. Select SOURCE Environment (where solution is configured and working)
+2. Select Solution (from source environment - can't pick without env first!)
+3. Select TARGET Environment (where solution will be deployed)
 4. System automatically:
    - Loads connection references from source solution
    - Loads connections from target environment
@@ -96,12 +96,12 @@
 ## Revised Slices
 
 ### Slice A: Panel Restructure - TODO
-- [ ] Add Solution selector (reuse SolutionFilterSection pattern)
-- [ ] Change single env selector to Source Environment selector
-- [ ] Add Target Environment selector
-- [ ] Remove "Load Source File" button
+- [ ] Add Source Environment selector (FIRST - enables solution loading)
+- [ ] Add Solution selector (loads after source env selected)
+- [ ] Add Target Environment selector (independent of source)
+- [ ] Remove "Load Source File" button and file loading logic
 - [ ] Update status section for new workflow
-- [ ] Auto-trigger data load when source + target both selected
+- [ ] Auto-trigger data load when source + solution + target all selected
 
 ### Slice B: Source Data Loading - TODO
 - [ ] Query connection references from source environment + solution
