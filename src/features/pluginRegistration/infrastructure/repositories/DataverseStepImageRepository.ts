@@ -1,0 +1,98 @@
+import type { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
+import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRepository';
+import { StepImage } from '../../domain/entities/StepImage';
+import { ImageType } from '../../domain/valueObjects/ImageType';
+
+/**
+ * DTO for Dataverse sdkmessageprocessingstepimage entity.
+ */
+interface StepImageDto {
+	sdkmessageprocessingstepimageid: string;
+	name: string;
+	_sdkmessageprocessingstepid_value: string;
+	imagetype: number;
+	entityalias: string;
+	attributes: string | null;
+	createdon: string;
+}
+
+/**
+ * Dataverse API response for sdkmessageprocessingstepimage collection.
+ */
+interface StepImageCollectionResponse {
+	value: StepImageDto[];
+}
+
+/**
+ * Dataverse repository for StepImage entities.
+ * Implements IStepImageRepository interface.
+ */
+export class DataverseStepImageRepository implements IStepImageRepository {
+	private static readonly ENTITY_SET = 'sdkmessageprocessingstepimages';
+	private static readonly SELECT_FIELDS =
+		'sdkmessageprocessingstepimageid,name,_sdkmessageprocessingstepid_value,imagetype,entityalias,attributes,createdon';
+
+	constructor(
+		private readonly apiService: IDataverseApiService,
+		private readonly logger: ILogger
+	) {}
+
+	public async findByStepId(
+		environmentId: string,
+		stepId: string
+	): Promise<readonly StepImage[]> {
+		this.logger.debug('DataverseStepImageRepository: Fetching images', {
+			environmentId,
+			stepId,
+		});
+
+		const endpoint =
+			`/api/data/v9.2/${DataverseStepImageRepository.ENTITY_SET}?$select=${DataverseStepImageRepository.SELECT_FIELDS}` +
+			`&$filter=_sdkmessageprocessingstepid_value eq ${stepId}&$orderby=name asc`;
+
+		const response = await this.apiService.get<StepImageCollectionResponse>(
+			environmentId,
+			endpoint
+		);
+
+		const images = response.value.map((dto) => this.mapToDomain(dto));
+
+		this.logger.debug('DataverseStepImageRepository: Fetched images', {
+			count: images.length,
+		});
+
+		return images;
+	}
+
+	public async findById(environmentId: string, imageId: string): Promise<StepImage | null> {
+		this.logger.debug('DataverseStepImageRepository: Fetching image by ID', {
+			environmentId,
+			imageId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataverseStepImageRepository.ENTITY_SET}(${imageId})?$select=${DataverseStepImageRepository.SELECT_FIELDS}`;
+
+		try {
+			const dto = await this.apiService.get<StepImageDto>(environmentId, endpoint);
+			return this.mapToDomain(dto);
+		} catch (error) {
+			if (error instanceof Error && error.message.includes('404')) {
+				return null;
+			}
+			throw error;
+		}
+	}
+
+	private mapToDomain(dto: StepImageDto): StepImage {
+		return new StepImage(
+			dto.sdkmessageprocessingstepimageid,
+			dto.name,
+			dto._sdkmessageprocessingstepid_value,
+			ImageType.fromValue(dto.imagetype),
+			dto.entityalias,
+			dto.attributes ?? '',
+			new Date(dto.createdon)
+		);
+	}
+}
