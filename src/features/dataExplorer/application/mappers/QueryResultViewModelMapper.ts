@@ -49,6 +49,9 @@ export class QueryResultViewModelMapper {
 	 * with "name" suffix (e.g., primarycontactidname) to hold the display name.
 	 * This ensures the column name matches the content - "id" suffix columns show GUIDs.
 	 *
+	 * Avoids duplicates: If the user already queried the virtual name column directly
+	 * (e.g., createdbyname), we don't add another one.
+	 *
 	 * @param columns - Original domain columns
 	 * @returns Expanded columns including virtual name columns
 	 */
@@ -57,18 +60,26 @@ export class QueryResultViewModelMapper {
 	): QueryColumnViewModel[] {
 		const expandedColumns: QueryColumnViewModel[] = [];
 
+		// Build set of existing column names to avoid duplicates
+		const existingColumnNames = new Set(columns.map((c) => c.logicalName));
+
 		for (const column of columns) {
 			// Add the original column
 			expandedColumns.push(this.mapColumn(column));
 
 			// For optionset and lookup columns, add a companion "name" column
+			// BUT only if it doesn't already exist in the original columns
 			if (column.dataType === 'optionset' || column.dataType === 'lookup') {
 				const nameColumnName = `${column.logicalName}name`;
-				expandedColumns.push({
-					name: nameColumnName,
-					header: nameColumnName, // Use logical name as header (e.g., "statuscodename")
-					dataType: 'string',
-				});
+
+				// Skip if the user already queried this virtual column directly
+				if (!existingColumnNames.has(nameColumnName)) {
+					expandedColumns.push({
+						name: nameColumnName,
+						header: nameColumnName, // Use logical name as header (e.g., "statuscodename")
+						dataType: 'string',
+					});
+				}
 			}
 		}
 
@@ -108,6 +119,10 @@ export class QueryResultViewModelMapper {
 	 * Maps QueryResultRow to ViewModel row.
 	 * For optionset and lookup columns, creates both the raw value column and the "name" column.
 	 *
+	 * When the user queries both a lookup column (e.g., createdby) AND its virtual name column
+	 * (e.g., createdbyname), we skip processing the explicit name column to avoid overwriting
+	 * the value we derived from the lookup (which has the correct name from Dataverse).
+	 *
 	 * @param row - Domain row to transform
 	 * @param columns - Column definitions for the row
 	 * @returns ViewModel row with display values
@@ -118,7 +133,22 @@ export class QueryResultViewModelMapper {
 	): QueryRowViewModel {
 		const viewModelRow: Record<string, string> = {};
 
+		// Identify name columns that should be populated from lookup/optionset columns
+		// These shouldn't be overwritten by explicit column values
+		const virtualNameColumns = new Set(
+			columns
+				.filter((c) => c.dataType === 'lookup' || c.dataType === 'optionset')
+				.map((c) => `${c.logicalName}name`)
+		);
+
 		for (const column of columns) {
+			// Skip columns that are virtual name columns for lookups/optionsets
+			// The lookup/optionset processing already populates these with the correct value
+			// Don't check dataType - it could be 'string', 'unknown', etc. depending on the data
+			if (virtualNameColumns.has(column.logicalName)) {
+				continue;
+			}
+
 			const value = row.getValue(column.logicalName);
 
 			// Handle optionset columns specially

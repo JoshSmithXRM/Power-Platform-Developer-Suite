@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Data Explorer - Duplicate Virtual Name Columns** - Fixed bug where querying both a lookup column and its virtual name column (e.g., `createdby` and `createdbyname`) caused duplicate columns and empty values
+  - Virtual name columns queried explicitly were overwriting values derived from the lookup
+  - Now correctly uses the lookup-derived name value and prevents duplicate column creation
+
+### Changed
+
+- **Documentation - Squash Merge Strategy** - Documented Git branching and merge strategy
+  - Added "Git Branch & Merge Strategy" section to CLAUDE.md
+  - Added "Squash Merge Strategy" section to CONTRIBUTING.md
+  - Clarifies that all PRs are squash merged to keep main branch history clean
+
 ## [0.3.1] - 2025-12-08
 
 ### Changed
