@@ -180,6 +180,26 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 		}
 	}
 
+	public async updateContent(
+		environmentId: string,
+		assemblyId: string,
+		base64Content: string
+	): Promise<void> {
+		this.logger.debug('DataversePluginAssemblyRepository: Updating assembly content', {
+			environmentId,
+			assemblyId,
+			contentLength: base64Content.length,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}(${assemblyId})`;
+
+		await this.apiService.patch(environmentId, endpoint, { content: base64Content });
+
+		this.logger.debug('DataversePluginAssemblyRepository: Assembly content updated', {
+			assemblyId,
+		});
+	}
+
 	private mapToDomain(dto: PluginAssemblyDto): PluginAssembly {
 		return new PluginAssembly(
 			dto.pluginassemblyid,

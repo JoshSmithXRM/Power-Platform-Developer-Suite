@@ -230,6 +230,26 @@
                 "category": "Power Platform Developer Suite"
             },
             {
+                "command": "power-platform-dev-suite.enablePluginStep",
+                "title": "Enable Step",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.disablePluginStep",
+                "title": "Disable Step",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.updatePluginAssembly",
+                "title": "Update Assembly...",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.updatePluginPackage",
+                "title": "Update Package...",
+                "category": "Power Platform Developer Suite"
+            },
+            {
                 "command": "power-platform-dev-suite.metadataBrowser",
                 "title": "Metadata Browser",
                 "category": "Power Platform Developer Suite"
@@ -457,6 +477,31 @@
                     "command": "power-platform-dev-suite.pluginRegistrationPickEnvironment",
                     "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration'",
                     "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.enablePluginStep",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'step' && canEnable == true",
+                    "group": "2_actions@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.disablePluginStep",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'step' && canDisable == true",
+                    "group": "2_actions@2"
+                },
+                {
+                    "command": "power-platform-dev-suite.updatePluginAssembly",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'assembly' && canUpdate == true",
+                    "group": "2_actions@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.updatePluginPackage",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'package' && canUpdate == true",
+                    "group": "2_actions@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.updatePluginPackage",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'assembly' && isStandalone == false",
+                    "group": "2_actions@1"
                 },
                 {
                     "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",

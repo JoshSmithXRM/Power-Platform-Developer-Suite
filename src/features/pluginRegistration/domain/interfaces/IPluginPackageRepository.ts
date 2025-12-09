@@ -21,4 +21,10 @@ export interface IPluginPackageRepository {
 	 * Used for canDelete() business rule.
 	 */
 	countAssemblies(environmentId: string, packageId: string): Promise<number>;
+
+	/**
+	 * Update package content with new .nupkg file.
+	 * @param base64Content - Base64-encoded .nupkg bytes
+	 */
+	updateContent(environmentId: string, packageId: string, base64Content: string): Promise<void>;
 }

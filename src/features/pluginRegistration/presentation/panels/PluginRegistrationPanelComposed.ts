@@ -26,8 +26,22 @@ import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/Solutio
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/solutionFilterView';
 import type { LoadPluginRegistrationTreeUseCase } from '../../application/useCases/LoadPluginRegistrationTreeUseCase';
+import type { EnablePluginStepUseCase } from '../../application/useCases/EnablePluginStepUseCase';
+import type { DisablePluginStepUseCase } from '../../application/useCases/DisablePluginStepUseCase';
+import type { UpdatePluginAssemblyUseCase } from '../../application/useCases/UpdatePluginAssemblyUseCase';
+import type { UpdatePluginPackageUseCase } from '../../application/useCases/UpdatePluginPackageUseCase';
+import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
+import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
+import type { IPluginPackageRepository } from '../../domain/interfaces/IPluginPackageRepository';
 import { PluginRegistrationTreeMapper } from '../../application/mappers/PluginRegistrationTreeMapper';
 import { PluginRegistrationTreeSection } from '../sections/PluginRegistrationTreeSection';
+import { PluginStepViewModelMapper } from '../../application/mappers/PluginStepViewModelMapper';
+import { PluginAssemblyViewModelMapper } from '../../application/mappers/PluginAssemblyViewModelMapper';
+import { PluginPackageViewModelMapper } from '../../application/mappers/PluginPackageViewModelMapper';
+import { PluginTypeViewModelMapper } from '../../application/mappers/PluginTypeViewModelMapper';
+import type { IPluginTypeRepository } from '../../domain/interfaces/IPluginTypeRepository';
+import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRepository';
+import { StepImageViewModelMapper } from '../../application/mappers/StepImageViewModelMapper';
 
 /**
  * Commands supported by Plugin Registration panel.

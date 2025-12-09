@@ -22,6 +22,7 @@ export class PluginAssemblyViewModelMapper {
 			modifiedOn: assembly.getModifiedOn().toISOString(),
 			canUpdate: assembly.canUpdate(),
 			canDelete: assembly.canDelete(activeStepCount),
+			packageId: assembly.getPackageId(),
 		};
 
 		return {

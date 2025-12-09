@@ -132,6 +132,32 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 		}
 	}
 
+	public async enable(environmentId: string, stepId: string): Promise<void> {
+		this.logger.debug('DataversePluginStepRepository: Enabling step', {
+			environmentId,
+			stepId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}(${stepId})`;
+
+		await this.apiService.patch(environmentId, endpoint, { statecode: 0 });
+
+		this.logger.debug('DataversePluginStepRepository: Step enabled', { stepId });
+	}
+
+	public async disable(environmentId: string, stepId: string): Promise<void> {
+		this.logger.debug('DataversePluginStepRepository: Disabling step', {
+			environmentId,
+			stepId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}(${stepId})`;
+
+		await this.apiService.patch(environmentId, endpoint, { statecode: 1 });
+
+		this.logger.debug('DataversePluginStepRepository: Step disabled', { stepId });
+	}
+
 	private mapToDomain(dto: PluginStepDto): PluginStep {
 		// Get message name from expanded entity or formatted value annotation
 		const messageName =

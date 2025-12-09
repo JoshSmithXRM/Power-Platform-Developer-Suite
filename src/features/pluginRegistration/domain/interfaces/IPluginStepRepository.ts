@@ -20,4 +20,16 @@ export interface IPluginStepRepository {
 	 * Find step by ID.
 	 */
 	findById(environmentId: string, stepId: string): Promise<PluginStep | null>;
+
+	/**
+	 * Enable a plugin step.
+	 * Sets statecode to 0 (Enabled).
+	 */
+	enable(environmentId: string, stepId: string): Promise<void>;
+
+	/**
+	 * Disable a plugin step.
+	 * Sets statecode to 1 (Disabled).
+	 */
+	disable(environmentId: string, stepId: string): Promise<void>;
 }
