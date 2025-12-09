@@ -29,6 +29,18 @@ export class PluginRegistrationTreeSection implements ISection {
 					/>
 				</div>
 
+				<!-- Tree Toolbar -->
+				<div class="tree-toolbar" id="treeToolbar" style="display: none;">
+					<button id="expandAllBtn" class="tree-toolbar-btn" title="Expand All">
+						<span class="tree-toolbar-icon">⊞</span>
+						<span>Expand All</span>
+					</button>
+					<button id="collapseAllBtn" class="tree-toolbar-btn" title="Collapse All">
+						<span class="tree-toolbar-icon">⊟</span>
+						<span>Collapse All</span>
+					</button>
+				</div>
+
 				<!-- Loading Progress -->
 				<div class="loading-progress-container" id="loadingProgress">
 					<div class="loading-spinner"></div>

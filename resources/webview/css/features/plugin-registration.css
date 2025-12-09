@@ -38,6 +38,42 @@
 	color: var(--vscode-input-placeholderForeground);
 }
 
+/* Tree Toolbar */
+.tree-toolbar {
+	display: flex;
+	gap: 8px;
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBar-background);
+}
+
+.tree-toolbar-btn {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 10px;
+	border: 1px solid var(--vscode-button-secondaryBorder, var(--vscode-button-border, transparent));
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+	border-radius: 3px;
+	font-size: 12px;
+	cursor: pointer;
+	transition: background 0.1s ease;
+}
+
+.tree-toolbar-btn:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.tree-toolbar-btn:active {
+	opacity: 0.8;
+}
+
+.tree-toolbar-icon {
+	font-size: 14px;
+	line-height: 1;
+}
+
 /* Loading Progress */
 .loading-progress-container {
 	display: flex;
