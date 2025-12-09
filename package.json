@@ -220,6 +220,16 @@
                 "category": "Power Platform Developer Suite"
             },
             {
+                "command": "power-platform-dev-suite.pluginRegistration",
+                "title": "Plugin Registration",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.pluginRegistrationPickEnvironment",
+                "title": "Plugin Registration: Choose Environment",
+                "category": "Power Platform Developer Suite"
+            },
+            {
                 "command": "power-platform-dev-suite.metadataBrowser",
                 "title": "Metadata Browser",
                 "category": "Power Platform Developer Suite"
@@ -397,6 +407,11 @@
                     "group": "1_environment@1"
                 },
                 {
+                    "command": "power-platform-dev-suite.pluginRegistrationPickEnvironment",
+                    "when": "view == power-platform-dev-suite-tools && viewItem == pluginRegistration",
+                    "group": "1_environment@1"
+                },
+                {
                     "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",
                     "when": "view == power-platform-dev-suite-tools && viewItem == metadataBrowser",
                     "group": "1_environment@1"
@@ -436,6 +451,11 @@
                 {
                     "command": "power-platform-dev-suite.pluginTraceViewerPickEnvironment",
                     "when": "webviewId == 'powerPlatformDevSuite.pluginTraceViewer'",
+                    "group": "1_environment@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.pluginRegistrationPickEnvironment",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration'",
                     "group": "1_environment@1"
                 },
                 {
