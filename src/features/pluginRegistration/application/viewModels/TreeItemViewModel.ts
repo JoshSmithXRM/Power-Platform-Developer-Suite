@@ -41,6 +41,8 @@ export interface AssemblyMetadata {
 	readonly modifiedOn: string;
 	readonly canUpdate: boolean;
 	readonly canDelete: boolean;
+	/** Package ID if assembly is part of a package, null if standalone */
+	readonly packageId: string | null;
 }
 
 /**

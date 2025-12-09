@@ -32,4 +32,10 @@ export interface IPluginAssemblyRepository {
 	 * Used for canDelete() business rule.
 	 */
 	countActiveSteps(environmentId: string, assemblyId: string): Promise<number>;
+
+	/**
+	 * Update assembly content with new DLL.
+	 * @param base64Content - Base64-encoded DLL bytes
+	 */
+	updateContent(environmentId: string, assemblyId: string, base64Content: string): Promise<void>;
 }

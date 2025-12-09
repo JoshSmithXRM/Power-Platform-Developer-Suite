@@ -100,6 +100,32 @@ function renderTree(items) {
 }
 
 /**
+ * Build VS Code context menu data for a tree node.
+ * This enables VS Code native right-click menus via data-vscode-context.
+ */
+function buildVscodeContext(item) {
+	const context = {
+		webviewSection: item.type,
+		nodeId: item.id,
+		preventDefaultContextMenuItems: true
+	};
+
+	// Add type-specific context for menu when clauses
+	if (item.type === 'step' && item.metadata) {
+		context.canEnable = item.metadata.canEnable === true;
+		context.canDisable = item.metadata.canDisable === true;
+	} else if (item.type === 'assembly' && item.metadata) {
+		context.canUpdate = item.metadata.canUpdate === true;
+		context.packageId = item.metadata.packageId || null;
+		context.isStandalone = item.metadata.packageId === null;
+	} else if (item.type === 'package' && item.metadata) {
+		context.canUpdate = item.metadata.canUpdate === true;
+	}
+
+	return JSON.stringify(context);
+}
+
+/**
  * Render a single tree node
  */
 function renderNode(item, depth) {
@@ -120,12 +146,14 @@ function renderNode(item, depth) {
 
 	const icon = getIcon(item.type, item.icon);
 	const badge = getBadge(item);
+	const vscodeContext = buildVscodeContext(item);
 
 	let html = `
 		<div class="${classes}"
 			 data-id="${item.id}"
 			 data-type="${item.type}"
 			 data-has-children="${hasChildren}"
+			 data-vscode-context='${vscodeContext}'
 			 style="padding-left: ${indent + 8}px">
 			<span class="tree-node-toggle ${toggleClass}"></span>
 			<span class="tree-node-icon">${icon}</span>
@@ -442,6 +470,68 @@ window.createBehavior({
 			case 'updateTree':
 				handleTreeUpdate(message.data);
 				break;
+			case 'updateNode':
+				handleNodeUpdate(message.data);
+				break;
+			case 'updateSubtree':
+				handleSubtreeUpdate(message.data);
+				break;
 		}
 	}
 });
+
+/**
+ * Update a single node in the tree (e.g., after enable/disable step).
+ * @param {Object} data - { nodeId, updatedNode }
+ */
+function handleNodeUpdate(data) {
+	const { nodeId, updatedNode } = data;
+	if (!nodeId || !updatedNode) return;
+
+	// Find and replace the node in treeData
+	const updated = updateNodeInTree(treeData, nodeId, updatedNode);
+	if (updated) {
+		renderTree(treeData);
+		if (currentFilter) {
+			filterTree(currentFilter);
+		}
+	}
+}
+
+/**
+ * Update a subtree (node and all children) in the tree.
+ * Used after updating assembly/package where children may have changed.
+ * @param {Object} data - { nodeId, updatedSubtree }
+ */
+function handleSubtreeUpdate(data) {
+	const { nodeId, updatedSubtree } = data;
+	if (!nodeId || !updatedSubtree) return;
+
+	// Find and replace the entire subtree in treeData
+	const updated = updateNodeInTree(treeData, nodeId, updatedSubtree);
+	if (updated) {
+		renderTree(treeData);
+		if (currentFilter) {
+			filterTree(currentFilter);
+		}
+	}
+}
+
+/**
+ * Recursively find and update a node in the tree.
+ * @returns {boolean} True if node was found and updated
+ */
+function updateNodeInTree(items, nodeId, newNode) {
+	for (let i = 0; i < items.length; i++) {
+		if (items[i].id === nodeId) {
+			items[i] = newNode;
+			return true;
+		}
+		if (items[i].children && items[i].children.length > 0) {
+			if (updateNodeInTree(items[i].children, nodeId, newNode)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}

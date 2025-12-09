@@ -116,6 +116,26 @@ export class DataversePluginPackageRepository implements IPluginPackageRepositor
 		return 0;
 	}
 
+	public async updateContent(
+		environmentId: string,
+		packageId: string,
+		base64Content: string
+	): Promise<void> {
+		this.logger.debug('DataversePluginPackageRepository: Updating package content', {
+			environmentId,
+			packageId,
+			contentLength: base64Content.length,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginPackageRepository.ENTITY_SET}(${packageId})`;
+
+		await this.apiService.patch(environmentId, endpoint, { content: base64Content });
+
+		this.logger.debug('DataversePluginPackageRepository: Package content updated', {
+			packageId,
+		});
+	}
+
 	private mapToDomain(dto: PluginPackageDto): PluginPackage {
 		return new PluginPackage(
 			dto.pluginpackageid,

@@ -31,11 +31,12 @@ export class PluginAssembly {
 	) {}
 
 	/**
-	 * Business rule: Managed assemblies cannot be updated.
-	 * Used by: UI to disable edit buttons
+	 * Business rule: Can update if unmanaged AND standalone (not in a package).
+	 * Assemblies in packages must be updated via the package.
+	 * Used by: UI to show/hide update context menu
 	 */
 	public canUpdate(): boolean {
-		return !this.isManaged;
+		return !this.isManaged && !this.isInPackage();
 	}
 
 	/**
