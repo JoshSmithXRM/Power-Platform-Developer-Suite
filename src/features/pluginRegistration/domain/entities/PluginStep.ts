@@ -7,16 +7,16 @@ import { StepStatus } from '../valueObjects/StepStatus';
  *
  * Business Rules:
  * - Steps execute at specific stages (PreValidation, PreOperation, PostOperation)
- * - Steps can be enabled/disabled
+ * - Steps can be enabled/disabled (including managed steps - developers need this for debugging)
  * - Steps have execution mode (Sync vs Async)
  * - Steps have rank (execution order within same stage)
  * - Filtering attributes apply only to Update message
  *
  * Rich behavior (NOT anemic):
  * - isEnabled(): boolean
- * - canEnable(): boolean (checks if disabled and not managed)
- * - canDisable(): boolean (checks if enabled and not managed)
- * - canDelete(): boolean (checks if not managed)
+ * - canEnable(): boolean (checks if disabled)
+ * - canDisable(): boolean (checks if enabled)
+ * - canDelete(): boolean (checks if not managed - deletion still restricted)
  * - getExecutionOrder(): string (formatted stage + rank)
  * - getFilteringAttributesArray(): string[]
  */
@@ -46,17 +46,19 @@ export class PluginStep {
 	}
 
 	/**
-	 * Business rule: Can enable if disabled and not managed.
+	 * Business rule: Can enable if currently disabled.
+	 * Note: Managed steps CAN be enabled/disabled - developers need this for debugging.
 	 */
 	public canEnable(): boolean {
-		return !this.isEnabled() && !this.isManaged;
+		return !this.isEnabled();
 	}
 
 	/**
-	 * Business rule: Can disable if enabled and not managed.
+	 * Business rule: Can disable if currently enabled.
+	 * Note: Managed steps CAN be enabled/disabled - developers need this for debugging.
 	 */
 	public canDisable(): boolean {
-		return this.isEnabled() && !this.isManaged;
+		return this.isEnabled();
 	}
 
 	/**
