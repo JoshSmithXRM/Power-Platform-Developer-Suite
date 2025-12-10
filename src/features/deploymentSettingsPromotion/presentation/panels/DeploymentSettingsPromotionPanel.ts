@@ -56,8 +56,12 @@ interface SolutionOption {
 interface ConnectionSelection {
 	/** Selected connection ID from dropdown (null if not selected) */
 	selectedConnectionId: string | null;
+	/** Selected connection's ConnectorId (needed for output when connector differs from source) */
+	selectedConnectorId: string | null;
 	/** Manual connection ID entry (for unmatched connectors) */
 	manualConnectionId: string;
+	/** Manual connector ID entry (when user enters ConnectionId manually) */
+	manualConnectorId: string;
 }
 
 /**
@@ -218,7 +222,7 @@ export class DeploymentSettingsPromotionPanel {
 			// Get or create selection state for this CR
 			let selection = this.connectionSelections.get(logicalName);
 			if (!selection) {
-				selection = { selectedConnectionId: null, manualConnectionId: '' };
+				selection = { selectedConnectionId: null, selectedConnectorId: null, manualConnectionId: '', manualConnectorId: '' };
 				this.connectionSelections.set(logicalName, selection);
 			}
 
@@ -228,25 +232,36 @@ export class DeploymentSettingsPromotionPanel {
 
 			if (connectorId !== null) {
 				const connections = this.matchResult?.getConnectionsForConnector(connectorId) ?? [];
-				availableConnections = connections.map(conn => ({
-					id: conn.id,
-					displayName: conn.displayName,
-					status: conn.status,
-					owner: conn.createdBy
-				}));
 
-				if (availableConnections.length > 0) {
-					// Auto-select first connection if not already selected
+				if (connections.length > 0) {
+					// Matched connector - show connections for this connector type
+					availableConnections = connections.map(conn => ({
+						id: conn.id,
+						displayName: conn.displayName,
+						status: conn.status,
+						owner: conn.createdBy,
+						connectorId: conn.connectorId,
+						connectorName: this.extractConnectorName(conn.connectorId)
+					}));
+
+					// Auto-select first active connection if not already selected
 					if (selection.selectedConnectionId === null) {
 						const defaultConn = this.connectorMappingService.selectDefaultConnection(connections);
 						if (defaultConn) {
 							selection.selectedConnectionId = defaultConn.id;
+							selection.selectedConnectorId = defaultConn.connectorId;
 						}
 					}
 					status = availableConnections.length > 1 ? 'multiple' : 'configured';
 				} else {
+					// Unmatched connector - show ALL target connections for manual mapping
+					availableConnections = this.getAllTargetConnectionsAsViewModels();
 					status = 'unmatched';
 				}
+			} else {
+				// No connector ID - show ALL target connections
+				availableConnections = this.getAllTargetConnectionsAsViewModels();
+				status = 'unmatched';
 			}
 
 			// Extract connector name for display
@@ -263,6 +278,21 @@ export class DeploymentSettingsPromotionPanel {
 				manualConnectionId: selection.manualConnectionId
 			};
 		});
+	}
+
+	/**
+	 * Converts ALL target connections to view models for unmatched connector dropdown.
+	 * Groups connections by connector type for easier selection.
+	 */
+	private getAllTargetConnectionsAsViewModels(): AvailableConnectionViewModel[] {
+		return this.targetConnections.map(conn => ({
+			id: conn.id,
+			displayName: conn.displayName,
+			status: conn.status,
+			owner: conn.createdBy,
+			connectorId: conn.connectorId,
+			connectorName: this.extractConnectorName(conn.connectorId)
+		}));
 	}
 
 	/**
@@ -445,6 +475,7 @@ export class DeploymentSettingsPromotionPanel {
 
 	/**
 	 * Handles connection dropdown selection change.
+	 * Captures both ConnectionId and ConnectorId from the selected target connection.
 	 */
 	private async handleConnectionSelectionChange(index: number, connectionId: string): Promise<void> {
 		const cr = this.sourceConnectionReferences[index];
@@ -455,13 +486,25 @@ export class DeploymentSettingsPromotionPanel {
 		const logicalName = cr.connectionReferenceLogicalName;
 		let selection = this.connectionSelections.get(logicalName);
 		if (!selection) {
-			selection = { selectedConnectionId: null, manualConnectionId: '' };
+			selection = { selectedConnectionId: null, selectedConnectorId: null, manualConnectionId: '', manualConnectorId: '' };
 			this.connectionSelections.set(logicalName, selection);
 		}
 
 		selection.selectedConnectionId = connectionId || null;
 
-		this.logger.debug('Connection selection changed', { logicalName, connectionId });
+		// Look up the selected connection to get its ConnectorId
+		if (connectionId) {
+			const selectedConnection = this.targetConnections.find(c => c.id === connectionId);
+			selection.selectedConnectorId = selectedConnection?.connectorId ?? null;
+		} else {
+			selection.selectedConnectorId = null;
+		}
+
+		this.logger.debug('Connection selection changed', {
+			logicalName,
+			connectionId,
+			connectorId: selection.selectedConnectorId
+		});
 
 		// Update save button state without full refresh (just update the button via message)
 		await this.panel.postMessage({
@@ -482,7 +525,7 @@ export class DeploymentSettingsPromotionPanel {
 		const logicalName = cr.connectionReferenceLogicalName;
 		let selection = this.connectionSelections.get(logicalName);
 		if (!selection) {
-			selection = { selectedConnectionId: null, manualConnectionId: '' };
+			selection = { selectedConnectionId: null, selectedConnectorId: null, manualConnectionId: '', manualConnectorId: '' };
 			this.connectionSelections.set(logicalName, selection);
 		}
 
@@ -693,20 +736,32 @@ export class DeploymentSettingsPromotionPanel {
 				const logicalName = cr.connectionReferenceLogicalName;
 				const selection = this.connectionSelections.get(logicalName);
 
-				// Determine ConnectionId: prefer dropdown selection, fall back to manual entry
+				// Determine ConnectionId and ConnectorId from selection
 				let connectionId = '';
+				let connectorId = cr.connectorId ?? '';
+
 				if (selection) {
 					if (selection.selectedConnectionId) {
+						// User selected from dropdown - use target connection's IDs
 						connectionId = selection.selectedConnectionId;
+						// Use target's ConnectorId if available (important for cross-connector mapping)
+						if (selection.selectedConnectorId) {
+							connectorId = selection.selectedConnectorId;
+						}
 					} else if (selection.manualConnectionId) {
+						// Manual entry - use provided values
 						connectionId = selection.manualConnectionId;
+						// For manual entry, use manual ConnectorId if provided, else source's
+						if (selection.manualConnectorId) {
+							connectorId = selection.manualConnectorId;
+						}
 					}
 				}
 
 				return {
 					LogicalName: logicalName,
 					ConnectionId: connectionId,
-					ConnectorId: cr.connectorId ?? ''
+					ConnectorId: connectorId
 				};
 			});
 

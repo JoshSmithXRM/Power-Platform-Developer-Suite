@@ -43,6 +43,12 @@ export interface AvailableConnectionViewModel {
 
 	/** Who created/owns this connection */
 	readonly owner: string;
+
+	/** ConnectorId this connection belongs to (needed for output) */
+	readonly connectorId: string;
+
+	/** Friendly connector name for grouping in dropdown */
+	readonly connectorName: string;
 }
 
 /**

@@ -96,7 +96,7 @@ export class ConnectionReferenceMappingSection implements ISection {
 		if (mapping.availableConnections.length === 0) {
 			return `
 				<div class="target-unmatched">
-					<div class="unmatched-warning">No matching connections in target</div>
+					<div class="unmatched-warning">No connections available in target</div>
 					<div class="manual-input-group">
 						<label for="manual-conn-${index}">ConnectionId:</label>
 						<input
@@ -113,26 +113,40 @@ export class ConnectionReferenceMappingSection implements ISection {
 			`;
 		}
 
+		// Determine if this is an unmatched connector (needs to show connector names)
+		const isUnmatched = mapping.status === 'unmatched';
+		const placeholderText = isUnmatched
+			? 'Select from all target connections...'
+			: 'Select connection...';
+
 		// Has available connections - show dropdown
 		const options = mapping.availableConnections.map(conn => {
 			const selected = conn.id === mapping.selectedConnectionId ? 'selected' : '';
 			const statusIndicator = conn.status === 'Connected' ? '●' : conn.status === 'Error' ? '○' : '◌';
 			const statusColor = conn.status === 'Connected' ? 'status-connected' : conn.status === 'Error' ? 'status-error' : 'status-unknown';
+
+			// For unmatched connectors, show connector name to help user identify the right connection
+			const displayText = isUnmatched
+				? `${conn.connectorName}: ${conn.displayName} (${conn.status})`
+				: `${conn.displayName} (${conn.status})`;
+
 			return `<option value="${this.escapeHtml(conn.id)}" ${selected} class="${statusColor}">
-				${statusIndicator} ${this.escapeHtml(conn.displayName)} (${conn.status})
+				${statusIndicator} ${this.escapeHtml(displayText)}
 			</option>`;
 		}).join('');
 
 		const connectionCount = mapping.availableConnections.length;
 		const countText = connectionCount === 1 ? '1 connection' : `${connectionCount} connections`;
+		const countLabel = isUnmatched ? 'All target connections' : 'Available';
 
 		return `
-			<div class="target-selection">
+			<div class="target-selection ${isUnmatched ? 'cross-connector' : ''}">
 				<select class="connection-dropdown" data-index="${index}" id="conn-select-${index}">
-					<option value="" ${mapping.selectedConnectionId === null ? 'selected' : ''} disabled>Select connection...</option>
+					<option value="" ${mapping.selectedConnectionId === null ? 'selected' : ''} disabled>${placeholderText}</option>
 					${options}
 				</select>
-				<div class="connection-count">Available: ${countText}</div>
+				<div class="connection-count">${countLabel}: ${countText}</div>
+				${isUnmatched ? '<div class="cross-connector-tip">Select the equivalent connection for this connector</div>' : ''}
 			</div>
 		`;
 	}

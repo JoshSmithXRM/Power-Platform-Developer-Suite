@@ -527,3 +527,16 @@
 .connection-dropdown option.status-unknown {
 	color: var(--vscode-descriptionForeground);
 }
+
+/* Cross-connector selection (unmatched connectors) */
+.target-selection.cross-connector {
+	border-left: 2px solid var(--vscode-testing-iconQueued);
+	padding-left: 8px;
+}
+
+.cross-connector-tip {
+	font-size: 11px;
+	color: var(--vscode-testing-iconQueued);
+	font-style: italic;
+	margin-top: 4px;
+}
