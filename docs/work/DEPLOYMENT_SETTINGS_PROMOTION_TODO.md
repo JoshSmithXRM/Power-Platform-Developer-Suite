@@ -2,7 +2,7 @@
 
 **Branch:** `feature/deployment-settings-promotion`
 **Created:** 2025-12-08
-**Status:** Building Full Editor UI
+**Status:** Connection References Complete - Next: Environment Variables
 
 ---
 
@@ -148,7 +148,7 @@
 - [x] Validate restored environments/solutions still exist
 - [x] Auto-trigger workflow if all three restored
 
-### Slice G: Environment Variables Table UI - TODO
+### Slice G: Environment Variables Table UI - NEXT FOCUS
 - [ ] Query EVs from source solution (reuse ListEnvironmentVariablesUseCase)
 - [ ] Create `EnvironmentVariableMappingViewModel`
 - [ ] Create `EnvironmentVariableMappingSection` - renders the EV table
@@ -315,16 +315,19 @@ resources/webview/
   - Connection status colors in dropdowns
 - All tests pass (8046), ready for F5 testing
 
-### Session 8 (2025-12-10) - STATE PERSISTENCE
-- **Added panel state persistence**
+### Session 8 (2025-12-10) - STATE PERSISTENCE & CONNECTION REFERENCES COMPLETE
+- **Added panel state persistence** (F5 verified working)
   - Source environment, solution, and target environment selections persist
   - Selections restored on panel open if still valid
   - Auto-triggers workflow if all three restored
+  - Fixed: `VSCodePanelStateRepository` now properly created in initialization (was missing)
+  - Fixed: Added `viewType` constant for consistent state keys
 - **Bug fixes from previous session**
   - Index-based selection changed to logicalName-based (fixes wrong item selection after sort)
   - ConnectorId output normalized to standard `/providers/Microsoft.PowerApps/apis/{connector}` format
   - Warning icons now clear when cross-connector mappings are selected
-- All tests pass, ready for F5 testing
+- **Connection References implementation complete** - ready for polish/tweaks later
+- All tests pass, F5 verified
 
 ---
 
