@@ -528,11 +528,8 @@ export class DataverseNotebookController {
 		viewModel: QueryResultViewModel,
 		environmentUrl: string | undefined
 	): string {
-		const totalRowCount = viewModel.rows.length;
-		const executionTime = viewModel.executionTimeMs;
-
-		if (totalRowCount === 0) {
-			return this.renderEmptyResults(viewModel.columns.length, executionTime);
+		if (viewModel.rows.length === 0) {
+			return this.renderEmptyResults();
 		}
 
 		// Generate unique IDs for this cell's elements to prevent cross-cell interference
@@ -553,13 +550,6 @@ export class DataverseNotebookController {
 		// Transform to simple format to minimize memory
 		const rowData = this.prepareRowDataForVirtualTable(viewModel, environmentUrl);
 
-		// Status bar
-		const statusBar = `<div class="status-bar">
-			<span class="results-count">${totalRowCount} row${totalRowCount !== 1 ? 's' : ''}</span>
-			<span class="execution-time">${executionTime}ms</span>
-			${viewModel.hasMoreRecords ? '<span class="more-records">More records available</span>' : ''}
-		</div>`;
-
 		return `
 			<style>
 				${this.getNotebookStyles()}
@@ -575,7 +565,6 @@ export class DataverseNotebookController {
 						</tbody>
 					</table>
 				</div>
-				${statusBar}
 			</div>
 			<script>
 				${this.getVirtualScrollScript(rowData, viewModel.columns.length, scrollContainerId, tbodyId)}
@@ -686,19 +675,6 @@ export class DataverseNotebookController {
 				padding: 0 !important;
 				border: none !important;
 			}
-			.status-bar {
-				display: flex;
-				align-items: center;
-				gap: 20px;
-				padding: 10px 16px;
-				background: var(--vscode-editorWidget-background);
-				border-top: 1px solid var(--vscode-panel-border);
-				font-size: 12px;
-				color: var(--vscode-descriptionForeground);
-			}
-			.results-count { font-weight: 500; }
-			.execution-time { font-family: var(--vscode-editor-font-family); }
-			.more-records { color: var(--vscode-editorWarning-foreground); }
 		`;
 	}
 
@@ -740,38 +716,18 @@ export class DataverseNotebookController {
 	/**
 	 * Renders empty results message.
 	 */
-	private renderEmptyResults(columnCount: number, executionTime: number): string {
+	private renderEmptyResults(): string {
 		return `
 			<style>
-				.results-container {
-					font-family: var(--vscode-font-family);
-					color: var(--vscode-foreground);
-					background: var(--vscode-editor-background);
-				}
 				.no-results {
-					padding: 40px 20px;
+					font-family: var(--vscode-font-family);
+					padding: 20px;
 					text-align: center;
 					color: var(--vscode-descriptionForeground);
 					font-style: italic;
 				}
-				.status-bar {
-					display: flex;
-					align-items: center;
-					gap: 20px;
-					padding: 10px 16px;
-					background: var(--vscode-editorWidget-background);
-					border-top: 1px solid var(--vscode-panel-border);
-					font-size: 12px;
-					color: var(--vscode-descriptionForeground);
-				}
 			</style>
-			<div class="results-container">
-				<div class="no-results">No results returned</div>
-				<div class="status-bar">
-					<span class="results-count">0 rows</span>
-					<span class="execution-time">${executionTime}ms</span>
-				</div>
-			</div>
+			<div class="no-results">No results returned</div>
 		`;
 	}
 
