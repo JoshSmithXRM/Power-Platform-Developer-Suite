@@ -16,9 +16,11 @@ interface PluginTypeDto {
 
 /**
  * Dataverse API response for plugintype collection.
+ * Includes optional @odata.nextLink for pagination (Dataverse defaults to 5000 records per page).
  */
 interface PluginTypeCollectionResponse {
 	value: PluginTypeDto[];
+	'@odata.nextLink'?: string;
 }
 
 /**
@@ -40,23 +42,39 @@ export class DataversePluginTypeRepository implements IPluginTypeRepository {
 			environmentId,
 		});
 
-		const endpoint =
+		// Use primary key ordering for optimal pagination performance
+		const initialEndpoint =
 			`/api/data/v9.2/${DataversePluginTypeRepository.ENTITY_SET}` +
 			`?$select=${DataversePluginTypeRepository.SELECT_FIELDS}` +
-			'&$orderby=typename asc';
+			'&$orderby=plugintypeid asc';
 
-		const response = await this.apiService.get<PluginTypeCollectionResponse>(
-			environmentId,
-			endpoint
-		);
+		const allPluginTypes: PluginType[] = [];
+		let currentEndpoint: string | null = initialEndpoint;
+		let pageCount = 0;
 
-		const pluginTypes = response.value.map((dto) => this.mapToDomain(dto));
+		while (currentEndpoint !== null) {
+			const response: PluginTypeCollectionResponse =
+				await this.apiService.get<PluginTypeCollectionResponse>(environmentId, currentEndpoint);
+
+			const pagePluginTypes = response.value.map((dto: PluginTypeDto) => this.mapToDomain(dto));
+			allPluginTypes.push(...pagePluginTypes);
+			pageCount++;
+
+			const nextLink: string | undefined = response['@odata.nextLink'];
+			if (nextLink !== undefined) {
+				const url: URL = new URL(nextLink);
+				currentEndpoint = url.pathname + url.search;
+			} else {
+				currentEndpoint = null;
+			}
+		}
 
 		this.logger.debug('DataversePluginTypeRepository: Fetched ALL plugin types', {
-			count: pluginTypes.length,
+			count: allPluginTypes.length,
+			pages: pageCount,
 		});
 
-		return pluginTypes;
+		return allPluginTypes;
 	}
 
 	public async findByAssemblyId(

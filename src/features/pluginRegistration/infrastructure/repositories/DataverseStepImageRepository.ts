@@ -19,9 +19,11 @@ interface StepImageDto {
 
 /**
  * Dataverse API response for sdkmessageprocessingstepimage collection.
+ * Includes optional @odata.nextLink for pagination (Dataverse defaults to 5000 records per page).
  */
 interface StepImageCollectionResponse {
 	value: StepImageDto[];
+	'@odata.nextLink'?: string;
 }
 
 /**
@@ -43,23 +45,39 @@ export class DataverseStepImageRepository implements IStepImageRepository {
 			environmentId,
 		});
 
-		const endpoint =
+		// Use primary key ordering for optimal pagination performance
+		const initialEndpoint =
 			`/api/data/v9.2/${DataverseStepImageRepository.ENTITY_SET}` +
 			`?$select=${DataverseStepImageRepository.SELECT_FIELDS}` +
-			`&$orderby=name asc`;
+			`&$orderby=sdkmessageprocessingstepimageid asc`;
 
-		const response = await this.apiService.get<StepImageCollectionResponse>(
-			environmentId,
-			endpoint
-		);
+		const allImages: StepImage[] = [];
+		let currentEndpoint: string | null = initialEndpoint;
+		let pageCount = 0;
 
-		const images = response.value.map((dto) => this.mapToDomain(dto));
+		while (currentEndpoint !== null) {
+			const response: StepImageCollectionResponse =
+				await this.apiService.get<StepImageCollectionResponse>(environmentId, currentEndpoint);
+
+			const pageImages = response.value.map((dto: StepImageDto) => this.mapToDomain(dto));
+			allImages.push(...pageImages);
+			pageCount++;
+
+			const nextLink: string | undefined = response['@odata.nextLink'];
+			if (nextLink !== undefined) {
+				const url: URL = new URL(nextLink);
+				currentEndpoint = url.pathname + url.search;
+			} else {
+				currentEndpoint = null;
+			}
+		}
 
 		this.logger.debug('DataverseStepImageRepository: Fetched ALL images', {
-			count: images.length,
+			count: allImages.length,
+			pages: pageCount,
 		});
 
-		return images;
+		return allImages;
 	}
 
 	public async findByStepId(
