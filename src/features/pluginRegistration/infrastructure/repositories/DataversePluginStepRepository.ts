@@ -36,14 +36,22 @@ interface PluginStepDto {
 
 /**
  * Dataverse API response for sdkmessageprocessingstep collection.
+ * Includes optional @odata.nextLink for pagination (Dataverse defaults to 5000 records per page).
  */
 interface PluginStepCollectionResponse {
 	value: PluginStepDto[];
+	'@odata.nextLink'?: string;
 }
 
 /**
  * Dataverse repository for PluginStep entities.
  * Implements IPluginStepRepository interface.
+ *
+ * Uses optimized sequential pagination with @odata.nextLink.
+ * This is the fastest approach for bulk fetches because:
+ * - Dataverse pre-computes the cursor on the first query
+ * - Primary key ordering is index-optimized
+ * - Server-side caching benefits subsequent pages
  */
 export class DataversePluginStepRepository implements IPluginStepRepository {
 	private static readonly ENTITY_SET = 'sdkmessageprocessingsteps';
@@ -56,29 +64,59 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 	) {}
 
 	public async findAll(environmentId: string): Promise<readonly PluginStep[]> {
-		this.logger.debug('DataversePluginStepRepository: Fetching ALL steps', {
+		this.logger.debug('DataversePluginStepRepository: Fetching ALL steps (optimized sequential)', {
 			environmentId,
 		});
 
-		// Expand sdkmessageid to get message name, and sdkmessagefilterid to get entity name
-		const endpoint =
+		const startTime = Date.now();
+
+		// Optimized query:
+		// - Order by primary key for optimal pagination (Dataverse is optimized for this)
+		// - Use $expand to get message/filter names in single query (fewer round trips)
+		// - Sequential pagination with @odata.nextLink is the fastest approach for bulk fetches
+		const initialEndpoint =
 			`/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}` +
 			`?$select=${DataversePluginStepRepository.SELECT_FIELDS}` +
 			`&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)` +
-			`&$orderby=name asc`;
+			`&$orderby=sdkmessageprocessingstepid asc`;
 
-		const response = await this.apiService.get<PluginStepCollectionResponse>(
-			environmentId,
-			endpoint
-		);
+		const allSteps: PluginStep[] = [];
+		let currentEndpoint: string | null = initialEndpoint;
+		let pageCount = 0;
 
-		const steps = response.value.map((dto) => this.mapToDomain(dto));
+		while (currentEndpoint !== null) {
+			const response: PluginStepCollectionResponse =
+				await this.apiService.get<PluginStepCollectionResponse>(environmentId, currentEndpoint);
 
-		this.logger.debug('DataversePluginStepRepository: Fetched ALL steps', {
-			count: steps.length,
+			const pageSteps = response.value.map((dto: PluginStepDto) => this.mapToDomain(dto));
+			allSteps.push(...pageSteps);
+			pageCount++;
+
+			this.logger.debug('DataversePluginStepRepository: Page fetched', {
+				page: pageCount,
+				pageSize: pageSteps.length,
+				totalSoFar: allSteps.length,
+			});
+
+			const nextLink: string | undefined = response['@odata.nextLink'];
+			if (nextLink !== undefined) {
+				const url: URL = new URL(nextLink);
+				currentEndpoint = url.pathname + url.search;
+			} else {
+				currentEndpoint = null;
+			}
+		}
+
+		const totalTime = Date.now() - startTime;
+
+		this.logger.info('DataversePluginStepRepository: Sequential fetch complete', {
+			totalSteps: allSteps.length,
+			pages: pageCount,
+			totalMs: totalTime,
+			avgMsPerPage: Math.round(totalTime / pageCount),
 		});
 
-		return steps;
+		return allSteps;
 	}
 
 	public async findByPluginTypeId(
