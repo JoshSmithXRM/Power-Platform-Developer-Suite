@@ -13,6 +13,8 @@ window.createBehavior({
 		this.wireSourceEnvSelector();
 		this.wireSolutionSelector();
 		this.wireTargetEnvSelector();
+		this.wireConnectionDropdowns();
+		this.wireManualInputs();
 		// Save button is wired by messaging.js via button ID convention
 	},
 
@@ -59,6 +61,59 @@ window.createBehavior({
 				command: 'targetEnvironmentChange',
 				data: {
 					environmentId: select.value
+				}
+			});
+		});
+	},
+
+	/**
+	 * Wires connection dropdown selectors using event delegation.
+	 * Dropdowns have class 'connection-dropdown' and data-index attribute.
+	 */
+	wireConnectionDropdowns() {
+		document.addEventListener('change', (event) => {
+			const target = event.target;
+			if (!target.classList.contains('connection-dropdown')) {
+				return;
+			}
+
+			const index = parseInt(target.dataset.index, 10);
+			if (isNaN(index)) {
+				return;
+			}
+
+			window.vscode.postMessage({
+				command: 'connectionSelectionChange',
+				data: {
+					index: index,
+					connectionId: target.value
+				}
+			});
+		});
+	},
+
+	/**
+	 * Wires manual connection ID inputs using event delegation.
+	 * Inputs have class 'manual-connection-input' and data-index attribute.
+	 * Uses 'input' event for real-time updates.
+	 */
+	wireManualInputs() {
+		document.addEventListener('input', (event) => {
+			const target = event.target;
+			if (!target.classList.contains('manual-connection-input')) {
+				return;
+			}
+
+			const index = parseInt(target.dataset.index, 10);
+			if (isNaN(index)) {
+				return;
+			}
+
+			window.vscode.postMessage({
+				command: 'manualConnectionIdChange',
+				data: {
+					index: index,
+					connectionId: target.value
 				}
 			});
 		});

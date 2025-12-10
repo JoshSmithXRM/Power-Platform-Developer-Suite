@@ -133,14 +133,14 @@
 
 ## Editor UI Implementation (Current Focus)
 
-### Slice F: Connection References Table UI - IN PROGRESS
-- [ ] Create `ConnectionReferenceMappingViewModel` - source info + target selection
-- [ ] Create `ConnectionReferenceMappingSection` - renders the CR table
-- [ ] Each row: source CR info (read-only) | dropdown of available connections
-- [ ] Handle unmatched: show text input for manual ConnectionId entry
-- [ ] Wire dropdown changes back to panel state
-- [ ] Update Save to use user's selections (not just auto-matched)
-- [ ] Show status: ✓ configured, ⚠ needs attention
+### Slice F: Connection References Table UI - COMPLETE
+- [x] Create `ConnectionReferenceMappingViewModel` - source info + target selection
+- [x] Create `ConnectionReferenceMappingSection` - renders the CR table
+- [x] Each row: source CR info (read-only) | dropdown of available connections
+- [x] Handle unmatched: show text input for manual ConnectionId entry
+- [x] Wire dropdown changes back to panel state
+- [x] Update Save to use user's selections (not just auto-matched)
+- [x] Show status: ✓ configured, ⚠ needs attention
 
 ### Slice G: Environment Variables Table UI - TODO
 - [ ] Query EVs from source solution (reuse ListEnvironmentVariablesUseCase)
@@ -188,12 +188,15 @@ src/features/deploymentSettingsPromotion/
 │       └── PowerPlatformApiConnectionRepository.ts ✓
 └── presentation/
     ├── panels/
-    │   └── DeploymentSettingsPromotionPanel.ts ✓ (restructured)
+    │   └── DeploymentSettingsPromotionPanel.ts ✓ (mapping table integrated)
     ├── sections/
-    │   ├── DeploymentSettingsStatusSection.ts ✓ (updated)
-    │   └── DeploymentSettingsToolbarSection.ts ✓ (new)
+    │   ├── DeploymentSettingsStatusSection.ts ✓
+    │   ├── DeploymentSettingsToolbarSection.ts ✓
+    │   └── ConnectionReferenceMappingSection.ts ✓ (new - table UI)
+    ├── viewModels/
+    │   └── ConnectionReferenceMappingViewModel.ts ✓ (new)
     └── initialization/
-        └── initializeDeploymentSettingsPromotion.ts ✓ (updated)
+        └── initializeDeploymentSettingsPromotion.ts ✓
 
 resources/webview/
 ├── js/behaviors/
@@ -282,6 +285,29 @@ resources/webview/
   - Auto-match just pre-populates, user has full control
 
 - Starting Slice F: Connection References Table UI
+
+### Session 7 (2025-12-09) - SLICE F COMPLETE
+- **Created Connection References Mapping Table UI**
+  - `ConnectionReferenceMappingViewModel.ts` - ViewModel with source info + target selection
+  - `ConnectionReferenceMappingSection.ts` - Two-column table rendering
+  - Dropdown for matched connectors (with connection status indicators)
+  - Manual text input for unmatched connectors
+  - Status icons: ✓ configured, ◐ multiple options, ⚠ needs attention
+  - Summary header showing "X of Y configured, Z needs attention"
+- **Updated Panel** (`DeploymentSettingsPromotionPanel.ts`)
+  - Added `buildMappingViewModels()` to transform match results
+  - Added `connectionSelections` Map to track user selections
+  - Added handlers for dropdown and manual input changes
+  - Auto-selects first active connection when available
+  - Save button uses user selections (not just auto-matched)
+- **Updated Behavior JS** (`DeploymentSettingsBehavior.js`)
+  - Event delegation for connection dropdowns
+  - Event delegation for manual connection ID inputs
+- **Added CSS** (`deployment-settings.css`)
+  - Full mapping table styling
+  - Status row highlighting
+  - Connection status colors in dropdowns
+- All tests pass (8046), ready for F5 testing
 
 ---
 

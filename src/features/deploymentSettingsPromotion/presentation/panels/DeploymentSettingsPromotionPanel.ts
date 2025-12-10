@@ -19,6 +19,12 @@ import type { ListConnectionReferencesUseCase } from '../../../connectionReferen
 import type { ConnectionReference } from '../../../connectionReferences/domain/entities/ConnectionReference';
 import { DeploymentSettingsToolbarSection, type DeploymentSettingsToolbarData } from '../sections/DeploymentSettingsToolbarSection';
 import { DeploymentSettingsStatusSection, type DeploymentSettingsStatus } from '../sections/DeploymentSettingsStatusSection';
+import { ConnectionReferenceMappingSection } from '../sections/ConnectionReferenceMappingSection';
+import type {
+	ConnectionReferenceMappingViewModel,
+	AvailableConnectionViewModel,
+	ConnectionMappingStatus
+} from '../viewModels/ConnectionReferenceMappingViewModel';
 
 /**
  * Commands supported by Deployment Settings Promotion panel.
@@ -27,6 +33,8 @@ type DeploymentSettingsPromotionCommands =
 	| 'sourceEnvironmentChange'
 	| 'solutionChange'
 	| 'targetEnvironmentChange'
+	| 'connectionSelectionChange'
+	| 'manualConnectionIdChange'
 	| 'saveDeploymentSettings';
 
 /**
@@ -43,14 +51,25 @@ interface SolutionOption {
 }
 
 /**
+ * Tracks user's connection selection for a single connection reference.
+ */
+interface ConnectionSelection {
+	/** Selected connection ID from dropdown (null if not selected) */
+	selectedConnectionId: string | null;
+	/** Manual connection ID entry (for unmatched connectors) */
+	manualConnectionId: string;
+}
+
+/**
  * Presentation layer panel for Deployment Settings Promotion.
  *
  * **Workflow:**
  * 1. Select SOURCE Environment (where solution is configured and working)
  * 2. Select Solution (loads from source environment)
  * 3. Select TARGET Environment (where solution will be deployed)
- * 4. System automatically loads and matches connection references
- * 5. Save generates deployment settings file
+ * 4. System loads connection references and matches to target connections
+ * 5. User reviews/edits mappings in the table
+ * 6. Save generates deployment settings file
  *
  * **Singleton Pattern (NOT Environment-Scoped)**:
  * This panel operates across TWO environments (source + target),
@@ -71,6 +90,9 @@ export class DeploymentSettingsPromotionPanel {
 	private sourceConnectionReferences: ConnectionReference[] = [];
 	private matchResult: ConnectorMatchResult | undefined;
 	private status: DeploymentSettingsStatus = { stage: 'initial' };
+
+	/** User's connection selections, keyed by CR logical name */
+	private connectionSelections: Map<string, ConnectionSelection> = new Map();
 
 	private constructor(
 		private readonly panel: SafeWebviewPanel,
@@ -169,20 +191,134 @@ export class DeploymentSettingsPromotionPanel {
 			saveDisabled: !this.canSave()
 		};
 
+		// Build mapping view models if we have data
+		const connectionReferenceMappings = this.buildMappingViewModels();
+
 		await this.scaffoldingBehavior.refresh({
 			customData: {
 				...toolbarData,
-				deploymentSettingsStatus: this.status
+				deploymentSettingsStatus: this.status,
+				connectionReferenceMappings
 			}
 		});
 	}
 
 	/**
+	 * Builds the mapping view models from current state.
+	 */
+	private buildMappingViewModels(): ConnectionReferenceMappingViewModel[] {
+		if (!this.matchResult || this.sourceConnectionReferences.length === 0) {
+			return [];
+		}
+
+		return this.sourceConnectionReferences.map((cr) => {
+			const connectorId = cr.connectorId;
+			const logicalName = cr.connectionReferenceLogicalName;
+
+			// Get or create selection state for this CR
+			let selection = this.connectionSelections.get(logicalName);
+			if (!selection) {
+				selection = { selectedConnectionId: null, manualConnectionId: '' };
+				this.connectionSelections.set(logicalName, selection);
+			}
+
+			// Get available connections for this connector type
+			let availableConnections: AvailableConnectionViewModel[] = [];
+			let status: ConnectionMappingStatus = 'unmatched';
+
+			if (connectorId !== null) {
+				const connections = this.matchResult?.getConnectionsForConnector(connectorId) ?? [];
+				availableConnections = connections.map(conn => ({
+					id: conn.id,
+					displayName: conn.displayName,
+					status: conn.status,
+					owner: conn.createdBy
+				}));
+
+				if (availableConnections.length > 0) {
+					// Auto-select first connection if not already selected
+					if (selection.selectedConnectionId === null) {
+						const defaultConn = this.connectorMappingService.selectDefaultConnection(connections);
+						if (defaultConn) {
+							selection.selectedConnectionId = defaultConn.id;
+						}
+					}
+					status = availableConnections.length > 1 ? 'multiple' : 'configured';
+				} else {
+					status = 'unmatched';
+				}
+			}
+
+			// Extract connector name for display
+			const connectorName = this.extractConnectorName(connectorId);
+
+			return {
+				logicalName,
+				displayName: cr.displayName,
+				connectorName,
+				connectorId,
+				availableConnections,
+				selectedConnectionId: selection.selectedConnectionId,
+				status,
+				manualConnectionId: selection.manualConnectionId
+			};
+		});
+	}
+
+	/**
+	 * Extracts a friendly connector name from the ConnectorId path.
+	 */
+	private extractConnectorName(connectorId: string | null): string {
+		if (connectorId === null) {
+			return 'Unknown Connector';
+		}
+
+		// Extract connector name after /apis/
+		const normalized = this.connectorMappingService.normalizeConnectorId(connectorId);
+
+		// Convert shared_commondataserviceforapps to "Dataverse" etc
+		const friendlyNames: Record<string, string> = {
+			'shared_commondataserviceforapps': 'Dataverse',
+			'shared_commondataservice': 'Dataverse (legacy)',
+			'shared_sharepointonline': 'SharePoint Online',
+			'shared_office365': 'Office 365',
+			'shared_office365users': 'Office 365 Users',
+			'shared_outlook': 'Outlook',
+			'shared_teams': 'Microsoft Teams',
+			'shared_azuread': 'Azure AD',
+			'shared_azureblob': 'Azure Blob Storage',
+			'shared_dynamicsax': 'Dynamics 365 Finance',
+			'shared_sendmail': 'Send Email'
+		};
+
+		return friendlyNames[normalized] ?? normalized.replace('shared_', '').replace(/_/g, ' ');
+	}
+
+	/**
 	 * Determines if save is enabled.
-	 * Requires matching to be complete with no unmatched connectors.
+	 * Now checks if all connection references have a valid selection.
 	 */
 	private canSave(): boolean {
-		return this.matchResult !== undefined && !this.matchResult.hasUnmatchedConnectors();
+		if (!this.matchResult || this.sourceConnectionReferences.length === 0) {
+			return false;
+		}
+
+		// Check that all CRs have either a selected connection or manual entry
+		for (const cr of this.sourceConnectionReferences) {
+			const selection = this.connectionSelections.get(cr.connectionReferenceLogicalName);
+			if (!selection) {
+				return false;
+			}
+
+			const hasSelection = selection.selectedConnectionId !== null && selection.selectedConnectionId !== '';
+			const hasManual = selection.manualConnectionId !== '';
+
+			if (!hasSelection && !hasManual) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	private createCoordinator(): {
@@ -192,11 +328,14 @@ export class DeploymentSettingsPromotionPanel {
 		// Custom toolbar with three selectors and save button
 		const toolbarSection = new DeploymentSettingsToolbarSection();
 
-		// Status section in main content area
+		// Status section (shows instructions before data is loaded)
 		const statusSection = new DeploymentSettingsStatusSection();
 
+		// Connection reference mapping table
+		const mappingSection = new ConnectionReferenceMappingSection();
+
 		const compositionBehavior = new SectionCompositionBehavior(
-			[toolbarSection, statusSection],
+			[toolbarSection, statusSection, mappingSection],
 			PanelLayout.SingleColumn
 		);
 
@@ -274,6 +413,28 @@ export class DeploymentSettingsPromotionPanel {
 		);
 
 		this.coordinator.registerHandler(
+			'connectionSelectionChange',
+			async (data?: unknown) => {
+				if (typeof data === 'object' && data !== null && 'index' in data && 'connectionId' in data) {
+					const { index, connectionId } = data as { index: number; connectionId: string };
+					await this.handleConnectionSelectionChange(index, connectionId);
+				}
+			},
+			{ disableOnExecute: false }
+		);
+
+		this.coordinator.registerHandler(
+			'manualConnectionIdChange',
+			async (data?: unknown) => {
+				if (typeof data === 'object' && data !== null && 'index' in data && 'connectionId' in data) {
+					const { index, connectionId } = data as { index: number; connectionId: string };
+					await this.handleManualConnectionIdChange(index, connectionId);
+				}
+			},
+			{ disableOnExecute: false }
+		);
+
+		this.coordinator.registerHandler(
 			'saveDeploymentSettings',
 			async () => {
 				await this.handleSaveDeploymentSettings();
@@ -283,23 +444,76 @@ export class DeploymentSettingsPromotionPanel {
 	}
 
 	/**
+	 * Handles connection dropdown selection change.
+	 */
+	private async handleConnectionSelectionChange(index: number, connectionId: string): Promise<void> {
+		const cr = this.sourceConnectionReferences[index];
+		if (!cr) {
+			return;
+		}
+
+		const logicalName = cr.connectionReferenceLogicalName;
+		let selection = this.connectionSelections.get(logicalName);
+		if (!selection) {
+			selection = { selectedConnectionId: null, manualConnectionId: '' };
+			this.connectionSelections.set(logicalName, selection);
+		}
+
+		selection.selectedConnectionId = connectionId || null;
+
+		this.logger.debug('Connection selection changed', { logicalName, connectionId });
+
+		// Update save button state without full refresh (just update the button via message)
+		await this.panel.postMessage({
+			command: 'updateSaveButton',
+			data: { disabled: !this.canSave() }
+		});
+	}
+
+	/**
+	 * Handles manual connection ID input change.
+	 */
+	private async handleManualConnectionIdChange(index: number, connectionId: string): Promise<void> {
+		const cr = this.sourceConnectionReferences[index];
+		if (!cr) {
+			return;
+		}
+
+		const logicalName = cr.connectionReferenceLogicalName;
+		let selection = this.connectionSelections.get(logicalName);
+		if (!selection) {
+			selection = { selectedConnectionId: null, manualConnectionId: '' };
+			this.connectionSelections.set(logicalName, selection);
+		}
+
+		selection.manualConnectionId = connectionId;
+
+		this.logger.debug('Manual connection ID changed', { logicalName, connectionId });
+
+		// Update save button state
+		await this.panel.postMessage({
+			command: 'updateSaveButton',
+			data: { disabled: !this.canSave() }
+		});
+	}
+
+	/**
 	 * Handles source environment selection.
 	 * Loads solutions for the selected source environment.
 	 */
 	private async handleSourceEnvironmentChanged(environmentId: string): Promise<void> {
 		this.sourceEnvironmentId = environmentId;
-		this.solutionId = undefined; // Reset solution when source changes
-		this.matchResult = undefined; // Reset matching
+		this.solutionId = undefined;
+		this.matchResult = undefined;
 		this.sourceConnectionReferences = [];
+		this.connectionSelections.clear();
 
 		this.logger.info('Source environment changed', { environmentId });
 
-		// Update status
 		this.status = { stage: 'sourceSelected' };
 		await this.refreshPanel();
 
 		try {
-			// Load solutions for the source environment
 			this.logger.debug('Loading solutions for source environment');
 			this.solutions = await this.solutionRepository.findAllForDropdown(environmentId);
 
@@ -308,7 +522,6 @@ export class DeploymentSettingsPromotionPanel {
 				count: this.solutions.length
 			});
 
-			// Update solution dropdown via message
 			await this.panel.postMessage({
 				command: 'updateSolutionSelector',
 				data: {
@@ -329,13 +542,13 @@ export class DeploymentSettingsPromotionPanel {
 	 */
 	private async handleSolutionChanged(solutionId: string): Promise<void> {
 		this.solutionId = solutionId;
-		this.matchResult = undefined; // Reset matching
+		this.matchResult = undefined;
 		this.sourceConnectionReferences = [];
+		this.connectionSelections.clear();
 
 		const solution = this.solutions.find(s => s.id === solutionId);
 		this.logger.info('Solution changed', { solutionId, solutionName: solution?.name });
 
-		// Update status
 		if (this.targetEnvironmentId) {
 			this.status = { stage: 'loading' };
 		} else {
@@ -343,7 +556,6 @@ export class DeploymentSettingsPromotionPanel {
 		}
 		await this.refreshPanel();
 
-		// Trigger auto-load if target is also selected
 		await this.tryAutoLoad();
 	}
 
@@ -352,11 +564,11 @@ export class DeploymentSettingsPromotionPanel {
 	 */
 	private async handleTargetEnvironmentChanged(environmentId: string): Promise<void> {
 		this.targetEnvironmentId = environmentId;
-		this.matchResult = undefined; // Reset matching
+		this.matchResult = undefined;
+		this.connectionSelections.clear();
 
 		this.logger.info('Target environment changed', { environmentId });
 
-		// Update status
 		if (this.sourceEnvironmentId && this.solutionId) {
 			this.status = { stage: 'loading' };
 		} else {
@@ -364,7 +576,6 @@ export class DeploymentSettingsPromotionPanel {
 		}
 		await this.refreshPanel();
 
-		// Trigger auto-load if source and solution are also selected
 		await this.tryAutoLoad();
 	}
 
@@ -376,7 +587,6 @@ export class DeploymentSettingsPromotionPanel {
 			return;
 		}
 
-		// Prevent selecting same environment as source and target
 		if (this.sourceEnvironmentId === this.targetEnvironmentId) {
 			void vscode.window.showWarningMessage('Source and target environments must be different');
 			return;
@@ -392,14 +602,12 @@ export class DeploymentSettingsPromotionPanel {
 		await this.refreshPanel();
 
 		try {
-			// Load connection references from source environment + solution
 			const sourceResult = await this.listConnectionReferencesUseCase.execute(
 				this.sourceEnvironmentId,
 				this.solutionId
 			);
 			this.sourceConnectionReferences = sourceResult.connectionReferences;
 
-			// Load connections from target environment
 			const connectionRepo = this.createConnectionRepository(this.targetEnvironmentId);
 			this.targetConnections = await connectionRepo.findAll();
 
@@ -408,7 +616,6 @@ export class DeploymentSettingsPromotionPanel {
 				targetConnections: this.targetConnections.length
 			});
 
-			// Run matching
 			await this.runMatching();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -439,26 +646,12 @@ export class DeploymentSettingsPromotionPanel {
 			return;
 		}
 
-		// Extract unique ConnectorIds from source connection references
 		const sourceConnectorIds = new Set(
 			this.sourceConnectionReferences
 				.map((cr) => cr.connectorId)
 				.filter((id): id is string => id !== null)
 		);
 
-		// DEBUG: Log sample ConnectorIds from both sources to compare formats
-		const sampleSourceIds = Array.from(sourceConnectorIds).slice(0, 5);
-		const sampleTargetIds = this.targetConnections.slice(0, 5).map(c => c.connectorId);
-		this.logger.info('DEBUG: Sample source ConnectorIds (from ConnectionReference.connectorId)', {
-			sampleSourceIds,
-			totalUniqueSource: sourceConnectorIds.size
-		});
-		this.logger.info('DEBUG: Sample target ConnectorIds (from Connection.connectorId/apiId)', {
-			sampleTargetIds,
-			totalTarget: this.targetConnections.length
-		});
-
-		// Run matching algorithm
 		this.matchResult = this.connectorMappingService.matchConnectors(sourceConnectorIds, this.targetConnections);
 
 		const autoMatchedCount = this.matchResult.getAutoMatchedCount();
@@ -469,7 +662,10 @@ export class DeploymentSettingsPromotionPanel {
 			needsMapping: unmatchedCount
 		});
 
-		// Update status with matching results
+		// Clear old selections and let buildMappingViewModels auto-select
+		this.connectionSelections.clear();
+
+		// Update status - now show the mapping table
 		this.status = {
 			stage: 'matched',
 			connectionReferenceCount: this.sourceConnectionReferences.length,
@@ -477,55 +673,40 @@ export class DeploymentSettingsPromotionPanel {
 			unmatchedCount
 		};
 		await this.refreshPanel();
-
-		// Show results summary
-		if (unmatchedCount === 0) {
-			void vscode.window.showInformationMessage(
-				`All ${autoMatchedCount} connectors auto-matched! Ready to save.`
-			);
-		} else {
-			void vscode.window.showWarningMessage(
-				`${autoMatchedCount} connectors auto-matched, ${unmatchedCount} need manual mapping`
-			);
-		}
 	}
 
 	/**
 	 * Handles save button click.
-	 * Generates deployment settings JSON and prompts for file location.
+	 * Generates deployment settings JSON using user's selections.
 	 */
 	private async handleSaveDeploymentSettings(): Promise<void> {
 		this.logger.debug('Saving deployment settings');
 
-		if (!this.matchResult || !this.sourceConnectionReferences.length) {
+		if (!this.sourceConnectionReferences.length) {
 			void vscode.window.showErrorMessage('No data to save. Please complete the workflow first.');
 			return;
 		}
 
-		if (this.matchResult.hasUnmatchedConnectors()) {
-			void vscode.window.showErrorMessage('Cannot save: some connectors need manual mapping');
-			return;
-		}
-
 		try {
-			// Generate promoted connection references
-			const matchResult = this.matchResult;
+			// Generate connection references using user's selections
 			const promotedConnectionRefs = this.sourceConnectionReferences.map((cr) => {
-				if (cr.connectorId === null) {
-					return {
-						LogicalName: cr.connectionReferenceLogicalName,
-						ConnectionId: '',
-						ConnectorId: ''
-					};
+				const logicalName = cr.connectionReferenceLogicalName;
+				const selection = this.connectionSelections.get(logicalName);
+
+				// Determine ConnectionId: prefer dropdown selection, fall back to manual entry
+				let connectionId = '';
+				if (selection) {
+					if (selection.selectedConnectionId) {
+						connectionId = selection.selectedConnectionId;
+					} else if (selection.manualConnectionId) {
+						connectionId = selection.manualConnectionId;
+					}
 				}
 
-				const connections = matchResult.getConnectionsForConnector(cr.connectorId);
-				const defaultConn = this.connectorMappingService.selectDefaultConnection(connections);
-
 				return {
-					LogicalName: cr.connectionReferenceLogicalName,
-					ConnectionId: defaultConn?.id ?? '',
-					ConnectorId: cr.connectorId
+					LogicalName: logicalName,
+					ConnectionId: connectionId,
+					ConnectorId: cr.connectorId ?? ''
 				};
 			});
 
@@ -554,7 +735,6 @@ export class DeploymentSettingsPromotionPanel {
 				title: 'Save Deployment Settings'
 			};
 
-			// Only set defaultUri if we have a workspace folder
 			if (workspaceFolder) {
 				saveDialogOptions.defaultUri = vscode.Uri.joinPath(workspaceFolder, suggestedName);
 			}
@@ -565,14 +745,12 @@ export class DeploymentSettingsPromotionPanel {
 				return;
 			}
 
-			// Write file
 			const content = JSON.stringify(deploymentSettings, null, 2);
 			await vscode.workspace.fs.writeFile(saveUri, Buffer.from(content, 'utf8'));
 
 			this.logger.info('Deployment settings saved', { path: saveUri.fsPath });
 			void vscode.window.showInformationMessage(`Saved: ${saveUri.fsPath}`);
 
-			// Open the generated file
 			const doc = await vscode.workspace.openTextDocument(saveUri);
 			await vscode.window.showTextDocument(doc);
 		} catch (error) {

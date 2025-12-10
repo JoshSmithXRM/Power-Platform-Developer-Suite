@@ -274,3 +274,232 @@
 	border-radius: 4px;
 	color: var(--vscode-foreground);
 }
+
+/* ============================================
+   Connection Reference Mapping Table
+   ============================================ */
+
+.mapping-section {
+	margin: 16px;
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.mapping-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 12px 16px;
+	background: var(--vscode-sideBar-background);
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.mapping-header h3 {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+
+.mapping-summary {
+	font-size: 12px;
+}
+
+.summary-ok {
+	color: var(--vscode-testing-iconPassed);
+}
+
+.summary-warning {
+	color: var(--vscode-testing-iconQueued);
+}
+
+/* Table container with horizontal scroll */
+.mapping-table-container {
+	overflow-x: auto;
+}
+
+.mapping-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.mapping-table thead {
+	background: var(--vscode-sideBar-background);
+	position: sticky;
+	top: 0;
+}
+
+.mapping-table th {
+	padding: 10px 16px;
+	text-align: left;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.mapping-table th.col-source {
+	width: 50%;
+}
+
+.mapping-table th.col-target {
+	width: 50%;
+}
+
+.mapping-table tbody tr {
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.mapping-table tbody tr:last-child {
+	border-bottom: none;
+}
+
+.mapping-table tbody tr:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.mapping-table td {
+	padding: 12px 16px;
+	vertical-align: top;
+}
+
+/* Source column (left side) */
+.source-info {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+}
+
+.status-icon {
+	font-size: 14px;
+	line-height: 1.4;
+	flex-shrink: 0;
+}
+
+.source-details {
+	flex: 1;
+	min-width: 0;
+}
+
+.source-name {
+	font-family: var(--vscode-editor-font-family);
+	font-size: 13px;
+	color: var(--vscode-foreground);
+	word-break: break-word;
+}
+
+.source-connector {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 2px;
+}
+
+/* Target column (right side) */
+.target-selection {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.connection-dropdown {
+	width: 100%;
+	padding: 6px 10px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 2px;
+	font-size: 13px;
+	font-family: inherit;
+}
+
+.connection-dropdown:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.connection-count {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* Unmatched connection (manual input) */
+.target-unmatched {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.unmatched-warning {
+	font-size: 12px;
+	color: var(--vscode-testing-iconQueued);
+	font-weight: 500;
+}
+
+.manual-input-group {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.manual-input-group label {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.manual-connection-input {
+	width: 100%;
+	padding: 6px 10px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 2px;
+	font-size: 13px;
+	font-family: var(--vscode-editor-font-family);
+}
+
+.manual-connection-input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.manual-connection-input::placeholder {
+	color: var(--vscode-input-placeholderForeground);
+}
+
+.unmatched-tip {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+}
+
+/* Row status styling */
+.mapping-row.status-configured .status-icon {
+	color: var(--vscode-testing-iconPassed);
+}
+
+.mapping-row.status-multiple .status-icon {
+	color: var(--vscode-testing-iconQueued);
+}
+
+.mapping-row.status-unmatched .status-icon {
+	color: var(--vscode-testing-iconQueued);
+}
+
+.mapping-row.status-unmatched {
+	background: color-mix(in srgb, var(--vscode-testing-iconQueued) 5%, transparent);
+}
+
+/* Connection status in dropdown */
+.connection-dropdown option.status-connected {
+	color: var(--vscode-testing-iconPassed);
+}
+
+.connection-dropdown option.status-error {
+	color: var(--vscode-errorForeground);
+}
+
+.connection-dropdown option.status-unknown {
+	color: var(--vscode-descriptionForeground);
+}
