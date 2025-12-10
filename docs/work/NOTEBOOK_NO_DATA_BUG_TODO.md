@@ -482,3 +482,110 @@ The Metadata Browser's Raw Data tab now shows the **complete, unmodified API res
 - All 8,014 tests pass
 - Compile successful
 - Ready for F5 manual testing
+
+---
+
+## Session 5 Summary (2025-12-09) - Raw DTO Preservation for All Metadata Types
+
+### Goal
+Extend the raw DTO preservation pattern (implemented for AttributeMetadata in Session 4) to ALL metadata entity types displayed in the Metadata Browser's Raw Data tab.
+
+### Changes Made
+
+#### Domain Entities Updated
+Added `_rawDto` private field and `setRawDto()`, `getRawDto()`, `hasRawDto()` methods to:
+
+| Entity | Type Export |
+|--------|-------------|
+| `EntityMetadata` | `RawEntityDto` |
+| `OneToManyRelationship` | `RawOneToManyRelationshipDto` |
+| `ManyToManyRelationship` | `RawManyToManyRelationshipDto` |
+| `EntityKey` | `RawEntityKeyDto` |
+| `SecurityPrivilege` | `RawSecurityPrivilegeDto` |
+
+#### Mappers Updated
+Added `preserveRawDto` parameter (default: `true`) to mapper methods:
+
+| Mapper | Method |
+|--------|--------|
+| `EntityMetadataMapper` | `mapDtoToEntityWithoutAttributes()`, `mapDtoToEntityWithAttributes()` |
+| `RelationshipMetadataMapper` | `mapOneToManyDtoToEntity()`, `mapManyToManyDtoToEntity()` |
+| `EntityKeyMapper` | `mapDtoToEntity()` |
+| `SecurityPrivilegeMapper` | `mapDtoToEntity()` |
+
+Pattern used:
+```typescript
+const entity = Entity.create({ ... });
+if (preserveRawDto) {
+    entity.setRawDto(dto as unknown as Record<string, unknown>);
+}
+return entity;
+```
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `src/features/metadataBrowser/domain/entities/EntityMetadata.ts` | +30 lines - Raw DTO type, field, methods |
+| `src/features/metadataBrowser/domain/entities/OneToManyRelationship.ts` | +30 lines - Raw DTO type, field, methods |
+| `src/features/metadataBrowser/domain/entities/ManyToManyRelationship.ts` | +30 lines - Raw DTO type, field, methods |
+| `src/features/metadataBrowser/domain/entities/EntityKey.ts` | +30 lines - Raw DTO type, field, methods |
+| `src/features/metadataBrowser/domain/entities/SecurityPrivilege.ts` | +30 lines - Raw DTO type, field, methods |
+| `src/features/metadataBrowser/infrastructure/mappers/EntityMetadataMapper.ts` | +15 lines - Preserve raw DTOs |
+| `src/features/metadataBrowser/infrastructure/mappers/RelationshipMetadataMapper.ts` | +20 lines - Preserve raw DTOs |
+| `src/features/metadataBrowser/infrastructure/mappers/EntityKeyMapper.ts` | +10 lines - Preserve raw DTO |
+| `src/features/metadataBrowser/infrastructure/mappers/SecurityPrivilegeMapper.ts` | +10 lines - Preserve raw DTO |
+| `src/features/metadataBrowser/infrastructure/mappers/EntityMetadataMapper.test.ts` | Updated test assertions |
+
+### Testing Results
+- All tests pass
+- Compile successful (lint warnings only, no errors)
+
+### Next Steps
+1. **Panel serialization** - Update `MetadataBrowserPanel` to serialize raw DTOs for ALL entity types (not just AttributeMetadata) when opening the detail panel's Raw Data tab
+2. **Create serializers** - Add serializers for EntityMetadata, relationships, keys, and privileges (or use raw DTOs directly if available)
+3. **F5 testing** - Verify Raw Data tab shows complete API response for all metadata types
+4. **Phase 2** - Virtual field filtering in IntelliSense using the `AttributeOf` field
+
+---
+
+## Session 5 Continued: Race Condition Bug Fix
+
+### Bug Report
+**Symptom:** Clicking entities quickly in the Metadata Browser tree causes wrong data to display.
+- User clicks "account" then quickly clicks "contact"
+- Header shows "Contact" but attributes table shows Account fields
+
+### Root Cause
+Classic async race condition in `handleSelectEntity()`:
+1. Click "account" → sets `currentSelectionId = 'account'`, starts async API call
+2. Click "contact" quickly → sets `currentSelectionId = 'contact'`, starts another async call
+3. Account API call finishes first → posts account data to webview
+4. Webview shows "Contact" header (from state) but Account data (from stale response)
+
+### Fix Applied
+Added race condition guards to both `handleSelectEntity()` and `handleSelectChoice()`:
+
+```typescript
+const result = await this.loadEntityMetadataUseCase.execute(...);
+
+// Race condition guard: discard result if user selected something else while loading
+if (this.currentSelectionId !== logicalName || this.currentSelectionType !== 'entity') {
+    this.logger.debug('Selection changed during load, discarding stale result', {
+        requested: logicalName,
+        current: this.currentSelectionId
+    });
+    return;
+}
+
+await this.panel.postMessage(postData);
+```
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `src/features/metadataBrowser/presentation/panels/MetadataBrowserPanel.ts` | Added race condition guards to `handleSelectEntity()` and `handleSelectChoice()` |
+
+### Testing
+- All 22 MetadataBrowserPanel integration tests pass
+- Compile successful
+- Ready for F5 manual testing to verify fix

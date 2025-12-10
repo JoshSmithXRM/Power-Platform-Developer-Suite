@@ -37,12 +37,20 @@ export class AttributeMetadataSerializer implements IEntitySerializer<AttributeM
 
 	serializeToRaw(attribute: AttributeMetadata): Record<string, unknown> {
 		// If raw DTO is available, use it directly for 100% complete API response
-		// Check if method exists (for backwards compatibility with mocks/tests)
+		// Check both:
+		// 1. getRawDto() method - for domain entities with preserved raw DTO
+		// 2. _rawDto property - for JSON-serialized objects from webview (methods are lost in JSON)
 		if (typeof attribute.getRawDto === 'function') {
 			const rawDto = attribute.getRawDto();
 			if (rawDto) {
 				return rawDto;
 			}
+		}
+
+		// Check for _rawDto property directly (webview sends JSON, methods are lost)
+		const attributeAsRecord = attribute as unknown as Record<string, unknown>;
+		if (attributeAsRecord['_rawDto'] && typeof attributeAsRecord['_rawDto'] === 'object') {
+			return attributeAsRecord['_rawDto'] as Record<string, unknown>;
 		}
 
 		// Fallback: reconstruct from domain properties (incomplete, but better than nothing)

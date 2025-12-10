@@ -1,8 +1,21 @@
 /**
+ * Raw DTO preserved for serialization.
+ * This is the original API response before domain mapping.
+ * Used by the serializer to show complete raw data in Metadata Browser.
+ */
+export type RawManyToManyRelationshipDto = Record<string, unknown>;
+
+/**
  * Domain entity representing a many-to-many relationship in Dataverse.
  * Rich domain model with behavior methods.
  */
 export class ManyToManyRelationship {
+    /**
+     * Original raw DTO from API response.
+     * Preserved for Raw Data tab display - contains ALL fields from Dataverse API.
+     */
+    private _rawDto: RawManyToManyRelationshipDto | null = null;
+
     private constructor(
         public readonly metadataId: string,
         public readonly schemaName: string,
@@ -80,5 +93,30 @@ export class ManyToManyRelationship {
             return this.entity1LogicalName;
         }
         return null;
+    }
+
+    // Raw DTO preservation (for Metadata Browser Raw Data tab)
+
+    /**
+     * Sets the original raw DTO from API response.
+     * Called by the mapper after creating the entity to preserve complete API data.
+     */
+    public setRawDto(dto: RawManyToManyRelationshipDto): void {
+        this._rawDto = dto;
+    }
+
+    /**
+     * Gets the original raw DTO if available.
+     * Returns null if entity was created without preserving the DTO.
+     */
+    public getRawDto(): RawManyToManyRelationshipDto | null {
+        return this._rawDto;
+    }
+
+    /**
+     * Checks if raw DTO is available.
+     */
+    public hasRawDto(): boolean {
+        return this._rawDto !== null;
     }
 }

@@ -11,9 +11,12 @@ import type { EntityKeyDto } from '../dtos/EntityMetadataDto';
 export class EntityKeyMapper {
 	/**
 	 * Maps an entity key DTO to domain entity.
+	 *
+	 * @param dto - Entity key DTO from Dataverse API
+	 * @param preserveRawDto - Whether to preserve the raw DTO for Raw Data tab (default: true)
 	 */
-	public mapDtoToEntity(dto: EntityKeyDto): EntityKey {
-		return EntityKey.create({
+	public mapDtoToEntity(dto: EntityKeyDto, preserveRawDto: boolean = true): EntityKey {
+		const entity = EntityKey.create({
 			metadataId: dto.MetadataId,
 			logicalName: LogicalName.create(dto.LogicalName),
 			schemaName: SchemaName.create(dto.SchemaName),
@@ -23,5 +26,11 @@ export class EntityKeyMapper {
 			isManaged: dto.IsManaged,
 			entityKeyIndexStatus: dto.EntityKeyIndexStatus ?? null
 		});
+
+		if (preserveRawDto) {
+			entity.setRawDto(dto as unknown as Record<string, unknown>);
+		}
+
+		return entity;
 	}
 }
