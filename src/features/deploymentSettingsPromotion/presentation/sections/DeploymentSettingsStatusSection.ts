@@ -130,10 +130,10 @@ export class DeploymentSettingsStatusSection implements ISection {
 	}
 
 	private renderMatchingResults(status: DeploymentSettingsStatus): string {
-		const autoMatched = status.autoMatchedCount ?? 0;
-		const unmatched = status.unmatchedCount ?? 0;
 		const total = status.connectionReferenceCount ?? 0;
 
+		// If we have connection references, the mapping table handles display
+		// Only show status for empty state
 		if (total === 0) {
 			return `
 				<div class="status-container">
@@ -146,37 +146,8 @@ export class DeploymentSettingsStatusSection implements ISection {
 			`;
 		}
 
-		const allMatched = unmatched === 0;
-		const statusClass = allMatched ? 'status-success' : 'status-warning';
-		const statusIcon = allMatched ? '✓' : '⚠';
-
-		return `
-			<div class="status-container">
-				<div class="status-matching ${statusClass}">
-					<h3>${statusIcon} Connector Matching Complete</h3>
-					<div class="matching-summary">
-						<div class="match-item match-success">
-							<span class="match-count">${autoMatched}</span>
-							<span class="match-label">Auto-matched</span>
-						</div>
-						${unmatched > 0 ? `
-						<div class="match-item match-warning">
-							<span class="match-count">${unmatched}</span>
-							<span class="match-label">Need manual mapping</span>
-						</div>
-						` : ''}
-						<div class="match-item match-total">
-							<span class="match-count">${total}</span>
-							<span class="match-label">Connection References</span>
-						</div>
-					</div>
-					${allMatched
-						? '<p class="status-action">All connectors matched! Click "Save" to generate deployment settings.</p>'
-						: '<p class="status-action">Some connectors could not be auto-matched. Manual mapping is not yet supported.</p>'
-					}
-				</div>
-			</div>
-		`;
+		// Mapping table is visible - don't show redundant status
+		return '';
 	}
 
 	private renderError(status: DeploymentSettingsStatus): string {

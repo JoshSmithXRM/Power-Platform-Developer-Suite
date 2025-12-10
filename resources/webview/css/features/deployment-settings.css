@@ -2,6 +2,25 @@
  * Deployment Settings Promotion Panel Styles
  */
 
+/* Panel layout - toolbar fixed, content scrollable */
+.panel-container {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	overflow: hidden;
+}
+
+.toolbar-section {
+	flex-shrink: 0;
+}
+
+.main-section {
+	flex: 1;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding-bottom: 32px;
+}
+
 /* Toolbar with three selectors and save button */
 .deployment-settings-toolbar {
 	display: flex;
@@ -9,6 +28,11 @@
 	gap: 16px;
 	padding: 8px 16px;
 	flex-wrap: wrap;
+	background: var(--vscode-editor-background);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	position: sticky;
+	top: 0;
+	z-index: 10;
 }
 
 .selector-group {
