@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2025-12-10
+
+### Added
+
+- **MCP Integration** - Added Model Context Protocol (MCP) server support for Dataverse
+  - Enables AI assistants to interact with Dataverse data through MCP
+  - Configurable via extension settings
+
+### Fixed
+
+- **Notebooks - Cross-Cell Data Corruption** - Fixed critical bug where query results would appear in the wrong notebook cell
+  - Running Query 2 would cause its data to appear in Cell 1's output instead of Cell 2
+  - Root cause: Hardcoded element IDs caused DOM conflicts between cells
+  - Now generates unique IDs per cell output
+
+- **Notebooks - Virtual Field Transformation** - SQL notebooks now transparently handle virtual fields (`*name` columns)
+  - Selecting a virtual field like `createdbyname` automatically includes the parent field in the query
+  - Results are filtered to show only the columns the user requested
+  - Works for both lookup virtual fields (e.g., `createdbyname`) and optionset virtual fields (e.g., `statuscodename`)
+  - No more empty columns when selecting virtual fields without their parent
+
+- **Notebooks - Stop Button / Query Cancellation** - Stop button now properly cancels running queries
+  - Added interrupt handler to abort all active cell executions
+  - Multi-cell execution now stops at the current cell instead of continuing to the next
+  - Shows "Query cancelled" message when interrupted
+
+- **Notebooks - Abort Queries on Close** - Closing a notebook now aborts any running queries
+  - Prevents orphaned HTTP requests from continuing in the background
+  - Cleans up resources properly on notebook close
+
+- **Notebooks - Aggregate Column Headers** - Fixed column header inference for aggregate queries
+  - Aggregate functions now show correct column names
+  - Single-column query results align properly
+
+- **Notebooks - Aliased Lookup Display** - Fixed bug where aliased lookups showed the display name instead of GUID
+  - `SELECT createdby AS creator FROM account` now correctly shows GUID in `creator` column
+  - Auto-expanded `creatorname` column shows the display name
+  - Consistent with non-aliased lookup behavior
+
+- **IntelliSense - Filter Yomi Fields** - Yomi name fields (Japanese phonetic fields) are now hidden from IntelliSense
+  - Fields ending in `yominame` are not queryable via SQL/FetchXML
+  - These fields are now filtered out to prevent confusing query results
+
+- **Metadata Browser - Incomplete Properties Display** - Fixed Properties panel showing incomplete metadata
+  - All metadata types now preserve complete raw API response
+  - Properties panel shows ALL fields, not just mapped subset
+  - Developers can trust they're seeing complete metadata
+
+- **Metadata Browser - Global Option Set Properties** - Fixed Global Option Set properties panel showing incomplete data
+  - Now displays all option set properties from API
+  - Consistent with entity and attribute property display
+
+### Changed
+
+- **Notebooks - Remove Status Bar** - Removed the status bar footer from notebook query outputs
+  - Cleaner, more compact output display
+  - Row count and execution time still visible in VS Code notebook cell status
+
+- **Notebooks - Fix Table Whitespace** - Fixed excess whitespace in notebook tables
+  - Changed from fixed height to max-height for better fit with smaller result sets
+  - Tables now size appropriately to their content
+
 ## [0.3.2] - 2025-12-09
 
 ### Fixed
