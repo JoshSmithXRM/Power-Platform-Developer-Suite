@@ -100,7 +100,7 @@ describe('EntityMetadataMapper', () => {
 					IsActivity: false,
 					HasNotes: true,
 					HasActivities: true,
-					IsValidForAdvancedFind: true,
+					IsValidForAdvancedFind: createManagedProperty(true),
 					IsAuditEnabled: createManagedProperty(true),
 					IsValidForQueue: createManagedProperty(false)
 				};

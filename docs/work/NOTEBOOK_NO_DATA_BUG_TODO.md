@@ -344,3 +344,141 @@ Our Metadata Browser DTOs and domain entities are **incomplete**. The Web API re
 ### Next Session
 - Full metadata audit and completion
 - Then implement virtual field filtering using proper metadata
+
+---
+
+## Session 4 Summary (2025-12-10)
+
+### Completed - Phase 1: Full Metadata Audit
+
+#### Dev Tools Infrastructure
+- [x] Created permanent dev-only command: `power-platform-dev-suite.devDumpRawMetadata`
+- [x] Outputs raw entity metadata to "Power Platform Dev Tools" output channel
+- [x] Only visible in development mode (`enablement: powerPlatformDevSuite.isDevelopment`)
+- [x] Files: `src/features/devTools/initializeDevTools.ts`, updated `extension.ts` and `package.json`
+
+#### Metadata DTO Expansion
+Added 30+ missing fields to `AttributeMetadataDto`:
+
+| Category | Fields Added |
+|----------|--------------|
+| **Virtual Field Detection** | `AttributeOf`, `IsLogical` |
+| **OData** | `@odata.type`, `IsValidODataAttribute` |
+| **Versioning** | `HasChanged`, `IntroducedVersion`, `DeprecatedVersion`, `CreatedOn`, `ModifiedOn` |
+| **Schema** | `ColumnNumber`, `EntityLogicalName`, `ExternalName`, `LinkedAttributeId`, `InheritsFrom` |
+| **Source** | `SourceType`, `SourceTypeMask`, `FormulaDefinition`, `AutoNumberFormat`, `IsDataSourceSecret` |
+| **Form** | `IsRequiredForForm` |
+| **Managed Properties** | `IsAuditEnabled`, `IsGlobalFilterEnabled`, `IsSortableEnabled`, `IsCustomizable`, `IsRenameable`, `IsValidForAdvancedFind`, `CanModifyAdditionalSettings` |
+| **Picklist** | `DefaultFormValue`, `ParentPicklistLogicalName`, `ChildPicklistLogicalNames` |
+| **Other** | `Settings` |
+
+#### Domain Entity Enhancement
+Updated `AttributeMetadata` with:
+- New fields: `attributeOf`, `isLogical`, `sourceType`, `formulaDefinition`, `introducedVersion`, `deprecatedVersion`
+- New `SourceType` type: `0 | 1 | 2 | null` (simple/calculated/rollup)
+- New behavior methods:
+  - `isVirtualField()` - Checks if `attributeOf` is set
+  - `getParentAttribute()` - Gets parent attribute for virtual fields
+  - `isCalculatedField()` - Checks if `sourceType === 1`
+  - `isRollupField()` - Checks if `sourceType === 2`
+  - `hasFormula()` - Checks if formula definition exists
+  - `isDeprecated()` - Checks if deprecated version is set
+
+#### Updated Mapper & Serializer
+- `AttributeMetadataMapper.ts` - Maps all new fields from DTO to domain
+- `AttributeMetadataSerializer.ts` - Serializes new fields for detail panel
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `src/features/devTools/initializeDevTools.ts` | NEW - Dev tools initialization |
+| `src/extension.ts` | Added devTools initialization |
+| `package.json` | Added dev command |
+| `src/features/metadataBrowser/infrastructure/dtos/EntityMetadataDto.ts` | +50 lines - Added 30+ fields |
+| `src/features/metadataBrowser/domain/entities/AttributeMetadata.ts` | +80 lines - New fields & methods |
+| `src/features/metadataBrowser/infrastructure/mappers/AttributeMetadataMapper.ts` | +20 lines - Map new fields |
+| `src/features/metadataBrowser/presentation/serializers/AttributeMetadataSerializer.ts` | +15 lines - Serialize new fields |
+| `src/features/metadataBrowser/presentation/serializers/AttributeMetadataSerializer.test.ts` | Updated expectations |
+
+### Ready for Phase 2
+The `AttributeOf` and `IsLogical` fields are now available on `AttributeMetadata`.
+Use `attribute.isVirtualField()` to filter virtual fields in:
+- IntelliSense SELECT suggestions
+- IntelliSense ORDER BY suggestions
+- Data Explorer columns panel
+
+### Next Steps (Phase 2)
+1. Update IntelliSense providers to filter virtual fields from SELECT/ORDER BY
+2. Update Data Explorer columns panel to hide virtual fields
+3. Keep Metadata Browser unchanged (pure data tool)
+
+---
+
+## Session 4 Continued: Track 2 - Raw DTO Preservation
+
+### The Problem
+The Metadata Browser's "Raw Data" tab was reconstructing data from the domain entity instead of showing the actual API response. This caused:
+- Missing fields (ColumnNumber, CreatedOn, ModifiedOn, etc.)
+- Missing type-specific fields (ImeMode, DateTimeBehavior, etc.)
+- Missing managed properties (IsAuditEnabled, IsCustomizable, etc.)
+
+### The Solution
+Implemented "Track 2": Preserve the original raw DTO alongside the domain entity.
+
+### Changes Made
+
+#### 1. AttributeMetadata Domain Entity
+Added private `_rawDto` field and methods:
+```typescript
+private _rawDto: RawAttributeDto | null = null;
+
+public setRawDto(dto: RawAttributeDto): void { ... }
+public getRawDto(): RawAttributeDto | null { ... }
+public hasRawDto(): boolean { ... }
+```
+
+#### 2. AttributeMetadataMapper
+Updated `mapDtoToEntity()` to preserve the raw DTO:
+```typescript
+public mapDtoToEntity(dto: AttributeMetadataDto, preserveRawDto: boolean = true): AttributeMetadata {
+    const entity = AttributeMetadata.create({ ... });
+
+    if (preserveRawDto) {
+        entity.setRawDto(dto as unknown as Record<string, unknown>);
+    }
+
+    return entity;
+}
+```
+
+#### 3. AttributeMetadataSerializer
+Updated `serializeToRaw()` to use raw DTO if available:
+```typescript
+serializeToRaw(attribute: AttributeMetadata): Record<string, unknown> {
+    // If raw DTO is available, use it directly for 100% complete API response
+    if (typeof attribute.getRawDto === 'function') {
+        const rawDto = attribute.getRawDto();
+        if (rawDto) {
+            return rawDto;  // Complete API response!
+        }
+    }
+
+    // Fallback: reconstruct from domain properties (incomplete)
+    return { ... };
+}
+```
+
+### Result
+The Metadata Browser's Raw Data tab now shows the **complete, unmodified API response** from Dataverse. Every field is visible, exactly as returned by the API.
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `src/features/metadataBrowser/domain/entities/AttributeMetadata.ts` | Added `RawAttributeDto` type, private field, getter/setter |
+| `src/features/metadataBrowser/infrastructure/mappers/AttributeMetadataMapper.ts` | Preserve DTO after mapping |
+| `src/features/metadataBrowser/presentation/serializers/AttributeMetadataSerializer.ts` | Use raw DTO if available |
+
+### Testing
+- All 8,014 tests pass
+- Compile successful
+- Ready for F5 manual testing

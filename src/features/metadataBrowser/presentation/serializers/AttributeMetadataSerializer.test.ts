@@ -56,11 +56,16 @@ describe('AttributeMetadataSerializer', () => {
 					AttributeTypeName: {
 						Value: 'String'
 					},
+					// Virtual field detection
+					AttributeOf: null,
+					IsLogical: false,
+					// Ownership
 					IsCustomAttribute: true,
 					IsManaged: false,
 					IsPrimaryId: false,
 					IsPrimaryName: false,
 					RequiredLevel: 'None',
+					// Type-specific
 					MaxLength: 100,
 					Targets: null,
 					Precision: null,
@@ -68,18 +73,27 @@ describe('AttributeMetadataSerializer', () => {
 					MaxValue: null,
 					Format: null,
 					OptionSet: null,
+					// Validation
 					IsValidForCreate: true,
 					IsValidForUpdate: true,
 					IsValidForRead: true,
 					IsValidForForm: true,
 					IsValidForGrid: true,
+					// Security
 					IsSecured: false,
 					CanBeSecuredForRead: false,
 					CanBeSecuredForCreate: false,
 					CanBeSecuredForUpdate: false,
+					// Behavior
 					IsFilterable: true,
 					IsSearchable: true,
-					IsRetrievable: true
+					IsRetrievable: true,
+					// Source and calculation
+					SourceType: null,
+					FormulaDefinition: null,
+					// Versioning
+					IntroducedVersion: null,
+					DeprecatedVersion: null
 				});
 			});
 
@@ -619,11 +633,16 @@ describe('AttributeMetadataSerializer', () => {
 				expect(result).toHaveProperty('DisplayName');
 				expect(result).toHaveProperty('Description');
 				expect(result).toHaveProperty('AttributeTypeName');
+				// Virtual field detection
+				expect(result).toHaveProperty('AttributeOf');
+				expect(result).toHaveProperty('IsLogical');
+				// Ownership
 				expect(result).toHaveProperty('IsCustomAttribute');
 				expect(result).toHaveProperty('IsManaged');
 				expect(result).toHaveProperty('IsPrimaryId');
 				expect(result).toHaveProperty('IsPrimaryName');
 				expect(result).toHaveProperty('RequiredLevel');
+				// Type-specific
 				expect(result).toHaveProperty('MaxLength');
 				expect(result).toHaveProperty('Targets');
 				expect(result).toHaveProperty('Precision');
@@ -631,18 +650,27 @@ describe('AttributeMetadataSerializer', () => {
 				expect(result).toHaveProperty('MaxValue');
 				expect(result).toHaveProperty('Format');
 				expect(result).toHaveProperty('OptionSet');
+				// Validation
 				expect(result).toHaveProperty('IsValidForCreate');
 				expect(result).toHaveProperty('IsValidForUpdate');
 				expect(result).toHaveProperty('IsValidForRead');
 				expect(result).toHaveProperty('IsValidForForm');
 				expect(result).toHaveProperty('IsValidForGrid');
+				// Security
 				expect(result).toHaveProperty('IsSecured');
 				expect(result).toHaveProperty('CanBeSecuredForRead');
 				expect(result).toHaveProperty('CanBeSecuredForCreate');
 				expect(result).toHaveProperty('CanBeSecuredForUpdate');
+				// Behavior
 				expect(result).toHaveProperty('IsFilterable');
 				expect(result).toHaveProperty('IsSearchable');
 				expect(result).toHaveProperty('IsRetrievable');
+				// Source and calculation
+				expect(result).toHaveProperty('SourceType');
+				expect(result).toHaveProperty('FormulaDefinition');
+				// Versioning
+				expect(result).toHaveProperty('IntroducedVersion');
+				expect(result).toHaveProperty('DeprecatedVersion');
 
 				// Verify values match
 				expect(result['MetadataId']).toBe('meta-all-fields');

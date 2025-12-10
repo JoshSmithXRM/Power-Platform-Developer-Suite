@@ -20,6 +20,7 @@ import { initializeEnvironmentVariables } from './features/environmentVariables/
 import { initializePluginTraceViewer } from './features/pluginTraceViewer/presentation/initialization/initializePluginTraceViewer.js';
 import { initializeMetadataBrowser } from './features/metadataBrowser/presentation/initialization/initializeMetadataBrowser.js';
 import { initializePersistenceInspector } from './features/persistenceInspector/presentation/initialization/initializePersistenceInspector.js';
+import { initializeDevTools } from './features/devTools/initializeDevTools.js';
 import { initializeDataExplorer } from './features/dataExplorer/presentation/initialization/initializeDataExplorer.js';
 import { initializeWebResources } from './features/webResources/presentation/initialization/initializeWebResources.js';
 import { registerDataverseNotebooks } from './features/dataExplorer/notebooks/registerNotebooks.js';
@@ -80,9 +81,19 @@ export function activate(context: vscode.ExtensionContext): void {
 	const isDevelopment = context.extensionMode === vscode.ExtensionMode.Development;
 	void vscode.commands.executeCommand('setContext', 'powerPlatformDevSuite.isDevelopment', isDevelopment);
 
-	// Initialize Persistence Inspector in development mode
+	// Initialize development-only tools
 	if (isDevelopment) {
 		void initializePersistenceInspector(context, container.eventPublisher, container.logger);
+		initializeDevTools(
+			context,
+			container.environmentRepository,
+			() => new DataverseApiService(
+				factories.dataverseApiServiceFactory.getAccessToken,
+				factories.dataverseApiServiceFactory.getDataverseUrl,
+				container.logger
+			),
+			container.logger
+		);
 	}
 
 	// Create and register tree view providers
