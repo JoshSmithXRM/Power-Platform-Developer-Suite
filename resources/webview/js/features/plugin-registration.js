@@ -204,7 +204,7 @@ function renderFlatNode(item, depth) {
 			 data-type="${item.type}"
 			 data-has-children="${hasChildren}"
 			 data-depth="${depth}"
-			 data-vscode-context='${vscodeContext}'
+			 data-vscode-context="${vscodeContext}"
 			 style="padding-left: ${indent + 8}px">
 			<span class="tree-node-toggle ${toggleClass}"></span>
 			<span class="tree-node-icon">${icon}</span>
@@ -280,6 +280,8 @@ function renderVirtualTreeContent(pluginTree) {
 /**
  * Build VS Code context menu data for a tree node.
  * This enables VS Code native right-click menus via data-vscode-context.
+ *
+ * IMPORTANT: The returned JSON must have double-quotes escaped for HTML attribute.
  */
 function buildVscodeContext(item) {
 	const context = {
@@ -300,7 +302,8 @@ function buildVscodeContext(item) {
 		context.canUpdate = item.metadata.canUpdate === true;
 	}
 
-	return JSON.stringify(context);
+	// Escape for use in HTML attribute with double quotes
+	return JSON.stringify(context).replace(/"/g, '&quot;');
 }
 
 /**
@@ -331,7 +334,7 @@ function renderNode(item, depth) {
 			 data-id="${item.id}"
 			 data-type="${item.type}"
 			 data-has-children="${hasChildren}"
-			 data-vscode-context='${vscodeContext}'
+			 data-vscode-context="${vscodeContext}"
 			 style="padding-left: ${indent + 8}px">
 			<span class="tree-node-toggle ${toggleClass}"></span>
 			<span class="tree-node-icon">${icon}</span>
@@ -909,7 +912,7 @@ function renderNodeOnly(item, depth, isExpanded) {
 			 data-id="${item.id}"
 			 data-type="${item.type}"
 			 data-has-children="${hasChildren}"
-			 data-vscode-context='${vscodeContext}'
+			 data-vscode-context="${vscodeContext}"
 			 style="padding-left: ${indent + 8}px">
 			<span class="tree-node-toggle ${toggleClass}"></span>
 			<span class="tree-node-icon">${icon}</span>
