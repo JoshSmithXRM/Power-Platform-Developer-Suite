@@ -306,3 +306,11 @@
 .tree-node.filter-match .tree-node-label {
 	background: var(--vscode-editor-findMatchHighlightBackground);
 }
+
+/* Virtual scrolling spacers */
+.virtual-spacer-top,
+.virtual-spacer-bottom {
+	display: block;
+	width: 100%;
+	pointer-events: none;
+}
