@@ -105,8 +105,27 @@ export class LoadPluginRegistrationTreeUseCase {
 	}
 
 	/**
+	 * Creates a progress tracker for parallel repository fetches.
+	 */
+	private createProgressTracker(reportProgress: LoadingProgressCallback): (name: string) => void {
+		const repoNames = ['packages', 'assemblies', 'plugin types', 'steps', 'images'];
+		const completedNames: string[] = [];
+
+		return (repoName: string): void => {
+			completedNames.push(repoName);
+			const percent = 10 + Math.round((completedNames.length / repoNames.length) * 80);
+			const remaining = repoNames.filter((n) => !completedNames.includes(n));
+			const message =
+				remaining.length > 0
+					? `Loaded ${completedNames.join(', ')}... (${remaining.length} remaining)`
+					: 'All data loaded';
+			reportProgress(message, percent);
+		};
+	}
+
+	/**
 	 * Fetches all data from repositories with progress reporting.
-	 * Uses parallel fetching for better performance - all repos fetch concurrently.
+	 * Uses parallel fetching - reports progress as each repository completes.
 	 */
 	private async fetchAllData(
 		environmentId: string,
@@ -114,19 +133,33 @@ export class LoadPluginRegistrationTreeUseCase {
 		reportProgress: LoadingProgressCallback
 	): Promise<BulkFetchResult> {
 		const startTime = Date.now();
+		const trackProgress = this.createProgressTracker(reportProgress);
 
 		reportProgress('Fetching data from Dataverse...', 10);
 
-		// Parallel fetch all data - steps is the bottleneck, so run everything concurrently
+		// Parallel fetch all data with progress tracking per repository
 		const [packages, assemblies, pluginTypes, steps, images] = await Promise.all([
-			this.packageRepository.findAll(environmentId, solutionId),
-			this.assemblyRepository.findAll(environmentId, solutionId),
-			this.pluginTypeRepository.findAll(environmentId),
-			this.stepRepository.findAll(environmentId),
-			this.imageRepository.findAll(environmentId),
+			this.packageRepository.findAll(environmentId, solutionId).then((r) => {
+				trackProgress('packages');
+				return r;
+			}),
+			this.assemblyRepository.findAll(environmentId, solutionId).then((r) => {
+				trackProgress('assemblies');
+				return r;
+			}),
+			this.pluginTypeRepository.findAll(environmentId).then((r) => {
+				trackProgress('plugin types');
+				return r;
+			}),
+			this.stepRepository.findAll(environmentId).then((r) => {
+				trackProgress('steps');
+				return r;
+			}),
+			this.imageRepository.findAll(environmentId).then((r) => {
+				trackProgress('images');
+				return r;
+			}),
 		]);
-
-		reportProgress('Building tree...', 90);
 
 		this.logger.debug('LoadPluginRegistrationTreeUseCase: Bulk fetch complete', {
 			packages: packages.length,
