@@ -624,17 +624,22 @@ export class DataverseNotebookController {
 				font-family: var(--vscode-font-family);
 				color: var(--vscode-foreground);
 				background: var(--vscode-editor-background);
+				margin: 0;
+				padding: 0;
 			}
 			.virtual-scroll-container {
-				height: ${DataverseNotebookController.CONTAINER_HEIGHT}px;
+				max-height: ${DataverseNotebookController.CONTAINER_HEIGHT}px;
 				overflow-y: auto;
 				overflow-x: auto;
 				position: relative;
+				margin: 0;
+				padding: 0;
 			}
 			.results-table {
 				width: max-content;
 				min-width: 100%;
 				border-collapse: collapse;
+				margin: 0;
 			}
 			.header-cell {
 				padding: 8px 12px;
