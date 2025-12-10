@@ -207,33 +207,140 @@ The code incorrectly identifies integer aggregates as `optionset`, triggering vi
 
 ## Implementation Checklist (Updated)
 
-### Bug 1: Duplicate Element IDs - FIXED
+### Bug 1: Duplicate Element IDs - FIXED ✓
 - [x] Identify root cause
 - [x] Write regression tests documenting bug
 - [x] Implement fix (unique IDs per cell)
 - [x] Update tests to verify unique IDs
 - [x] Manual testing with multi-cell notebook
 
-### Bug 2: Aggregate `countname` Column - OPEN
+### Bug 2: Aggregate `countname` Column - FIXED ✓
 - [x] Identify root cause (inferDataType returns 'optionset' for integer aggregates)
-- [ ] Write regression test
-- [ ] Fix data type inference for aggregates
+- [x] Write regression tests (3 tests added)
+- [x] Fix data type inference for aggregates
 - [ ] Manual testing
 
-### Bug 3: Single Column Text Alignment - OPEN (NEW)
+**Fix:** Added `isNumericFormattedValue()` helper in `DataverseDataExplorerQueryRepository.ts`.
+Integer values with FormattedValue that parses as a number are now identified as `'number'` type,
+not `'optionset'`. This prevents spurious `{column}name` virtual columns for aggregates.
+
+**Tests added:**
+1. `should NOT create spurious name columns for aggregate COUNT results`
+2. `should NOT create spurious name columns for aggregate SUM results`
+3. `should handle aggregate COUNT with large numbers and locale formatting`
+
+### Bug 3: Single Column Text Alignment - FIXED ✓
 **Symptom:** When query returns only 1 column, cell text is right-aligned but header is left-aligned.
 
-**Screenshot:** Single column query shows misaligned text - headers left, data right.
+**Root Cause:** `.data-cell` CSS class was missing `text-align: left;` property.
+Header cells had `text-align: left;` but data cells relied on browser default alignment.
 
-**Root Cause:** TBD - likely CSS issue in notebook styles or virtual scroll renderer.
+**Fix:** Added `text-align: left;` to `.data-cell` class in `DataverseNotebookController.ts:668`.
 
-- [ ] Identify root cause
-- [ ] Write regression test
-- [ ] Fix CSS alignment
+- [x] Identify root cause
+- [x] Fix CSS alignment
 - [ ] Manual testing
 
-### Issue 4: Virtual Column Behavior - INVESTIGATING
+### Issue 4: Virtual Column Behavior - DOCUMENTED (NOT A BUG) ✓
 - [x] Add debug command for API testing
-- [ ] Run debug command to capture raw API response
-- [ ] Determine if Dataverse behavior or our bug
-- [ ] Implement fix if needed
+- [x] Register debug command in package.json (now visible in command palette when in dev mode)
+- [x] Run debug command to capture raw API response
+- [x] Determine if Dataverse behavior or our bug → **Dataverse behavior**
+
+**Findings from API tests (2025-12-09):**
+
+| Query | Dataverse Returns |
+|-------|-------------------|
+| `SELECT createdbyname` | Only `accountid` (ignores virtual column) |
+| `SELECT createdby, createdbyname` | `_createdby_value` + FormattedValue annotation (ignores createdbyname) |
+| `SELECT createdby` | `_createdby_value` + FormattedValue annotation (name in annotation) |
+
+**Conclusion:** `createdbyname` and similar virtual columns are NOT queryable via FetchXML.
+Dataverse ignores them and returns the lookup value with the name in the `FormattedValue` annotation.
+Our code correctly handles this by extracting names from annotations.
+
+**No fix needed** - this is expected Dataverse behavior.
+
+---
+
+## Issue 5: Virtual Fields in IntelliSense and Data Explorer
+
+### Problem Statement
+Virtual fields (like `createdbyname`, `statuscodename`) should not appear in:
+- IntelliSense SELECT suggestions (they return empty)
+- Data Explorer columns panel (can't be selected)
+
+But they SHOULD appear in:
+- IntelliSense WHERE suggestions (filtering works!)
+- IntelliSense ORDER BY - **Hide** (redundant - sorts same as real field)
+
+### Key Findings from Testing
+
+| Operation | Virtual Field | Real Field | Notes |
+|-----------|--------------|------------|-------|
+| SELECT | Returns empty | Works | Virtual not retrievable |
+| WHERE | Works (filters by label) | Works (filters by value) | Both valid, different comparison |
+| ORDER BY | Sorts by label | Also sorts by label! | Identical behavior - virtual redundant |
+
+### Metadata Discovery
+
+Dataverse metadata includes fields we're NOT capturing:
+
+| Missing Field | Purpose |
+|---------------|---------|
+| `AttributeOf` | Parent attribute (e.g., `createdbyname` → `createdby`) |
+| `IsLogical` | Whether it's a logical/computed attribute |
+| `SourceType` | 0=simple, 1=calculated, 2=rollup |
+| `LinkedAttributeId` | For linked attributes |
+| Many others... | Full audit needed |
+
+### Root Cause
+Our Metadata Browser DTOs and domain entities are **incomplete**. The Web API returns these fields but we're not capturing them.
+
+---
+
+## REVISED PLAN: Full Metadata Audit
+
+### Phase 1: Complete Metadata Capture (NEW SESSION)
+**Goal:** Capture ALL attribute metadata fields from Dataverse Web API
+
+1. **Audit current DTOs** - Document what we have vs what API returns
+2. **Add ALL missing fields** to `AttributeMetadataDto`
+3. **Update domain entity** `AttributeMetadata` with new fields
+4. **Update mappers** to propagate all fields
+5. **Update serializer** for detail panel display
+6. **Test** - Verify all fields appear in Metadata Browser raw view
+
+### Phase 2: Use Metadata for Filtering
+**Goal:** Filter virtual fields properly using `AttributeOf` field
+
+1. **IntelliSense** - Context-aware filtering:
+   - SELECT: Hide fields where `AttributeOf` is set (virtual)
+   - WHERE: Show all fields (virtual filtering works)
+   - ORDER BY: Hide fields where `AttributeOf` is set (redundant)
+2. **Data Explorer columns panel** - Hide virtual fields
+3. **No changes to Metadata Browser** - Keep showing everything
+
+### Decision Made
+- Context-aware IntelliSense: **YES**
+- Use `AttributeOf` for filtering: **YES** (not pattern matching)
+- Metadata Browser changes: **NO** (keep as pure data tool)
+
+---
+
+## Session 3 Summary (2025-12-09)
+
+### Completed
+- [x] Bug 2: Aggregate countname - FIXED with tests
+- [x] Bug 3: Single column alignment - FIXED
+- [x] Issue 4: Virtual column investigation - Documented as Dataverse behavior
+- [x] Removed temporary debug command (investigation complete)
+
+### Discovered
+- Virtual fields work in WHERE but not SELECT
+- ORDER BY on virtual field = same as real field (sorts by label)
+- Our metadata is incomplete - missing `AttributeOf`, `IsLogical`, etc.
+
+### Next Session
+- Full metadata audit and completion
+- Then implement virtual field filtering using proper metadata

@@ -665,6 +665,7 @@ export class DataverseNotebookController {
 				padding: 8px 12px;
 				white-space: nowrap;
 				vertical-align: middle;
+				text-align: left;
 			}
 			.data-cell a {
 				color: var(--vscode-textLink-foreground);
