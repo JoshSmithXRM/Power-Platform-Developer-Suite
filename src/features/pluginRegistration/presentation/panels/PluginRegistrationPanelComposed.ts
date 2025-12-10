@@ -375,45 +375,30 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		await this.loadingBehavior.setLoading(true);
 
 		try {
-			// Show VS Code progress notification with step updates
-			await vscode.window.withProgress(
-				{
-					location: vscode.ProgressLocation.Notification,
-					title: 'Loading Plugin Registration',
-					cancellable: false,
-				},
-				async (progress) => {
-					// Progress callback updates both VS Code notification and webview
-					const onProgress = (step: string, percent: number): void => {
-						progress.report({ message: step, increment: percent > 0 ? 20 : 0 });
-						// Also update webview for in-panel feedback
-						void this.panel.postMessage({
-							command: 'updateLoadingProgress',
-							data: { step, percent },
-						});
-					};
+			// Progress callback updates webview only (no status bar notification - panel UI is sufficient)
+			const onProgress = (step: string, percent: number): void => {
+				void this.panel.postMessage({
+					command: 'updateLoadingProgress',
+					data: { step, percent },
+				});
+			};
 
-					const result = await this.useCases.loadTree.execute(
-						this.currentEnvironmentId,
-						this.currentSolutionId === DEFAULT_SOLUTION_ID ? undefined : this.currentSolutionId,
-						onProgress
-					);
-
-					const treeItems = this.treeMapper.toTreeItems(
-						result.packages,
-						result.standaloneAssemblies
-					);
-
-					this.logger.info('Plugin registration tree loaded', {
-						totalNodeCount: result.totalNodeCount,
-					});
-
-					await this.panel.postMessage({
-						command: 'updateTree',
-						data: { treeItems, isEmpty: result.totalNodeCount === 0 },
-					});
-				}
+			const result = await this.useCases.loadTree.execute(
+				this.currentEnvironmentId,
+				this.currentSolutionId === DEFAULT_SOLUTION_ID ? undefined : this.currentSolutionId,
+				onProgress
 			);
+
+			const treeItems = this.treeMapper.toTreeItems(result.packages, result.standaloneAssemblies);
+
+			this.logger.info('Plugin registration tree loaded', {
+				totalNodeCount: result.totalNodeCount,
+			});
+
+			await this.panel.postMessage({
+				command: 'updateTree',
+				data: { treeItems, isEmpty: result.totalNodeCount === 0 },
+			});
 		} catch (error: unknown) {
 			this.logger.error('Error loading plugin registration tree', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
