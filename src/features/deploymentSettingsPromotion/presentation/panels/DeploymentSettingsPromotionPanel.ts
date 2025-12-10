@@ -209,13 +209,14 @@ export class DeploymentSettingsPromotionPanel {
 
 	/**
 	 * Builds the mapping view models from current state.
+	 * Sorted: items needing attention first, then alphabetically by logicalName.
 	 */
 	private buildMappingViewModels(): ConnectionReferenceMappingViewModel[] {
 		if (!this.matchResult || this.sourceConnectionReferences.length === 0) {
 			return [];
 		}
 
-		return this.sourceConnectionReferences.map((cr) => {
+		const viewModels = this.sourceConnectionReferences.map((cr) => {
 			const connectorId = cr.connectorId;
 			const logicalName = cr.connectionReferenceLogicalName;
 
@@ -278,6 +279,43 @@ export class DeploymentSettingsPromotionPanel {
 				manualConnectionId: selection.manualConnectionId
 			};
 		});
+
+		// Sort: needs attention first, then alphabetically by logicalName
+		return this.sortMappingsForDisplay(viewModels);
+	}
+
+	/**
+	 * Sorts mappings: items needing attention first, then alphabetically by logicalName.
+	 */
+	private sortMappingsForDisplay(
+		mappings: ConnectionReferenceMappingViewModel[]
+	): ConnectionReferenceMappingViewModel[] {
+		return [...mappings].sort((a, b) => {
+			const aNeedsAttention = this.needsAttention(a);
+			const bNeedsAttention = this.needsAttention(b);
+
+			// Needs attention items come first
+			if (aNeedsAttention && !bNeedsAttention) return -1;
+			if (!aNeedsAttention && bNeedsAttention) return 1;
+
+			// Within same group, sort by logicalName
+			return a.logicalName.localeCompare(b.logicalName);
+		});
+	}
+
+	/**
+	 * Determines if a mapping needs user attention.
+	 */
+	private needsAttention(mapping: ConnectionReferenceMappingViewModel): boolean {
+		// Unmatched without selection needs attention
+		if (mapping.status === 'unmatched') {
+			return mapping.selectedConnectionId === null && mapping.manualConnectionId === '';
+		}
+		// Multiple options without selection needs attention
+		if (mapping.status === 'multiple') {
+			return mapping.selectedConnectionId === null;
+		}
+		return false;
 	}
 
 	/**
