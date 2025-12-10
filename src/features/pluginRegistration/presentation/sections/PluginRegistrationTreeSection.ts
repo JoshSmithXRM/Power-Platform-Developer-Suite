@@ -51,7 +51,8 @@ export class PluginRegistrationTreeSection implements ISection {
 				</div>
 
 				<!-- Tree Container -->
-				<div class="tree-container" id="pluginTree" style="display: none;">
+				<div class="tree-container" id="pluginTree" style="display: none;"
+					 data-vscode-context='{"preventDefaultContextMenuItems": true}'>
 				</div>
 
 				<!-- Empty State -->

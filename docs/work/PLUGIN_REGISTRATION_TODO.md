@@ -370,8 +370,43 @@ After Expand All:
 - Filter with virtual scroll: Works correctly
 
 **Testing Needed:**
-- [ ] F5 test with large dataset
-- [ ] Verify expand/collapse behavior
-- [ ] Verify filter behavior in both modes
-- [ ] Verify context menus still work
-- [ ] Verify Expand All / Collapse All buttons work
+- [x] F5 test with large dataset - DONE
+- [x] Verify expand/collapse behavior - DONE
+- [x] Verify filter behavior in both modes - DONE
+- [x] Verify context menus still work - DONE (see Session 7)
+- [x] Verify Expand All / Collapse All buttons work - DONE
+
+### Session 7 (2025-12-10)
+**Context Menu Fixes & UX Improvements**
+
+**Problem 1: Duplicate progress indicators**
+- Both panel loading bar AND status bar notification shown
+- Fix: Removed status bar notification, panel UI is sufficient
+
+**Problem 2: Context menus not appearing**
+- `data-vscode-context` attribute wasn't being read by VS Code
+- Root cause: HTML escaping issue with quotes
+- Fix: Use single quotes for attribute, raw JSON inside
+- Added `preventDefaultContextMenuItems: true` to tree container
+
+**Problem 3: Managed steps couldn't be enabled/disabled**
+- Business rule incorrectly prevented enable/disable on managed steps
+- Fix: Removed managed check from `canEnable()` and `canDisable()` in PluginStep entity
+- Developers need this for debugging - don't artificially limit
+
+**Problem 4: Step loses position after enable/disable** - BUG FOUND
+- After enabling/disabling a step, it appears at wrong position in tree
+- Likely issue with `handleNodeUpdate()` targeted DOM update
+- Need to investigate and fix
+
+**Known Limitation: Virtual Entity plugins can't be disabled**
+- Dataverse returns error 0x80044184: "Invalid plug-in registration stage"
+- These are internal system plugins with special stages
+- Not a bug in our code - Dataverse limitation
+
+**Files Modified:**
+- `PluginRegistrationPanelComposed.ts` - Removed duplicate status bar notification
+- `PluginStep.ts` - Allow enable/disable on managed steps
+- `plugin-registration.js` - Fixed context menu attribute escaping
+- `PluginRegistrationTreeSection.ts` - Added preventDefaultContextMenuItems to container
+- `package.json` - Simplified when clause conditions (truthy checks)

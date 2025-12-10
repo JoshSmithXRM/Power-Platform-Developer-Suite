@@ -204,7 +204,7 @@ function renderFlatNode(item, depth) {
 			 data-type="${item.type}"
 			 data-has-children="${hasChildren}"
 			 data-depth="${depth}"
-			 data-vscode-context="${vscodeContext}"
+			 data-vscode-context='${vscodeContext}'
 			 style="padding-left: ${indent + 8}px">
 			<span class="tree-node-toggle ${toggleClass}"></span>
 			<span class="tree-node-icon">${icon}</span>
@@ -281,7 +281,7 @@ function renderVirtualTreeContent(pluginTree) {
  * Build VS Code context menu data for a tree node.
  * This enables VS Code native right-click menus via data-vscode-context.
  *
- * IMPORTANT: The returned JSON must have double-quotes escaped for HTML attribute.
+ * Returns raw JSON string - use with single-quoted HTML attribute.
  */
 function buildVscodeContext(item) {
 	const context = {
@@ -302,8 +302,7 @@ function buildVscodeContext(item) {
 		context.canUpdate = item.metadata.canUpdate === true;
 	}
 
-	// Escape for use in HTML attribute with double quotes
-	return JSON.stringify(context).replace(/"/g, '&quot;');
+	return JSON.stringify(context);
 }
 
 /**
@@ -334,7 +333,7 @@ function renderNode(item, depth) {
 			 data-id="${item.id}"
 			 data-type="${item.type}"
 			 data-has-children="${hasChildren}"
-			 data-vscode-context="${vscodeContext}"
+			 data-vscode-context='${vscodeContext}'
 			 style="padding-left: ${indent + 8}px">
 			<span class="tree-node-toggle ${toggleClass}"></span>
 			<span class="tree-node-icon">${icon}</span>
@@ -842,7 +841,7 @@ window.createBehavior({
 
 /**
  * Update a single node in the tree (e.g., after enable/disable step).
- * Uses targeted DOM update instead of full re-render.
+ * Uses full re-render to ensure correct positioning.
  * @param {Object} data - { nodeId, updatedNode }
  */
 function handleNodeUpdate(data) {
@@ -852,128 +851,19 @@ function handleNodeUpdate(data) {
 	// Update data model
 	updateNodeInTree(treeData, nodeId, updatedNode);
 
-	// Find the DOM node and replace it in place
-	const pluginTree = document.getElementById('pluginTree');
-	if (!pluginTree) return;
+	// Re-render tree to ensure correct positioning
+	// (Targeted DOM updates caused positioning bugs with virtual scrolling)
+	renderTree(treeData);
 
-	const existingNode = pluginTree.querySelector(`.tree-node[data-id="${nodeId}"]`);
-	if (existingNode) {
-		const depth = getNodeDepth(existingNode);
-		const wasExpanded = expandedNodes.has(nodeId);
-
-		// Preserve children container if it exists
-		const childrenContainer = existingNode.nextElementSibling;
-		const hasChildrenContainer = childrenContainer && childrenContainer.classList.contains('tree-children');
-
-		// Create new node HTML (without children - they're separate)
-		const nodeHtml = renderNodeOnly(updatedNode, depth, wasExpanded);
-
-		// Replace the node element
-		existingNode.insertAdjacentHTML('beforebegin', nodeHtml);
-		const newNode = existingNode.previousElementSibling;
-		existingNode.remove();
-
-		// Attach click handler
-		newNode.addEventListener('click', handleNodeClick);
-
-		// Apply filter if active
-		if (currentFilter) {
-			const visibleNodeIds = getVisibleNodeIds();
-			newNode.style.display = visibleNodeIds.has(nodeId) ? 'flex' : 'none';
-		}
+	// Re-apply filter if active
+	if (currentFilter) {
+		filterTree(currentFilter);
 	}
-}
-
-/**
- * Render just the node element (no children).
- * Used for targeted updates.
- */
-function renderNodeOnly(item, depth, isExpanded) {
-	const hasChildren = item.children && item.children.length > 0;
-	const indent = depth * 16;
-
-	const isDisabledStep = item.type === 'step' && item.metadata?.isEnabled === false;
-	const classes = [
-		'tree-node',
-		item.isManaged ? 'managed' : '',
-		isDisabledStep ? 'disabled' : ''
-	].filter(Boolean).join(' ');
-
-	const toggleClass = hasChildren
-		? (isExpanded ? 'expanded' : 'collapsed')
-		: 'leaf';
-
-	const icon = getIcon(item.type, item.icon);
-	const badge = getBadge(item);
-	const vscodeContext = buildVscodeContext(item);
-
-	return `
-		<div class="${classes}"
-			 data-id="${item.id}"
-			 data-type="${item.type}"
-			 data-has-children="${hasChildren}"
-			 data-vscode-context="${vscodeContext}"
-			 style="padding-left: ${indent + 8}px">
-			<span class="tree-node-toggle ${toggleClass}"></span>
-			<span class="tree-node-icon">${icon}</span>
-			<span class="tree-node-label">${escapeHtml(item.displayName)}</span>
-			${badge ? `<span class="tree-node-badge">${badge}</span>` : ''}
-		</div>
-	`;
-}
-
-/**
- * Get set of visible node IDs based on current filter.
- * Used for targeted update visibility checks.
- */
-function getVisibleNodeIds() {
-	const visibleNodeIds = new Set();
-	const term = currentFilter.toLowerCase().trim();
-
-	if (term === '') {
-		// No filter - all nodes visible (return empty set as indicator)
-		return visibleNodeIds;
-	}
-
-	function markMatchingBranches(item) {
-		const nodeMatches = item.displayName.toLowerCase().includes(term);
-		let hasMatchingDescendant = false;
-		if (item.children && item.children.length > 0) {
-			for (const child of item.children) {
-				if (markMatchingBranches(child)) {
-					hasMatchingDescendant = true;
-				}
-			}
-		}
-		if (nodeMatches || hasMatchingDescendant) {
-			visibleNodeIds.add(item.id);
-			if (nodeMatches && item.children) {
-				markAllDescendantsVisible(item.children);
-			}
-			return true;
-		}
-		return false;
-	}
-
-	function markAllDescendantsVisible(children) {
-		for (const child of children) {
-			visibleNodeIds.add(child.id);
-			if (child.children && child.children.length > 0) {
-				markAllDescendantsVisible(child.children);
-			}
-		}
-	}
-
-	for (const item of treeData) {
-		markMatchingBranches(item);
-	}
-
-	return visibleNodeIds;
 }
 
 /**
  * Update a subtree (node and all children) in the tree.
- * Uses targeted DOM replacement instead of full re-render.
+ * Uses full re-render to ensure correct positioning.
  * @param {Object} data - { nodeId, updatedSubtree }
  */
 function handleSubtreeUpdate(data) {
@@ -983,44 +873,13 @@ function handleSubtreeUpdate(data) {
 	// Update data model
 	updateNodeInTree(treeData, nodeId, updatedSubtree);
 
-	// Find the DOM node and replace subtree in place
-	const pluginTree = document.getElementById('pluginTree');
-	if (!pluginTree) return;
+	// Re-render tree to ensure correct positioning
+	// (Targeted DOM updates caused positioning bugs with virtual scrolling)
+	renderTree(treeData);
 
-	const existingNode = pluginTree.querySelector(`.tree-node[data-id="${nodeId}"]`);
-	if (existingNode) {
-		const depth = getNodeDepth(existingNode);
-		const wasExpanded = expandedNodes.has(nodeId);
-
-		// Remove existing children container if present
-		const existingChildren = existingNode.nextElementSibling;
-		if (existingChildren && existingChildren.classList.contains('tree-children')) {
-			existingChildren.remove();
-		}
-
-		// Create new subtree HTML
-		const subtreeHtml = renderNode(updatedSubtree, depth);
-
-		// Replace the node and insert new subtree
-		existingNode.insertAdjacentHTML('beforebegin', subtreeHtml);
-		const newSubtreeStart = existingNode.previousElementSibling;
-		existingNode.remove();
-
-		// Attach click handlers to all new nodes
-		if (newSubtreeStart) {
-			newSubtreeStart.addEventListener('click', handleNodeClick);
-			const childrenContainer = newSubtreeStart.nextElementSibling;
-			if (childrenContainer && childrenContainer.classList.contains('tree-children')) {
-				childrenContainer.querySelectorAll('.tree-node').forEach(node => {
-					node.addEventListener('click', handleNodeClick);
-				});
-			}
-		}
-
-		// Apply filter if active
-		if (currentFilter) {
-			filterTree(currentFilter);
-		}
+	// Re-apply filter if active
+	if (currentFilter) {
+		filterTree(currentFilter);
 	}
 }
 
