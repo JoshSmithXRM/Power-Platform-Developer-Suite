@@ -6,6 +6,7 @@ import type {
 	QueryColumnViewModel,
 	QueryRowViewModel,
 	RowLookupsViewModel,
+	LookupViewModel,
 } from '../viewModels/QueryResultViewModel';
 
 /**
@@ -19,18 +20,56 @@ export class QueryResultViewModelMapper {
 	 * Maps QueryResult entity to ViewModel.
 	 *
 	 * @param result - Domain query result to transform
+	 * @param columnsToShow - Optional column filter (for virtual column support). If provided,
+	 *                        only these columns will be included in the output (case-insensitive).
 	 * @returns ViewModel ready for presentation layer
 	 */
-	public toViewModel(result: QueryResult): QueryResultViewModel {
+	public toViewModel(result: QueryResult, columnsToShow?: string[] | null): QueryResultViewModel {
 		const entityLogicalName = this.extractEntityNameFromFetchXml(result.executedFetchXml);
 
 		// Expand columns to include virtual "name" columns for optionsets and lookups
-		const expandedColumns = this.expandColumnsWithVirtualNameColumns(result.columns);
+		let expandedColumns = this.expandColumnsWithVirtualNameColumns(result.columns);
+		let mappedRows = result.rows.map((row) => this.mapRow(row, result.columns));
+		let rowLookups = result.rows.map((row) => this.extractLookups(row, result.columns));
+
+		// Apply column filter if provided (for virtual column transformation)
+		if (columnsToShow !== undefined && columnsToShow !== null && columnsToShow.length > 0) {
+			const allowedColumnsLower = new Set(columnsToShow.map(c => c.toLowerCase()));
+
+			// Filter columns
+			expandedColumns = expandedColumns.filter(col =>
+				allowedColumnsLower.has(col.name.toLowerCase())
+			);
+
+			// Filter row data to only include allowed columns
+			mappedRows = mappedRows.map(row => {
+				const filteredRow: Record<string, string> = {};
+				for (const col of expandedColumns) {
+					const value = row[col.name];
+					if (value !== undefined) {
+						filteredRow[col.name] = value;
+					}
+				}
+				return filteredRow as QueryRowViewModel;
+			});
+
+			// Filter rowLookups to only include allowed columns
+			rowLookups = rowLookups.map(lookups => {
+				const filteredLookups: Record<string, LookupViewModel> = {};
+				for (const col of expandedColumns) {
+					const lookup = lookups[col.name];
+					if (lookup !== undefined) {
+						filteredLookups[col.name] = lookup;
+					}
+				}
+				return filteredLookups as RowLookupsViewModel;
+			});
+		}
 
 		return {
 			columns: expandedColumns,
-			rows: result.rows.map((row) => this.mapRow(row, result.columns)),
-			rowLookups: result.rows.map((row) => this.extractLookups(row, result.columns)),
+			rows: mappedRows,
+			rowLookups,
 			totalRecordCount: result.totalRecordCount,
 			hasMoreRecords: result.hasMoreRecords(),
 			executionTimeMs: result.executionTimeMs,

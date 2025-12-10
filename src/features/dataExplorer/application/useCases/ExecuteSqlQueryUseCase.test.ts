@@ -38,7 +38,7 @@ describe('ExecuteSqlQueryUseCase', () => {
 			mockRepository.getEntitySetName.mockResolvedValue('accounts');
 			mockRepository.executeQuery.mockResolvedValue(queryResult);
 
-			const result = await useCase.execute(
+			const { result, columnsToShow } = await useCase.execute(
 				'env-123',
 				'SELECT name FROM account'
 			);
@@ -54,6 +54,7 @@ describe('ExecuteSqlQueryUseCase', () => {
 				undefined
 			);
 			expect(result.getRowCount()).toBe(2);
+			expect(columnsToShow).toBeNull(); // No virtual columns, no filter needed
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				'Executing SQL query',
 				expect.any(Object)
@@ -66,7 +67,7 @@ describe('ExecuteSqlQueryUseCase', () => {
 			mockRepository.getEntitySetName.mockResolvedValue('accounts');
 			mockRepository.executeQuery.mockResolvedValue(queryResult);
 
-			const result = await useCase.execute(
+			const { result } = await useCase.execute(
 				'env-123',
 				"SELECT name FROM account WHERE statecode = 0"
 			);

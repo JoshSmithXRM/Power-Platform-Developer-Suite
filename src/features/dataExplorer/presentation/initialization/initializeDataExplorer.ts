@@ -74,7 +74,12 @@ export async function initializeDataExplorer(
 
 	const panelStateRepository = new VSCodePanelStateRepository(context.workspaceState, logger);
 
-	const executeSqlUseCase = new ExecuteSqlQueryUseCase(queryRepository, logger);
+	// Use shared metadata cache for virtual column detection
+	const executeSqlUseCase = new ExecuteSqlQueryUseCase(
+		queryRepository,
+		logger,
+		intelliSenseServices.metadataCache
+	);
 	const executeFetchXmlUseCase = new ExecuteFetchXmlQueryUseCase(queryRepository, logger);
 	const resultMapper = new QueryResultViewModelMapper();
 

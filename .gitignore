@@ -44,3 +44,6 @@ e2e/results/*
 
 # VS Code test downloads
 .vscode-test/
+
+# Test notebooks - local scratch files
+test-notebooks/local/

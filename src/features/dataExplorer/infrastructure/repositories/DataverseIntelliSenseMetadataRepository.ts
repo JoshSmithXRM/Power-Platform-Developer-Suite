@@ -25,6 +25,8 @@ interface AttributeMetadataDto {
 	AttributeType: string;
 	IsCustomAttribute: boolean;
 	IsValidForRead: boolean;
+	/** Parent attribute if this is a virtual field (e.g., createdbyname → createdby) */
+	AttributeOf: string | null;
 }
 
 interface EntityDefinitionsResponse {
@@ -66,29 +68,37 @@ export class DataverseIntelliSenseMetadataRepository implements IIntelliSenseMet
 
 	/**
 	 * Fetches attribute names for a specific entity with minimal payload.
-	 * Filters out attributes that aren't valid for read (virtual/computed columns).
+	 * Filters out:
+	 * - Attributes that aren't valid for read (virtual/computed columns like isprivate)
+	 * - Yomi (phonetic) fields - not queryable via OData, always return empty
 	 * Payload: ~10-15 KB for typical entity (100 attributes).
 	 */
 	public async getAttributeSuggestions(
 		environmentId: string,
 		entityLogicalName: string
 	): Promise<AttributeSuggestion[]> {
-		const endpoint = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$select=LogicalName,DisplayName,AttributeType,IsCustomAttribute,IsValidForRead`;
+		const endpoint = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$select=LogicalName,DisplayName,AttributeType,IsCustomAttribute,IsValidForRead,AttributeOf`;
 
 		const response = await this.apiService.get<AttributesResponse>(
 			environmentId,
 			endpoint
 		);
 
-		// Filter out attributes that aren't valid for read (virtual/computed columns like isprivate)
 		return response.value
-			.filter(dto => dto.IsValidForRead === true)
+			.filter(dto =>
+				// Must be valid for read
+				dto.IsValidForRead === true &&
+				// Filter out yomi fields - they're not queryable via OData
+				// Yomi fields always end in 'yominame' (e.g., createdbyyominame, owneridyominame)
+				!dto.LogicalName.endsWith('yominame')
+			)
 			.map(dto =>
 				AttributeSuggestion.create(
 					dto.LogicalName,
 					dto.DisplayName.UserLocalizedLabel?.Label ?? dto.LogicalName,
 					this.mapAttributeType(dto.AttributeType),
-					dto.IsCustomAttribute
+					dto.IsCustomAttribute,
+					dto.AttributeOf
 				)
 			);
 	}

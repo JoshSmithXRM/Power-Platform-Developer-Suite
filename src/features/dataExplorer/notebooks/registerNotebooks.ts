@@ -61,6 +61,12 @@ export async function registerDataverseNotebooks(
 	const { DataverseDataExplorerQueryRepository } = await import(
 		'../infrastructure/repositories/DataverseDataExplorerQueryRepository.js'
 	);
+	const { DataverseIntelliSenseMetadataRepository } = await import(
+		'../infrastructure/repositories/DataverseIntelliSenseMetadataRepository.js'
+	);
+	const { IntelliSenseMetadataCache } = await import(
+		'../application/services/IntelliSenseMetadataCache.js'
+	);
 	const { ExecuteSqlQueryUseCase } = await import(
 		'../application/useCases/ExecuteSqlQueryUseCase.js'
 	);
@@ -81,8 +87,12 @@ export async function registerDataverseNotebooks(
 		logger
 	);
 
+	// Create metadata cache for virtual column detection
+	const metadataRepository = new DataverseIntelliSenseMetadataRepository(dataverseApiService);
+	const metadataCache = new IntelliSenseMetadataCache(metadataRepository);
+
 	// Create use cases and mapper
-	const executeSqlUseCase = new ExecuteSqlQueryUseCase(queryRepository, logger);
+	const executeSqlUseCase = new ExecuteSqlQueryUseCase(queryRepository, logger, metadataCache);
 	const executeFetchXmlUseCase = new ExecuteFetchXmlQueryUseCase(queryRepository, logger);
 	const resultMapper = new QueryResultViewModelMapper();
 

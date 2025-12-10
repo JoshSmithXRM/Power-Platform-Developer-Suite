@@ -407,12 +407,19 @@ export class DataverseNotebookController {
 			});
 
 			// Execute based on language
-			const result = isFetchXml
-				? await this.executeFetchXmlUseCase.execute(this.selectedEnvironmentId, cellContent)
-				: await this.executeSqlUseCase.execute(this.selectedEnvironmentId, cellContent);
+			let result;
+			let columnsToShow: string[] | null = null;
 
-			// Map to view model
-			const viewModel = this.resultMapper.toViewModel(result);
+			if (isFetchXml) {
+				result = await this.executeFetchXmlUseCase.execute(this.selectedEnvironmentId, cellContent);
+			} else {
+				const sqlResult = await this.executeSqlUseCase.execute(this.selectedEnvironmentId, cellContent);
+				result = sqlResult.result;
+				columnsToShow = sqlResult.columnsToShow;
+			}
+
+			// Map to view model (with optional column filter for virtual column support)
+			const viewModel = this.resultMapper.toViewModel(result, columnsToShow);
 
 			// DEBUG: Log detailed info about the mapping result to diagnose race conditions
 			// This logging helps identify cases where data exists but doesn't display

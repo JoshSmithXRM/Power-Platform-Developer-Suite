@@ -557,6 +557,16 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 			}
 		}
 
+		// Check if this is a lookup by looking for lookuplogicalname annotation
+		// This handles aliased lookups where Dataverse returns the alias directly
+		// e.g., "creator@Microsoft.Dynamics.CRM.lookuplogicalname": "systemuser"
+		const lookupAnnotationKey = `${attrName}@Microsoft.Dynamics.CRM.lookuplogicalname`;
+		for (const record of records) {
+			if (lookupAnnotationKey in record) {
+				return 'lookup';
+			}
+		}
+
 		// Find a record that has this attribute with a non-null value
 		for (const record of records) {
 			for (const key of possibleKeys) {
