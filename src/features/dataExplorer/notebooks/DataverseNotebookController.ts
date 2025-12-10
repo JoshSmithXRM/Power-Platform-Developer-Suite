@@ -50,6 +50,7 @@ export class DataverseNotebookController {
 	private selectedEnvironmentUrl: string | undefined;
 	private statusBarItem: vscode.StatusBarItem;
 	private textChangeListener: vscode.Disposable | undefined;
+	private notebookCloseListener: vscode.Disposable;
 
 	/** Stores last query results by cell URI for export functionality */
 	private readonly cellResults = new Map<string, QueryResultViewModel>();
@@ -91,6 +92,18 @@ export class DataverseNotebookController {
 
 		// Register auto-switch listener for cell language detection
 		this.registerAutoSwitchListener();
+
+		// Register notebook close listener to abort queries when notebook is closed
+		this.notebookCloseListener = vscode.workspace.onDidCloseNotebookDocument(
+			(notebook) => {
+				if (notebook.notebookType === this.notebookType) {
+					this.logger.info('Notebook closed, aborting active queries', {
+						uri: notebook.uri.toString(),
+					});
+					this.interruptHandler(notebook);
+				}
+			}
+		);
 
 		// Check all open notebooks and show status bar if any are ppdsnb
 		this.checkOpenNotebooks();
@@ -264,7 +277,11 @@ export class DataverseNotebookController {
 	 * Gets the VS Code disposables for cleanup.
 	 */
 	public getDisposables(): vscode.Disposable[] {
-		const disposables: vscode.Disposable[] = [this.controller, this.statusBarItem];
+		const disposables: vscode.Disposable[] = [
+			this.controller,
+			this.statusBarItem,
+			this.notebookCloseListener,
+		];
 		if (this.textChangeListener) {
 			disposables.push(this.textChangeListener);
 		}
