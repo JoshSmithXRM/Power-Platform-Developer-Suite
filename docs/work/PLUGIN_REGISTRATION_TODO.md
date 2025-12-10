@@ -410,3 +410,40 @@ After Expand All:
 - `plugin-registration.js` - Fixed context menu attribute escaping
 - `PluginRegistrationTreeSection.ts` - Added preventDefaultContextMenuItems to container
 - `package.json` - Simplified when clause conditions (truthy checks)
+
+**Problem 4 Resolution:**
+- Fixed step positioning bug - was caused by targeted DOM updates not working with virtual scrolling
+- Solution: Use full re-render after node updates (simpler and reliable)
+- Removed unused `renderNodeOnly()` and `getVisibleNodeIds()` functions
+
+**Additional Fixes:**
+- Added pagination to `DataversePluginTypeRepository` (3,879 records, close to 5k limit)
+- Added pagination to `DataverseStepImageRepository` (2,316 records, could grow)
+- Improved loading progress - shows incremental updates as each repo completes
+
+---
+
+## Known Issues & Future Work
+
+### Update Plugin Package - UX IMPROVEMENTS NEEDED ⚠️
+- Update DOES work, but takes ~2 minutes with no user feedback
+- Eventually shows "Plugin package updated" success message
+- **Next session tasks:**
+  1. Add progress notification while update is running (non-cancellable spinner)
+  2. Prevent concurrent updates (disable context menu or block while update in progress)
+  3. Test what happens if user triggers multiple updates simultaneously
+
+### Slice 2 Status: COMPLETE ✅ (with UX polish needed)
+- [x] Enable/disable steps - WORKING
+- [x] Update assembly - WORKING
+- [x] Update package - WORKING (slow, needs progress indicator)
+
+---
+
+## Pre-PR Polish Checklist
+
+Before merging Slices 1+2:
+- [ ] Detail panel - Show metadata when node selected
+- [ ] Solution filtering - Filter tree by solution
+- [ ] Unit tests - Domain and application layer tests
+- [ ] Update operation UX - Progress indicator + prevent concurrent updates
