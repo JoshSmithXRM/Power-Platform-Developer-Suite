@@ -106,26 +106,27 @@ export class LoadPluginRegistrationTreeUseCase {
 
 	/**
 	 * Fetches all data from repositories with progress reporting.
+	 * Uses parallel fetching for better performance - all repos fetch concurrently.
 	 */
 	private async fetchAllData(
 		environmentId: string,
 		solutionId: string | undefined,
 		reportProgress: LoadingProgressCallback
 	): Promise<BulkFetchResult> {
-		reportProgress('Loading plugin packages...', 0);
-		const packages = await this.packageRepository.findAll(environmentId, solutionId);
+		const startTime = Date.now();
 
-		reportProgress('Loading assemblies...', 20);
-		const assemblies = await this.assemblyRepository.findAll(environmentId, solutionId);
+		reportProgress('Fetching data from Dataverse...', 10);
 
-		reportProgress('Loading plugin types...', 40);
-		const pluginTypes = await this.pluginTypeRepository.findAll(environmentId);
+		// Parallel fetch all data - steps is the bottleneck, so run everything concurrently
+		const [packages, assemblies, pluginTypes, steps, images] = await Promise.all([
+			this.packageRepository.findAll(environmentId, solutionId),
+			this.assemblyRepository.findAll(environmentId, solutionId),
+			this.pluginTypeRepository.findAll(environmentId),
+			this.stepRepository.findAll(environmentId),
+			this.imageRepository.findAll(environmentId),
+		]);
 
-		reportProgress('Loading steps...', 60);
-		const steps = await this.stepRepository.findAll(environmentId);
-
-		reportProgress('Loading images...', 80);
-		const images = await this.imageRepository.findAll(environmentId);
+		reportProgress('Building tree...', 90);
 
 		this.logger.debug('LoadPluginRegistrationTreeUseCase: Bulk fetch complete', {
 			packages: packages.length,
@@ -133,6 +134,7 @@ export class LoadPluginRegistrationTreeUseCase {
 			pluginTypes: pluginTypes.length,
 			steps: steps.length,
 			images: images.length,
+			totalMs: Date.now() - startTime,
 		});
 
 		return { packages, assemblies, pluginTypes, steps, images };
