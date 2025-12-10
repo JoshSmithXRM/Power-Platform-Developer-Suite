@@ -446,6 +446,18 @@ export class DeploymentSettingsPromotionPanel {
 				.filter((id): id is string => id !== null)
 		);
 
+		// DEBUG: Log sample ConnectorIds from both sources to compare formats
+		const sampleSourceIds = Array.from(sourceConnectorIds).slice(0, 5);
+		const sampleTargetIds = this.targetConnections.slice(0, 5).map(c => c.connectorId);
+		this.logger.info('DEBUG: Sample source ConnectorIds (from ConnectionReference.connectorId)', {
+			sampleSourceIds,
+			totalUniqueSource: sourceConnectorIds.size
+		});
+		this.logger.info('DEBUG: Sample target ConnectorIds (from Connection.connectorId/apiId)', {
+			sampleTargetIds,
+			totalTarget: this.targetConnections.length
+		});
+
 		// Run matching algorithm
 		this.matchResult = this.connectorMappingService.matchConnectors(sourceConnectorIds, this.targetConnections);
 

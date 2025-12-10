@@ -130,16 +130,75 @@ describe('ConnectorMappingService', () => {
 			expect(result.getUnmatchedTargetConnectors().size).toBe(0);
 		});
 
-		it('should handle case-sensitive connector IDs', () => {
+		it('should match connector IDs case-insensitively after normalization', () => {
 			const sourceConnectorIds = new Set(['/apis/Shared_Dataverse']);
 
 			const targetConnections = [createConnection('conn-1', '/apis/shared_dataverse')];
 
 			const result = service.matchConnectors(sourceConnectorIds, targetConnections);
 
-			// Should NOT match due to case difference
-			expect(result.getAutoMatchedCount()).toBe(0);
-			expect(result.hasUnmatchedConnectors()).toBe(true);
+			// Should match after normalization (case-insensitive)
+			expect(result.getAutoMatchedCount()).toBe(1);
+			expect(result.hasUnmatchedConnectors()).toBe(false);
+		});
+
+		it('should match when source and target have different path prefixes', () => {
+			// Real-world scenario: Dataverse API vs Power Apps Admin API
+			const sourceConnectorIds = new Set([
+				'/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps',
+				'/providers/Microsoft.PowerApps/apis/shared_dynamicsax',
+			]);
+
+			// Target from Power Apps Admin API includes environment GUID in path
+			const targetConnections = [
+				createConnection(
+					'conn-1',
+					'/providers/Microsoft.PowerApps/scopes/admin/environments/63eac569-2076-4bee-b16e-a6e9e03343d8/apis/shared_commondataserviceforapps'
+				),
+				createConnection(
+					'conn-2',
+					'/providers/Microsoft.PowerApps/scopes/admin/environments/63eac569-2076-4bee-b16e-a6e9e03343d8/apis/shared_dynamicsax'
+				),
+			];
+
+			const result = service.matchConnectors(sourceConnectorIds, targetConnections);
+
+			// Should match based on connector name after /apis/
+			expect(result.getAutoMatchedCount()).toBe(2);
+			expect(result.hasUnmatchedConnectors()).toBe(false);
+		});
+	});
+
+	describe('normalizeConnectorId', () => {
+		it('should extract connector name from Dataverse API format', () => {
+			const connectorId = '/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps';
+			const normalized = service.normalizeConnectorId(connectorId);
+			expect(normalized).toBe('shared_commondataserviceforapps');
+		});
+
+		it('should extract connector name from Power Apps Admin API format', () => {
+			const connectorId =
+				'/providers/Microsoft.PowerApps/scopes/admin/environments/63eac569-2076-4bee-b16e-a6e9e03343d8/apis/shared_commondataserviceforapps';
+			const normalized = service.normalizeConnectorId(connectorId);
+			expect(normalized).toBe('shared_commondataserviceforapps');
+		});
+
+		it('should handle short path format', () => {
+			const connectorId = '/apis/shared_dataverse';
+			const normalized = service.normalizeConnectorId(connectorId);
+			expect(normalized).toBe('shared_dataverse');
+		});
+
+		it('should normalize to lowercase', () => {
+			const connectorId = '/apis/Shared_Dataverse';
+			const normalized = service.normalizeConnectorId(connectorId);
+			expect(normalized).toBe('shared_dataverse');
+		});
+
+		it('should return lowercase original if no /apis/ marker found', () => {
+			const connectorId = 'some_other_format';
+			const normalized = service.normalizeConnectorId(connectorId);
+			expect(normalized).toBe('some_other_format');
 		});
 	});
 

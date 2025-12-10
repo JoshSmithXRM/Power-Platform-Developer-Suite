@@ -2,18 +2,21 @@
 
 **Branch:** `feature/deployment-settings-promotion`
 **Created:** 2025-12-08
-**Status:** MVP Complete - Ready for F5 Testing
+**Status:** Building Full Editor UI
 
 ---
 
 ## Overview
 
-**Goal:** Enable Power Platform developers to create and promote deployment settings between environments with:
-- Solution-scoped workflow (select solution first)
-- Source environment selection (where solution works)
-- Target environment selection (where deploying to)
-- Auto-matching of connection references by ConnectorId
-- Environment variable management (add new, set values for target)
+**Goal:** Full ALM management for deployment settings - Create, Edit, Update, Save.
+
+**The Vision: Deployment Settings EDITOR**
+- Not just a one-shot generator - a living editor for `.deploymentsettings.json`
+- Load existing files, edit values, save updates
+- Side-by-side view: Source (what solution needs) | Target (user's configuration)
+- Connection References: Dropdown to pick from available target connections
+- Environment Variables: Free-form text input (no pool to pick from)
+- Smart auto-matching with full user control to override
 
 **Design Document:** `docs/design/DEPLOYMENT_SETTINGS_PROMOTION_DESIGN.md`
 
@@ -128,6 +131,40 @@
 
 ---
 
+## Editor UI Implementation (Current Focus)
+
+### Slice F: Connection References Table UI - IN PROGRESS
+- [ ] Create `ConnectionReferenceMappingViewModel` - source info + target selection
+- [ ] Create `ConnectionReferenceMappingSection` - renders the CR table
+- [ ] Each row: source CR info (read-only) | dropdown of available connections
+- [ ] Handle unmatched: show text input for manual ConnectionId entry
+- [ ] Wire dropdown changes back to panel state
+- [ ] Update Save to use user's selections (not just auto-matched)
+- [ ] Show status: ✓ configured, ⚠ needs attention
+
+### Slice G: Environment Variables Table UI - TODO
+- [ ] Query EVs from source solution (reuse ListEnvironmentVariablesUseCase)
+- [ ] Create `EnvironmentVariableMappingViewModel`
+- [ ] Create `EnvironmentVariableMappingSection` - renders the EV table
+- [ ] Each row: variable info (read-only) | text input for target value
+- [ ] Show default value and type for context
+- [ ] Include in Save output
+
+### Slice H: Load Existing File - TODO
+- [ ] Look for existing `.deploymentsettings.json` in workspace
+- [ ] Parse and populate UI with existing values
+- [ ] Merge with current solution state (handle new/removed items)
+- [ ] Show file status indicator (loaded from X, unsaved changes)
+
+### Slice I: Polish & UX - TODO
+- [ ] Save As functionality (new file location)
+- [ ] Preview JSON before saving
+- [ ] Dirty state tracking (unsaved changes indicator)
+- [ ] Collapsible sections
+- [ ] Better error handling for edge cases
+
+---
+
 ## File Structure
 
 ```
@@ -226,6 +263,25 @@ resources/webview/
 - Updated `initializeDeploymentSettingsPromotion.ts` with new dependencies
 - Updated CSS with toolbar styles and loading spinner
 - All tests pass (8046), ready for F5 testing
+
+### Session 6 (2025-12-09) - CONNECTOR ID NORMALIZATION & VISION REFINEMENT
+- **Bug fix:** ConnectorIds from different APIs had different formats
+  - Dataverse API: `/providers/Microsoft.PowerApps/apis/shared_dataverse`
+  - Power Apps Admin API: `/providers/.../environments/{guid}/apis/shared_dataverse`
+- Added `normalizeConnectorId()` to extract connector name after `/apis/`
+- Matching now works: 10 auto-matched, 1 needs mapping (was 0/11)
+- Added debug logging to diagnose format differences
+- 20 tests for ConnectorMappingService (5 new for normalization)
+
+- **Vision refined:** This is a full EDITOR, not just a generator
+  - Create + Edit + Update deployment settings files
+  - Side-by-side UI: Source (read-only) | Target (editable)
+  - Connection refs: dropdown to pick from available connections
+  - Env vars: free text input
+  - Load existing files, show unsaved changes
+  - Auto-match just pre-populates, user has full control
+
+- Starting Slice F: Connection References Table UI
 
 ---
 
