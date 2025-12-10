@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
+import type { IPanelStateRepository } from '../../../../shared/infrastructure/ui/IPanelStateRepository';
 import { PanelCoordinator } from '../../../../shared/infrastructure/ui/coordinators/PanelCoordinator';
 import { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import {
@@ -25,6 +26,15 @@ import type {
 	AvailableConnectionViewModel,
 	ConnectionMappingStatus
 } from '../viewModels/ConnectionReferenceMappingViewModel';
+
+/** Persisted state for deployment settings panel */
+interface DeploymentSettingsPanelState {
+	sourceEnvironmentId?: string;
+	solutionId?: string;
+	targetEnvironmentId?: string;
+	lastUpdated: string;
+	[key: string]: unknown; // Index signature required by PanelState
+}
 
 /**
  * Commands supported by Deployment Settings Promotion panel.
@@ -80,6 +90,7 @@ interface ConnectionSelection {
  * so it doesn't fit the EnvironmentScopedPanel pattern.
  */
 export class DeploymentSettingsPromotionPanel {
+	public static readonly viewType = 'deploymentSettings';
 	private static currentPanel: DeploymentSettingsPromotionPanel | undefined;
 	private coordinator!: PanelCoordinator<DeploymentSettingsPromotionCommands>;
 	private scaffoldingBehavior!: HtmlScaffoldingBehavior;
@@ -106,7 +117,8 @@ export class DeploymentSettingsPromotionPanel {
 		private readonly solutionRepository: ISolutionRepository,
 		private readonly listConnectionReferencesUseCase: ListConnectionReferencesUseCase,
 		private readonly connectorMappingService: ConnectorMappingService,
-		private readonly logger: ILogger
+		private readonly logger: ILogger,
+		private readonly panelStateRepository?: IPanelStateRepository
 	) {
 		logger.debug('DeploymentSettingsPromotionPanel: Initialized');
 
@@ -135,7 +147,8 @@ export class DeploymentSettingsPromotionPanel {
 		solutionRepository: ISolutionRepository,
 		listConnectionReferencesUseCase: ListConnectionReferencesUseCase,
 		connectorMappingService: ConnectorMappingService,
-		logger: ILogger
+		logger: ILogger,
+		panelStateRepository?: IPanelStateRepository
 	): DeploymentSettingsPromotionPanel {
 		const column = vscode.ViewColumn.One;
 
@@ -166,7 +179,8 @@ export class DeploymentSettingsPromotionPanel {
 			solutionRepository,
 			listConnectionReferencesUseCase,
 			connectorMappingService,
-			logger
+			logger,
+			panelStateRepository
 		);
 
 		DeploymentSettingsPromotionPanel.currentPanel = newPanel;
@@ -178,7 +192,99 @@ export class DeploymentSettingsPromotionPanel {
 		const envData = await this.getEnvironments();
 		this.environments = envData.map((e) => ({ id: e.id, name: e.name }));
 
+		// Try to restore saved state
+		await this.restoreSavedState();
+
 		await this.refreshPanel();
+	}
+
+	/**
+	 * Restores saved panel state (source env, solution, target env).
+	 * If all three are restored, auto-triggers the workflow.
+	 */
+	private async restoreSavedState(): Promise<void> {
+		if (!this.panelStateRepository) {
+			return;
+		}
+
+		try {
+			const state = await this.panelStateRepository.load({
+				panelType: DeploymentSettingsPromotionPanel.viewType,
+				environmentId: 'global' // Not environment-scoped
+			}) as DeploymentSettingsPanelState | null;
+
+			if (!state) {
+				return;
+			}
+
+			this.logger.debug('Restoring deployment settings panel state', state);
+
+			// Restore source environment if it still exists
+			if (state.sourceEnvironmentId && this.environments.some(e => e.id === state.sourceEnvironmentId)) {
+				this.sourceEnvironmentId = state.sourceEnvironmentId;
+
+				// Load solutions for restored source environment
+				try {
+					this.solutions = await this.solutionRepository.findAllForDropdown(state.sourceEnvironmentId);
+				} catch {
+					this.logger.debug('Failed to load solutions for restored source environment');
+					this.sourceEnvironmentId = undefined;
+					return;
+				}
+
+				// Restore solution if it still exists
+				if (state.solutionId && this.solutions.some(s => s.id === state.solutionId)) {
+					this.solutionId = state.solutionId;
+				}
+			}
+
+			// Restore target environment if it still exists
+			if (state.targetEnvironmentId && this.environments.some(e => e.id === state.targetEnvironmentId)) {
+				this.targetEnvironmentId = state.targetEnvironmentId;
+			}
+
+			// Auto-trigger workflow if all three are restored
+			if (this.sourceEnvironmentId && this.solutionId && this.targetEnvironmentId) {
+				this.logger.info('Auto-loading data from restored state');
+				this.status = { stage: 'loading' };
+				// Don't await - let it run in background while panel renders
+				void this.tryAutoLoad();
+			}
+		} catch (error) {
+			this.logger.debug('Failed to restore panel state', { error });
+		}
+	}
+
+	/**
+	 * Saves current panel state for restoration on next open.
+	 */
+	private async saveState(): Promise<void> {
+		if (!this.panelStateRepository) {
+			return;
+		}
+
+		try {
+			// Build state object conditionally to satisfy exactOptionalPropertyTypes
+			const state: DeploymentSettingsPanelState = {
+				lastUpdated: new Date().toISOString()
+			};
+			if (this.sourceEnvironmentId !== undefined) {
+				state.sourceEnvironmentId = this.sourceEnvironmentId;
+			}
+			if (this.solutionId !== undefined) {
+				state.solutionId = this.solutionId;
+			}
+			if (this.targetEnvironmentId !== undefined) {
+				state.targetEnvironmentId = this.targetEnvironmentId;
+			}
+
+			await this.panelStateRepository.save(
+				{ panelType: DeploymentSettingsPromotionPanel.viewType, environmentId: 'global' },
+				state
+			);
+		} catch (error) {
+			this.logger.debug('Failed to save panel state', { error });
+		}
 	}
 
 	/**
@@ -235,8 +341,8 @@ export class DeploymentSettingsPromotionPanel {
 				const connections = this.matchResult?.getConnectionsForConnector(connectorId) ?? [];
 
 				if (connections.length > 0) {
-					// Matched connector - show connections for this connector type
-					availableConnections = connections.map(conn => ({
+					// Matched connector - show connections for this connector type, sorted
+					const mapped = connections.map(conn => ({
 						id: conn.id,
 						displayName: conn.displayName,
 						status: conn.status,
@@ -244,6 +350,7 @@ export class DeploymentSettingsPromotionPanel {
 						connectorId: conn.connectorId,
 						connectorName: this.extractConnectorName(conn.connectorId)
 					}));
+					availableConnections = this.sortConnectionViewModels(mapped);
 
 					// Auto-select first active connection if not already selected
 					if (selection.selectedConnectionId === null) {
@@ -320,10 +427,10 @@ export class DeploymentSettingsPromotionPanel {
 
 	/**
 	 * Converts ALL target connections to view models for unmatched connector dropdown.
-	 * Groups connections by connector type for easier selection.
+	 * Sorted: Connected first, then alphabetically by connector name and display name.
 	 */
 	private getAllTargetConnectionsAsViewModels(): AvailableConnectionViewModel[] {
-		return this.targetConnections.map(conn => ({
+		const viewModels = this.targetConnections.map(conn => ({
 			id: conn.id,
 			displayName: conn.displayName,
 			status: conn.status,
@@ -331,6 +438,47 @@ export class DeploymentSettingsPromotionPanel {
 			connectorId: conn.connectorId,
 			connectorName: this.extractConnectorName(conn.connectorId)
 		}));
+		return this.sortConnectionViewModels(viewModels);
+	}
+
+	/**
+	 * Sorts connection view models: Connected first, then alphabetically by connector/display name.
+	 */
+	private sortConnectionViewModels(connections: AvailableConnectionViewModel[]): AvailableConnectionViewModel[] {
+		return [...connections].sort((a, b) => {
+			// Connected status comes first
+			const aConnected = a.status === 'Connected' ? 0 : 1;
+			const bConnected = b.status === 'Connected' ? 0 : 1;
+			if (aConnected !== bConnected) {
+				return aConnected - bConnected;
+			}
+
+			// Then sort by connector name
+			const connectorCompare = a.connectorName.localeCompare(b.connectorName);
+			if (connectorCompare !== 0) {
+				return connectorCompare;
+			}
+
+			// Finally by display name
+			return a.displayName.localeCompare(b.displayName);
+		});
+	}
+
+	/**
+	 * Normalizes a ConnectorId to the short form for deployment settings output.
+	 * Converts: /providers/.../environments/{guid}/apis/shared_foo
+	 * To:       /providers/Microsoft.PowerApps/apis/shared_foo
+	 */
+	private normalizeConnectorIdForOutput(connectorId: string | null): string {
+		if (connectorId === null) {
+			return '';
+		}
+
+		// Extract connector name (e.g., "shared_azureblob")
+		const connectorName = this.connectorMappingService.normalizeConnectorId(connectorId);
+
+		// Return the standard short-form path
+		return `/providers/Microsoft.PowerApps/apis/${connectorName}`;
 	}
 
 	/**
@@ -483,9 +631,9 @@ export class DeploymentSettingsPromotionPanel {
 		this.coordinator.registerHandler(
 			'connectionSelectionChange',
 			async (data?: unknown) => {
-				if (typeof data === 'object' && data !== null && 'index' in data && 'connectionId' in data) {
-					const { index, connectionId } = data as { index: number; connectionId: string };
-					await this.handleConnectionSelectionChange(index, connectionId);
+				if (typeof data === 'object' && data !== null && 'logicalName' in data && 'connectionId' in data) {
+					const { logicalName, connectionId } = data as { logicalName: string; connectionId: string };
+					await this.handleConnectionSelectionChange(logicalName, connectionId);
 				}
 			},
 			{ disableOnExecute: false }
@@ -494,9 +642,9 @@ export class DeploymentSettingsPromotionPanel {
 		this.coordinator.registerHandler(
 			'manualConnectionIdChange',
 			async (data?: unknown) => {
-				if (typeof data === 'object' && data !== null && 'index' in data && 'connectionId' in data) {
-					const { index, connectionId } = data as { index: number; connectionId: string };
-					await this.handleManualConnectionIdChange(index, connectionId);
+				if (typeof data === 'object' && data !== null && 'logicalName' in data && 'connectionId' in data) {
+					const { logicalName, connectionId } = data as { logicalName: string; connectionId: string };
+					await this.handleManualConnectionIdChange(logicalName, connectionId);
 				}
 			},
 			{ disableOnExecute: false }
@@ -515,13 +663,7 @@ export class DeploymentSettingsPromotionPanel {
 	 * Handles connection dropdown selection change.
 	 * Captures both ConnectionId and ConnectorId from the selected target connection.
 	 */
-	private async handleConnectionSelectionChange(index: number, connectionId: string): Promise<void> {
-		const cr = this.sourceConnectionReferences[index];
-		if (!cr) {
-			return;
-		}
-
-		const logicalName = cr.connectionReferenceLogicalName;
+	private async handleConnectionSelectionChange(logicalName: string, connectionId: string): Promise<void> {
 		let selection = this.connectionSelections.get(logicalName);
 		if (!selection) {
 			selection = { selectedConnectionId: null, selectedConnectorId: null, manualConnectionId: '', manualConnectorId: '' };
@@ -544,23 +686,14 @@ export class DeploymentSettingsPromotionPanel {
 			connectorId: selection.selectedConnectorId
 		});
 
-		// Update save button state without full refresh (just update the button via message)
-		await this.panel.postMessage({
-			command: 'updateSaveButton',
-			data: { disabled: !this.canSave() }
-		});
+		// Refresh panel to update visual indicators (checkmarks/warnings)
+		await this.refreshPanel();
 	}
 
 	/**
 	 * Handles manual connection ID input change.
 	 */
-	private async handleManualConnectionIdChange(index: number, connectionId: string): Promise<void> {
-		const cr = this.sourceConnectionReferences[index];
-		if (!cr) {
-			return;
-		}
-
-		const logicalName = cr.connectionReferenceLogicalName;
+	private async handleManualConnectionIdChange(logicalName: string, connectionId: string): Promise<void> {
 		let selection = this.connectionSelections.get(logicalName);
 		if (!selection) {
 			selection = { selectedConnectionId: null, selectedConnectorId: null, manualConnectionId: '', manualConnectorId: '' };
@@ -571,7 +704,7 @@ export class DeploymentSettingsPromotionPanel {
 
 		this.logger.debug('Manual connection ID changed', { logicalName, connectionId });
 
-		// Update save button state
+		// Update save button state (don't refresh full panel on every keystroke)
 		await this.panel.postMessage({
 			command: 'updateSaveButton',
 			data: { disabled: !this.canSave() }
@@ -590,6 +723,9 @@ export class DeploymentSettingsPromotionPanel {
 		this.connectionSelections.clear();
 
 		this.logger.info('Source environment changed', { environmentId });
+
+		// Persist selection
+		await this.saveState();
 
 		this.status = { stage: 'sourceSelected' };
 		await this.refreshPanel();
@@ -630,6 +766,9 @@ export class DeploymentSettingsPromotionPanel {
 		const solution = this.solutions.find(s => s.id === solutionId);
 		this.logger.info('Solution changed', { solutionId, solutionName: solution?.name });
 
+		// Persist selection
+		await this.saveState();
+
 		if (this.targetEnvironmentId) {
 			this.status = { stage: 'loading' };
 		} else {
@@ -649,6 +788,9 @@ export class DeploymentSettingsPromotionPanel {
 		this.connectionSelections.clear();
 
 		this.logger.info('Target environment changed', { environmentId });
+
+		// Persist selection
+		await this.saveState();
 
 		if (this.sourceEnvironmentId && this.solutionId) {
 			this.status = { stage: 'loading' };
@@ -796,10 +938,14 @@ export class DeploymentSettingsPromotionPanel {
 					}
 				}
 
+				// Normalize ConnectorId to short form for deployment settings output
+				// Converts environment-scoped paths to standard /providers/Microsoft.PowerApps/apis/... format
+				const normalizedConnectorId = this.normalizeConnectorIdForOutput(connectorId);
+
 				return {
 					LogicalName: logicalName,
 					ConnectionId: connectionId,
-					ConnectorId: connectorId
+					ConnectorId: normalizedConnectorId
 				};
 			});
 

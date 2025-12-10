@@ -38,7 +38,8 @@ export async function initializeDeploymentSettingsPromotion(
 		{ DataverseApiSolutionComponentRepository },
 		{ DataverseApiSolutionRepository },
 		{ FlowConnectionRelationshipBuilder },
-		{ ListConnectionReferencesUseCase }
+		{ ListConnectionReferencesUseCase },
+		{ VSCodePanelStateRepository }
 	] = await Promise.all([
 		import('../panels/DeploymentSettingsPromotionPanel.js'),
 		import('../../../../shared/infrastructure/services/PowerAppsAdminApiService.js'),
@@ -50,7 +51,8 @@ export async function initializeDeploymentSettingsPromotion(
 		import('../../../../shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js'),
 		import('../../../solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js'),
 		import('../../../connectionReferences/domain/services/FlowConnectionRelationshipBuilder.js'),
-		import('../../../connectionReferences/application/useCases/ListConnectionReferencesUseCase.js')
+		import('../../../connectionReferences/application/useCases/ListConnectionReferencesUseCase.js'),
+		import('../../../../shared/infrastructure/ui/VSCodePanelStateRepository.js')
 	]);
 
 	const { logger } = dependencies;
@@ -99,6 +101,9 @@ export async function initializeDeploymentSettingsPromotion(
 	// Create connector mapping service
 	const connectorMappingService = new ConnectorMappingService();
 
+	// Create panel state repository for persisting selections
+	const panelStateRepository = new VSCodePanelStateRepository(context.workspaceState, logger);
+
 	DeploymentSettingsPromotionPanel.createOrShow(
 		context.extensionUri,
 		dependencies.getEnvironments,
@@ -106,6 +111,7 @@ export async function initializeDeploymentSettingsPromotion(
 		solutionRepository,
 		listConnectionReferencesUseCase,
 		connectorMappingService,
-		logger
+		logger,
+		panelStateRepository
 	);
 }

@@ -142,6 +142,12 @@
 - [x] Update Save to use user's selections (not just auto-matched)
 - [x] Show status: ✓ configured, ⚠ needs attention
 
+### Slice F2: State Persistence - COMPLETE
+- [x] Persist source environment, solution, target environment selections
+- [x] Restore selections on panel open
+- [x] Validate restored environments/solutions still exist
+- [x] Auto-trigger workflow if all three restored
+
 ### Slice G: Environment Variables Table UI - TODO
 - [ ] Query EVs from source solution (reuse ListEnvironmentVariablesUseCase)
 - [ ] Create `EnvironmentVariableMappingViewModel`
@@ -308,6 +314,37 @@ resources/webview/
   - Status row highlighting
   - Connection status colors in dropdowns
 - All tests pass (8046), ready for F5 testing
+
+### Session 8 (2025-12-10) - STATE PERSISTENCE
+- **Added panel state persistence**
+  - Source environment, solution, and target environment selections persist
+  - Selections restored on panel open if still valid
+  - Auto-triggers workflow if all three restored
+- **Bug fixes from previous session**
+  - Index-based selection changed to logicalName-based (fixes wrong item selection after sort)
+  - ConnectorId output normalized to standard `/providers/Microsoft.PowerApps/apis/{connector}` format
+  - Warning icons now clear when cross-connector mappings are selected
+- All tests pass, ready for F5 testing
+
+---
+
+## Known Limitations
+
+### Service Principal Authentication Not Supported
+The Connections API (`PowerAppsAdminApiService`) requires **interactive user authentication**. Service principals receive 403 Forbidden errors:
+
+```
+Power Apps Admin API request failed: 403 Forbidden
+"The service principal with id '...' does not have permission to access the path
+'.../providers/Microsoft.BusinessAppPlatform/scopes/service/environments/.../checkAccess'"
+```
+
+**Workaround:** Use interactive login (not service principal) for this feature.
+
+**Future Fix Options:**
+1. Request Microsoft add service principal support to Power Apps Admin API
+2. Find alternative API that works with service principals
+3. Document as expected behavior (many admin APIs require user context)
 
 ---
 

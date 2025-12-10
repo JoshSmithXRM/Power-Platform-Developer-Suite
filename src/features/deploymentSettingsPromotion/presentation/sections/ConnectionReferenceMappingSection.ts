@@ -54,7 +54,7 @@ export class ConnectionReferenceMappingSection implements ISection {
 							</tr>
 						</thead>
 						<tbody>
-							${mappings.map((m, index) => this.renderRow(m, index)).join('')}
+							${mappings.map((m) => this.renderRow(m)).join('')}
 						</tbody>
 					</table>
 				</div>
@@ -69,12 +69,12 @@ export class ConnectionReferenceMappingSection implements ISection {
 		return `<span class="summary-warning">${summary.configured} of ${summary.total} configured, ${summary.needsAttention} needs attention</span>`;
 	}
 
-	private renderRow(mapping: ConnectionReferenceMappingViewModel, index: number): string {
+	private renderRow(mapping: ConnectionReferenceMappingViewModel): string {
 		const statusIcon = this.getStatusIcon(mapping);
 		const statusClass = this.getStatusClass(mapping);
 
 		return `
-			<tr class="mapping-row ${statusClass}" data-index="${index}">
+			<tr class="mapping-row ${statusClass}" data-logical-name="${this.escapeHtml(mapping.logicalName)}">
 				<td class="col-source">
 					<div class="source-info">
 						<span class="status-icon">${statusIcon}</span>
@@ -85,25 +85,28 @@ export class ConnectionReferenceMappingSection implements ISection {
 					</div>
 				</td>
 				<td class="col-target">
-					${this.renderTargetSelection(mapping, index)}
+					${this.renderTargetSelection(mapping)}
 				</td>
 			</tr>
 		`;
 	}
 
-	private renderTargetSelection(mapping: ConnectionReferenceMappingViewModel, index: number): string {
+	private renderTargetSelection(mapping: ConnectionReferenceMappingViewModel): string {
+		// Use logicalName as stable identifier (not index which changes on sort)
+		const logicalName = mapping.logicalName;
+
 		// No available connections - show manual input
 		if (mapping.availableConnections.length === 0) {
 			return `
 				<div class="target-unmatched">
 					<div class="unmatched-warning">No connections available in target</div>
 					<div class="manual-input-group">
-						<label for="manual-conn-${index}">ConnectionId:</label>
+						<label for="manual-conn-${this.escapeHtml(logicalName)}">ConnectionId:</label>
 						<input
 							type="text"
-							id="manual-conn-${index}"
+							id="manual-conn-${this.escapeHtml(logicalName)}"
 							class="manual-connection-input"
-							data-index="${index}"
+							data-logical-name="${this.escapeHtml(logicalName)}"
 							placeholder="Enter ConnectionId manually"
 							value="${this.escapeHtml(mapping.manualConnectionId)}"
 						/>
@@ -141,7 +144,7 @@ export class ConnectionReferenceMappingSection implements ISection {
 
 		return `
 			<div class="target-selection ${isUnmatched ? 'cross-connector' : ''}">
-				<select class="connection-dropdown" data-index="${index}" id="conn-select-${index}">
+				<select class="connection-dropdown" data-logical-name="${this.escapeHtml(logicalName)}" id="conn-select-${this.escapeHtml(logicalName)}">
 					<option value="" ${mapping.selectedConnectionId === null ? 'selected' : ''} disabled>${placeholderText}</option>
 					${options}
 				</select>
@@ -160,7 +163,8 @@ export class ConnectionReferenceMappingSection implements ISection {
 			case 'manual':
 				return mapping.manualConnectionId !== '' ? '✓' : '⚠';
 			case 'unmatched':
-				return '⚠';
+				// Cross-connector mapping - check if user has selected a connection
+				return mapping.selectedConnectionId !== null ? '✓' : '⚠';
 			default:
 				return '○';
 		}
@@ -175,7 +179,8 @@ export class ConnectionReferenceMappingSection implements ISection {
 			case 'manual':
 				return mapping.manualConnectionId !== '' ? 'status-configured' : 'status-unmatched';
 			case 'unmatched':
-				return 'status-unmatched';
+				// Cross-connector mapping - check if user has selected a connection
+				return mapping.selectedConnectionId !== null ? 'status-configured' : 'status-unmatched';
 			default:
 				return '';
 		}

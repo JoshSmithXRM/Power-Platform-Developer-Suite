@@ -68,7 +68,7 @@ window.createBehavior({
 
 	/**
 	 * Wires connection dropdown selectors using event delegation.
-	 * Dropdowns have class 'connection-dropdown' and data-index attribute.
+	 * Dropdowns have class 'connection-dropdown' and data-logical-name attribute.
 	 */
 	wireConnectionDropdowns() {
 		document.addEventListener('change', (event) => {
@@ -77,15 +77,15 @@ window.createBehavior({
 				return;
 			}
 
-			const index = parseInt(target.dataset.index, 10);
-			if (isNaN(index)) {
+			const logicalName = target.dataset.logicalName;
+			if (!logicalName) {
 				return;
 			}
 
 			window.vscode.postMessage({
 				command: 'connectionSelectionChange',
 				data: {
-					index: index,
+					logicalName: logicalName,
 					connectionId: target.value
 				}
 			});
@@ -94,7 +94,7 @@ window.createBehavior({
 
 	/**
 	 * Wires manual connection ID inputs using event delegation.
-	 * Inputs have class 'manual-connection-input' and data-index attribute.
+	 * Inputs have class 'manual-connection-input' and data-logical-name attribute.
 	 * Uses 'input' event for real-time updates.
 	 */
 	wireManualInputs() {
@@ -104,15 +104,15 @@ window.createBehavior({
 				return;
 			}
 
-			const index = parseInt(target.dataset.index, 10);
-			if (isNaN(index)) {
+			const logicalName = target.dataset.logicalName;
+			if (!logicalName) {
 				return;
 			}
 
 			window.vscode.postMessage({
 				command: 'manualConnectionIdChange',
 				data: {
-					index: index,
+					logicalName: logicalName,
 					connectionId: target.value
 				}
 			});
