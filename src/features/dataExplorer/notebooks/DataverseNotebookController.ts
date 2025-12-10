@@ -54,6 +54,9 @@ export class DataverseNotebookController {
 	/** Stores last query results by cell URI for export functionality */
 	private readonly cellResults = new Map<string, QueryResultViewModel>();
 
+	/** Tracks active cell executions for cancellation support */
+	private readonly activeExecutions = new Map<string, AbortController>();
+
 	constructor(
 		private readonly getEnvironments: () => Promise<EnvironmentInfo[]>,
 		private readonly executeSqlUseCase: ExecuteSqlQueryUseCase,
@@ -73,6 +76,7 @@ export class DataverseNotebookController {
 		this.controller.supportedLanguages = ['sql', 'fetchxml'];
 		this.controller.supportsExecutionOrder = true;
 		this.controller.executeHandler = this.executeHandler.bind(this);
+		this.controller.interruptHandler = this.interruptHandler.bind(this);
 
 		// Create status bar item for environment selection
 		this.statusBarItem = vscode.window.createStatusBarItem(
@@ -359,12 +363,37 @@ export class DataverseNotebookController {
 	}
 
 	/**
+	 * Handles interrupt requests (stop button) by aborting active executions.
+	 */
+	private interruptHandler(notebook: vscode.NotebookDocument): void {
+		this.logger.info('Interrupt requested for notebook', {
+			uri: notebook.uri.toString(),
+		});
+
+		// Abort all active executions for cells in this notebook
+		for (const cell of notebook.getCells()) {
+			const cellUri = cell.document.uri.toString();
+			const abortController = this.activeExecutions.get(cellUri);
+			if (abortController) {
+				this.logger.debug('Aborting cell execution', { cellUri });
+				abortController.abort();
+				this.activeExecutions.delete(cellUri);
+			}
+		}
+	}
+
+	/**
 	 * Executes a single notebook cell (SQL or FetchXML).
 	 */
 	private async executeCell(cell: vscode.NotebookCell): Promise<void> {
 		const execution = this.controller.createNotebookCellExecution(cell);
 		execution.executionOrder = Date.now();
 		execution.start(Date.now());
+
+		// Create AbortController for cancellation support
+		const cellUri = cell.document.uri.toString();
+		const abortController = new AbortController();
+		this.activeExecutions.set(cellUri, abortController);
 
 		try {
 			// Check if environment is selected
@@ -406,14 +435,15 @@ export class DataverseNotebookController {
 				contentLength: cellContent.length,
 			});
 
-			// Execute based on language
+			// Execute based on language (with abort signal)
 			let result;
 			let columnsToShow: string[] | null = null;
+			const signal = abortController.signal;
 
 			if (isFetchXml) {
-				result = await this.executeFetchXmlUseCase.execute(this.selectedEnvironmentId, cellContent);
+				result = await this.executeFetchXmlUseCase.execute(this.selectedEnvironmentId, cellContent, signal);
 			} else {
-				const sqlResult = await this.executeSqlUseCase.execute(this.selectedEnvironmentId, cellContent);
+				const sqlResult = await this.executeSqlUseCase.execute(this.selectedEnvironmentId, cellContent, signal);
 				result = sqlResult.result;
 				columnsToShow = sqlResult.columnsToShow;
 			}
@@ -458,6 +488,18 @@ export class DataverseNotebookController {
 
 			execution.end(true, Date.now());
 		} catch (error) {
+			// Check if this was an abort/cancellation
+			if (abortController.signal.aborted) {
+				this.logger.info('Notebook cell execution cancelled');
+				execution.replaceOutput([
+					new vscode.NotebookCellOutput([
+						vscode.NotebookCellOutputItem.text('Query cancelled', 'text/plain'),
+					]),
+				]);
+				execution.end(false, Date.now());
+				return;
+			}
+
 			this.logger.error('Notebook cell execution failed', error);
 
 			const errorMessage = this.formatError(error);
@@ -477,6 +519,9 @@ export class DataverseNotebookController {
 			]);
 
 			execution.end(false, Date.now());
+		} finally {
+			// Clean up the abort controller
+			this.activeExecutions.delete(cellUri);
 		}
 	}
 
