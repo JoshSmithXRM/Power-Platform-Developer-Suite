@@ -117,9 +117,6 @@ export class VirtualColumnDetector {
 		originalColumns: string[],
 		virtualColumns: VirtualColumnInfo[]
 	): string[] {
-		// Build set of original column names (lowercase for comparison)
-		const originalSet = new Set(originalColumns.map(c => c.toLowerCase()));
-
 		// Build map of virtual → expected result column name
 		// e.g., if user wrote "createdbyname", result will have "createdbyname" from auto-expansion
 		const virtualResultNames = new Map<string, string>();

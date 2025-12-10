@@ -2,7 +2,7 @@ import { AttributeMetadataMapper } from './AttributeMetadataMapper';
 import { OptionSetMetadataMapper } from './OptionSetMetadataMapper';
 import { AttributeMetadata } from '../../domain/entities/AttributeMetadata';
 import type { AttributeMetadataDto, LocalizedLabel, ManagedProperty } from '../dtos/EntityMetadataDto';
-import { OptionSetMetadata } from '../../domain/valueObjects/OptionSetMetadata';
+import { OptionMetadata, OptionSetMetadata } from '../../domain/valueObjects/OptionSetMetadata';
 
 // Test helper to create complete LocalizedLabel
 function createLocalizedLabel(label: string, languageCode = 1033): LocalizedLabel {
@@ -349,7 +349,7 @@ describe('AttributeMetadataMapper', () => {
 				const mockOptionSetValue = OptionSetMetadata.create({
 					name: 'statuscode',
 					isGlobal: false,
-					options: [{ value: 1, label: 'Active', description: null, color: null }]
+					options: [OptionMetadata.create({ value: 1, label: 'Active', description: null, color: null })]
 				});
 
 				mockOptionSetMapper.mapOptionSetDtoToValueObject.mockReturnValue(mockOptionSetValue);

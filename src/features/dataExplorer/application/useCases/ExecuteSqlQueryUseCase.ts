@@ -67,10 +67,7 @@ export class ExecuteSqlQueryUseCase {
 		sql: string,
 		signal?: AbortSignal
 	): Promise<SqlQueryExecutionResult> {
-		this.logger.info('Executing SQL query', {
-			environmentId,
-			sqlLength: sql.length,
-		});
+		this.logger.info('Executing SQL query', { environmentId, sqlLength: sql.length });
 
 		try {
 			// 1. Parse SQL to AST
@@ -81,47 +78,16 @@ export class ExecuteSqlQueryUseCase {
 			});
 
 			// 2. Detect and transform virtual columns if metadata available
-			let transformation: VirtualColumnTransformation | null = null;
-			let statementToExecute = statement;
-
-			if (this.metadataCache !== undefined && !statement.isSelectAll()) {
-				transformation = await this.detectVirtualColumns(
-					environmentId,
-					statement.getEntityName(),
-					statement.columns
-				);
-
-				if (transformation.needsTransformation) {
-					this.logger.debug('Virtual column transformation needed', {
-						parentsToAdd: transformation.parentsToAdd,
-						virtualColumns: transformation.virtualColumns.map(v => v.virtualColumn),
-					});
-					// Build map of virtual column (lowercase) → parent column
-					const virtualToParent = new Map<string, string>();
-					for (const vc of transformation.virtualColumns) {
-						virtualToParent.set(vc.virtualColumn.toLowerCase(), vc.parentColumn);
-					}
-					statementToExecute = statement.withVirtualColumnsReplaced(virtualToParent);
-				}
-			}
-
-			// 3. Transpile AST to FetchXML
-			const fetchXml = this.transpiler.transpile(statementToExecute);
-			this.logger.debug('SQL transpiled to FetchXML', {
-				fetchXmlLength: fetchXml.length,
-			});
-
-			// 4. Get entity set name (account → accounts)
-			const entitySetName = await this.repository.getEntitySetName(
+			const { statementToExecute, transformation } = await this.applyVirtualColumnTransformation(
 				environmentId,
-				statement.getEntityName()
+				statement
 			);
 
-			// 5. Execute FetchXML query
-			const result = await this.repository.executeQuery(
+			// 3. Transpile and execute
+			const result = await this.transpileAndExecute(
 				environmentId,
-				entitySetName,
-				fetchXml,
+				statement.getEntityName(),
+				statementToExecute,
 				signal
 			);
 
@@ -130,8 +96,7 @@ export class ExecuteSqlQueryUseCase {
 				executionTimeMs: result.executionTimeMs,
 			});
 
-			// 6. Return result with column filter for virtual column support
-			// The filter should be applied AFTER mapper expansion (at ViewModel level)
+			// 4. Return result with column filter for virtual column support
 			const columnsToShow = transformation?.needsTransformation
 				? transformation.originalColumns
 				: null;
@@ -144,20 +109,75 @@ export class ExecuteSqlQueryUseCase {
 	}
 
 	/**
+	 * Applies virtual column transformation if metadata is available.
+	 * Returns the statement to execute and transformation info.
+	 */
+	private async applyVirtualColumnTransformation(
+		environmentId: string,
+		statement: import('../../domain/valueObjects/SqlAst').SqlSelectStatement
+	): Promise<{
+		statementToExecute: import('../../domain/valueObjects/SqlAst').SqlSelectStatement;
+		transformation: VirtualColumnTransformation | null;
+	}> {
+		if (this.metadataCache === undefined || statement.isSelectAll()) {
+			return { statementToExecute: statement, transformation: null };
+		}
+
+		const transformation = await this.detectVirtualColumns(
+			environmentId,
+			statement.getEntityName(),
+			statement.columns,
+			this.metadataCache
+		);
+
+		if (!transformation.needsTransformation) {
+			return { statementToExecute: statement, transformation };
+		}
+
+		this.logger.debug('Virtual column transformation needed', {
+			parentsToAdd: transformation.parentsToAdd,
+			virtualColumns: transformation.virtualColumns.map(v => v.virtualColumn),
+		});
+
+		// Build map of virtual column (lowercase) → parent column
+		const virtualToParent = new Map<string, string>();
+		for (const vc of transformation.virtualColumns) {
+			virtualToParent.set(vc.virtualColumn.toLowerCase(), vc.parentColumn);
+		}
+
+		return {
+			statementToExecute: statement.withVirtualColumnsReplaced(virtualToParent),
+			transformation,
+		};
+	}
+
+	/**
+	 * Transpiles SQL AST to FetchXML and executes the query.
+	 */
+	private async transpileAndExecute(
+		environmentId: string,
+		entityName: string,
+		statement: import('../../domain/valueObjects/SqlAst').SqlSelectStatement,
+		signal?: AbortSignal
+	): Promise<QueryResult> {
+		const fetchXml = this.transpiler.transpile(statement);
+		this.logger.debug('SQL transpiled to FetchXML', { fetchXmlLength: fetchXml.length });
+
+		const entitySetName = await this.repository.getEntitySetName(environmentId, entityName);
+		return this.repository.executeQuery(environmentId, entitySetName, fetchXml, signal);
+	}
+
+	/**
 	 * Detects virtual columns in SQL and determines transformation needed.
 	 */
 	private async detectVirtualColumns(
 		environmentId: string,
 		entityName: string,
-		columns: readonly (SqlColumnRef | SqlAggregateColumn)[]
+		columns: readonly (SqlColumnRef | SqlAggregateColumn)[],
+		metadataCache: IntelliSenseMetadataCache
 	): Promise<VirtualColumnTransformation> {
-		// Get attribute metadata for the entity
-		const attributes = await this.metadataCache!.getAttributeSuggestions(
-			environmentId,
-			entityName
-		);
+		const attributes = await metadataCache.getAttributeSuggestions(environmentId, entityName);
 
-		// Extract column info for detection
 		const sqlColumns = columns
 			.filter((col): col is SqlColumnRef => col instanceof SqlColumnRef && !col.isWildcard)
 			.map(col => ({

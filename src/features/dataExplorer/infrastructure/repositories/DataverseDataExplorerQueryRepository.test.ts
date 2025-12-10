@@ -534,8 +534,10 @@ describe('DataverseDataExplorerQueryRepository', () => {
 				id: '11111111-1111-1111-1111-111111111111',
 			});
 
-			// The row data should also use 'CreatedByUser' as the key
-			expect(viewModel.rows[0]!['CreatedByUser']).toBe('John Doe');
+			// The lookup column shows GUID, the virtual name column shows display name
+			// This matches the mapper behavior: lookup columns show ID, *name columns show name
+			expect(viewModel.rows[0]!['CreatedByUser']).toBe('11111111-1111-1111-1111-111111111111');
+			expect(viewModel.rows[0]!['CreatedByUsername']).toBe('John Doe');
 		});
 
 		it('should preserve lookup value when Dataverse returns both alias key and _value pattern', async () => {
