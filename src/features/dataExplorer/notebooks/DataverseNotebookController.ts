@@ -57,6 +57,9 @@ export class DataverseNotebookController {
 	/** Tracks active cell executions for cancellation support */
 	private readonly activeExecutions = new Map<string, AbortController>();
 
+	/** Flag to stop execution loop when interrupt is requested */
+	private executionInterrupted = false;
+
 	constructor(
 		private readonly getEnvironments: () => Promise<EnvironmentInfo[]>,
 		private readonly executeSqlUseCase: ExecuteSqlQueryUseCase,
@@ -357,7 +360,15 @@ export class DataverseNotebookController {
 		_notebook: vscode.NotebookDocument,
 		_controller: vscode.NotebookController
 	): Promise<void> {
+		// Reset interrupt flag at start of new execution batch
+		this.executionInterrupted = false;
+
 		for (const cell of cells) {
+			// Stop if interrupt was requested
+			if (this.executionInterrupted) {
+				this.logger.info('Skipping remaining cells due to interrupt');
+				break;
+			}
 			await this.executeCell(cell);
 		}
 	}
@@ -369,6 +380,9 @@ export class DataverseNotebookController {
 		this.logger.info('Interrupt requested for notebook', {
 			uri: notebook.uri.toString(),
 		});
+
+		// Set flag to stop execution loop
+		this.executionInterrupted = true;
 
 		// Abort all active executions for cells in this notebook
 		for (const cell of notebook.getCells()) {
@@ -446,6 +460,18 @@ export class DataverseNotebookController {
 				const sqlResult = await this.executeSqlUseCase.execute(this.selectedEnvironmentId, cellContent, signal);
 				result = sqlResult.result;
 				columnsToShow = sqlResult.columnsToShow;
+			}
+
+			// Check if aborted while query was running
+			if (signal.aborted) {
+				this.logger.info('Notebook cell execution cancelled (after query returned)');
+				execution.replaceOutput([
+					new vscode.NotebookCellOutput([
+						vscode.NotebookCellOutputItem.text('Query cancelled', 'text/plain'),
+					]),
+				]);
+				execution.end(false, Date.now());
+				return;
 			}
 
 			// Map to view model (with optional column filter for virtual column support)
