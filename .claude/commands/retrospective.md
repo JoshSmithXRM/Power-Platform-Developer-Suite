@@ -50,35 +50,74 @@ The goal is **actionable improvements** to documentation, commands, agents, and 
 
 ### 1.1 Conversation History Analysis
 
-Scan conversation history for this project:
+**Location:** `~/.claude/projects/` - find directories matching this project.
 
 ```bash
 # Find project history directories (main + worktrees)
 ls ~/.claude/projects/ | grep "Power-Platform-Developer-Suite"
+
+# On Windows with Git Bash:
+ls /c/Users/$USER/.claude/projects/ | grep "Power-Platform-Developer-Suite"
 ```
 
-For each history directory, analyze JSONL files for:
+**Note:** Worktree directories may have few/no JSONL files if most sessions were run from the main repo directory. This is expected - only collect from directories that have content.
 
-**Correction Patterns (Claude-side):**
-- User saying "I'll decide" / "let me decide"
-- User saying "don't assume" / "ask me first"
-- User asking for recommendations you didn't give
-- Signs of frustration (caps, repetition)
-- "STOP" / "NO" / corrections
+---
 
-**Correction Patterns (User-side):**
-- Prompts that led to confusion vs clarity
-- When context was missing
-- Patterns in clarification requests
+**IMPORTANT: Sampling Strategy**
 
-**Decision Points:**
-- Major technical decisions made
-- Pivots or changes in direction
-- What triggered them
+Conversation files can be huge (200+ MB total). Do NOT attempt to parse everything.
 
-**Extended Thinking Usage:**
-- When "think" / "think harder" was invoked
-- Was it necessary? Overkill?
+**Step 1: Inventory**
+```bash
+# List session files (exclude agent-* which are subagent logs)
+ls -lt ~/.claude/projects/[PROJECT]/*.jsonl 2>/dev/null | grep -v "agent-" | head -20
+
+# Get total size
+du -sh ~/.claude/projects/[PROJECT]/
+```
+
+**Step 2: Pattern Detection via Grep (Fast)**
+
+Search ALL files for patterns, but don't parse them:
+
+```bash
+# Correction patterns - Claude asking without recommending
+grep -l "I'll decide\|let me decide\|I will decide" *.jsonl 2>/dev/null
+
+# Correction patterns - Claude making unauthorized decisions
+grep -l "don't assume\|ask me first\|should have asked" *.jsonl 2>/dev/null
+
+# Frustration indicators
+grep -l "STOP\|NO NO\|wrong" *.jsonl 2>/dev/null
+
+# Yes-man behavior
+grep -l "You're absolutely right\|you're absolutely right" *.jsonl 2>/dev/null
+
+# Extended thinking usage
+grep -l "think hard\|think harder\|ultrathink" *.jsonl 2>/dev/null
+
+# Slash command usage
+grep -o '"/[a-z-]*"' *.jsonl 2>/dev/null | sort | uniq -c | sort -rn | head -20
+```
+
+**Step 3: Sample Deep Analysis (2-3 sessions)**
+
+Pick 2-3 of the **largest recent sessions** for deeper analysis:
+- Read the actual JSONL content
+- Extract specific exchanges where corrections happened
+- Note decision points and pivots
+
+**What to Extract:**
+
+| Category | Method | What to Find |
+|----------|--------|--------------|
+| Correction patterns (Claude) | grep | Files with "I'll decide", "don't assume", etc. |
+| Correction patterns (User) | sample read | Prompts that caused confusion |
+| Decision points | sample read | Major technical decisions, pivots |
+| Command usage | grep | Which slash commands were invoked |
+| Tool usage | grep count | `"tool_use"` occurrences per session |
+| Extended thinking | grep | When think/think harder was used |
 
 ### 1.2 Git Analysis
 
@@ -376,22 +415,129 @@ Structure:
 ### Multi-Machine Export
 `docs/retrospective/data/[machine-id]-YYYY-MM-DD.json`
 
-When running `--collect`:
+When running `--collect`, create this file with the following schema:
+
 ```json
 {
   "machineId": "DESKTOP-ABC",
   "exportDate": "2025-12-11",
-  "conversationInsights": {
-    "correctionPatterns": [...],
-    "decisionPoints": [...],
-    "promptingPatterns": [...]
+  "period": {
+    "start": "2025-11-11",
+    "end": "2025-12-11",
+    "source": "last 30 days (default)"
   },
+
+  "conversationInsights": {
+    "sessionCount": 15,
+    "totalSizeMB": 207,
+    "projectDirectories": [
+      "C--VS-Power-Platform-Developer-Suite",
+      "C--VS-Power-Platform-Developer-Suite-data-explorer"
+    ],
+
+    "correctionPatterns": {
+      "claudeAskingWithoutRecommending": {
+        "filesFound": 3,
+        "examples": ["Session X: User said 'I'll decide'"]
+      },
+      "claudeMakingUnauthorizedDecisions": {
+        "filesFound": 2,
+        "examples": ["Session Y: User said 'don't assume'"]
+      },
+      "frustrationIndicators": {
+        "filesFound": 1,
+        "examples": ["Session Z: User used caps 'STOP'"]
+      },
+      "yesManBehavior": {
+        "filesFound": 0,
+        "examples": []
+      }
+    },
+
+    "commandUsage": {
+      "/design": 5,
+      "/code-review": 3,
+      "/handoff": 2
+    },
+
+    "extendedThinkingUsage": {
+      "thinkHard": 2,
+      "thinkHarder": 1,
+      "ultrathink": 0
+    },
+
+    "observations": [
+      "Pattern: Most sessions don't use slash commands",
+      "Pattern: Extended thinking rarely used"
+    ]
+  },
+
   "gitSummary": {
-    "commitsByType": {...},
-    "featureBranches": [...]
+    "totalCommits": 158,
+    "commitsByType": {
+      "feat": 45,
+      "fix": 17,
+      "refactor": 8,
+      "test": 12,
+      "docs": 15,
+      "chore": 10,
+      "other": 51
+    },
+    "mostChangedFiles": [
+      {"file": "src/features/X/Panel.ts", "changes": 15},
+      {"file": "CHANGELOG.md", "changes": 12}
+    ],
+    "activeBranches": [
+      "feature/deployment-settings-promotion",
+      "fix/notebook-no-data-race-condition"
+    ],
+    "observations": [
+      "11% of commits are bug fixes",
+      "High churn in Panel.ts files"
+    ]
+  },
+
+  "prSummary": {
+    "recentPRs": 20,
+    "externalReviewFindings": [
+      {
+        "pr": "#43",
+        "source": "Gemini",
+        "finding": "Unused import",
+        "shouldCatchEarlier": true
+      }
+    ],
+    "ciFailures": 2,
+    "postPRCommits": {
+      "pr43": 4,
+      "pr42": 1
+    }
+  },
+
+  "toolInventory": {
+    "commands": ["/design", "/code-review", "/prepare-release", "..."],
+    "agents": ["code-guardian", "design-architect"],
+    "observations": [
+      "/prepare-pr exists but wasn't used in this period"
+    ]
+  },
+
+  "highLevelObservations": {
+    "successes": [
+      "Design-first approach working for complex features"
+    ],
+    "failures": [
+      "CHANGELOG verification skipped in v0.3.3 release"
+    ],
+    "improvements": [
+      "Need to use /prepare-pr before PRs"
+    ]
   }
 }
 ```
+
+**Required fields:** machineId, exportDate, period, conversationInsights, gitSummary
+**Optional fields:** prSummary (if gh CLI available), toolInventory, highLevelObservations
 
 ### History Tracking
 `docs/retrospective/history.json` - Tracks all retrospectives for trend analysis.
