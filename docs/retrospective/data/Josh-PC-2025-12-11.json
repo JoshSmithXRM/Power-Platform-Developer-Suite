@@ -1,0 +1,116 @@
+{
+  "machineId": "Josh-PC",
+  "exportDate": "2025-12-11",
+  "periodStart": "2025-11-11",
+  "periodEnd": "2025-12-11",
+  "conversationInsights": {
+    "totalSessions": 113,
+    "totalSize": "45 MB",
+    "worktreeSessions": {
+      "main": { "sessions": 113, "size": "45 MB" },
+      "configuration": { "sessions": 8, "size": "4.6 MB" },
+      "data-explorer": { "sessions": 26, "size": "8.6 MB" },
+      "import-jobs": { "sessions": 6, "size": "988 KB" },
+      "virtual-table": { "sessions": 14, "size": "14 MB" }
+    },
+    "sessionsWithExtendedThinking": 19,
+    "sessionsWithCorrections": 6,
+    "sessionsWithSlashCommands": 14,
+    "correctionPatterns": {
+      "note": "Relatively low correction rate (6 out of 113 sessions)",
+      "commonPhrases": ["ask me first", "let me decide", "don't assume"],
+      "observation": "Lower correction density than SKYNET machine, possibly due to more established patterns or different task mix"
+    },
+    "promptingPatterns": {
+      "observation": "Higher usage of extended thinking (19 sessions vs 1 on SKYNET), indicating more complex architectural decisions on this machine"
+    }
+  },
+  "gitSummary": {
+    "totalCommitsLast30Days": 79,
+    "commitsByType": {
+      "docs": 39,
+      "fix": 17,
+      "chore": 11,
+      "feat": 6,
+      "test": 4,
+      "refactor": 2
+    },
+    "docHeavy": true,
+    "docRatio": 0.49,
+    "bugFixRatio": 0.22,
+    "featureRatio": 0.08,
+    "refactorRatio": 0.03,
+    "mostChangedFiles": [
+      {"file": "package.json", "changes": 26},
+      {"file": "CHANGELOG.md", "changes": 23},
+      {"file": "WebResourcesPanelComposed.ts", "changes": 19},
+      {"file": "VirtualTableRenderer.js", "changes": 18},
+      {"file": "E2E_TESTING_AND_FIXES_TODO.md", "changes": 17},
+      {"file": "CLAUDE.md", "changes": 16},
+      {"file": "PluginTraceViewerPanelComposed.ts", "changes": 15},
+      {"file": "EnvironmentVariablesPanelComposed.ts", "changes": 14},
+      {"file": "ConnectionReferencesPanelComposed.ts", "changes": 13},
+      {"file": "ImportJobViewerPanelComposed.ts", "changes": 12}
+    ],
+    "featureBranches": {
+      "local": [
+        "feature/demo",
+        "feature/deployment-settings-promotion",
+        "feature/plugin-registration",
+        "feature/retrospective-process",
+        "fix/notebook-no-data-race-condition"
+      ],
+      "remote": [
+        "feature/configuration-settings",
+        "feature/data-explorer",
+        "feature/deployment-settings-promotion",
+        "feature/import-jobs-virtual-table",
+        "feature/plugin-registration",
+        "feature/solution-diff",
+        "feature/virtual-table"
+      ]
+    }
+  },
+  "prSummary": {
+    "totalPRsLast30Days": 10,
+    "mergedPRs": 9,
+    "closedWithoutMerge": 1,
+    "recentPRs": [
+      {"number": 43, "title": "fix: notebook and metadata browser improvements (v0.3.3)", "state": "MERGED"},
+      {"number": 42, "title": "fix: v0.3.2 - Memory optimization and IntelliSense fixes", "state": "MERGED"},
+      {"number": 41, "title": "docs: roadmap cleanup, release process simplification, and v0.3.1 bug fixes", "state": "MERGED"},
+      {"number": 39, "title": "Release v0.3.0 - Data Explorer, Web Resources & Metadata Browser", "state": "MERGED"},
+      {"number": 36, "title": "fix: Critical bugs batch + 8 user-configurable settings (v0.2.6)", "state": "MERGED"},
+      {"number": 35, "title": "Release v0.2.5 - Environment Management & Stability", "state": "MERGED"}
+    ]
+  },
+  "ciSummary": {
+    "recentRuns": "All successful",
+    "successRate": 1.0,
+    "observation": "CI is very stable on this machine's recent work"
+  },
+  "toolVersions": {
+    "claudeCodeVersion": "2.0.65"
+  },
+  "observations": {
+    "processSuccesses": [
+      "Higher extended thinking usage (17% of sessions) indicates good use for complex decisions",
+      "Low correction rate (5% of sessions) suggests good alignment",
+      "100% CI success rate on recent runs",
+      "Active worktree usage for parallel development"
+    ],
+    "processFailures": [
+      "Documentation commits dominate (49%) - may indicate over-documentation or lots of process refinement",
+      "High file churn on PanelComposed files - same files changing repeatedly"
+    ],
+    "potentialImprovements": [
+      "Consider whether doc commits represent actual value or process overhead",
+      "Review PanelComposed file churn - is there an abstraction opportunity?",
+      "Compare extended thinking usage between machines to understand when it helps"
+    ],
+    "interestingPatterns": [
+      "This machine shows 17% extended thinking usage vs <1% on SKYNET",
+      "Different worktree usage patterns between machines"
+    ]
+  }
+}
