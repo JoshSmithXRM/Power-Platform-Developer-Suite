@@ -29,6 +29,12 @@ Custom slash commands for this project.
 |---------|---------|
 | `/prepare-release` | Prepare version release (bump version, create release notes, update changelog) |
 
+### Process Improvement
+| Command | Purpose |
+|---------|---------|
+| `/retrospective` | Continuous workflow improvement (analyze patterns, iterate on process) |
+| `/retrospective --collect` | Export data for multi-machine sync |
+
 ### Session Management
 | Command | Purpose |
 |---------|---------|
@@ -57,6 +63,24 @@ Custom slash commands for this project.
 **Frequency:** As needed per sprint planning
 **Duration:** 2-6 hours (depends on item complexity)
 
+### `/retrospective`
+**Purpose:** Analyze conversation history, git patterns, and PR feedback to improve workflow
+**What it does:**
+- Scans conversation history for correction patterns (both Claude and user)
+- Analyzes git commits for bug/refactor patterns
+- Reviews PR comments from external tools (Gemini, Copilot)
+- Audits command/agent usage and effectiveness
+- Facilitates discussion session (not just a report)
+- Proposes and implements workflow improvements
+
+**Modes:**
+- `/retrospective` - Full retrospective with all phases
+- `/retrospective --collect` - Export data only (for multi-machine sync)
+- `/retrospective --synthesize` - Combine exports from multiple machines
+
+**Frequency:** Bi-weekly + on-demand after incidents
+**Duration:** 30-90 minutes (depends on discussion depth)
+
 ---
 
 ## Typical Workflows
@@ -82,6 +106,11 @@ Custom slash commands for this project.
 1. `/handoff` - Capture context
 2. `/clear` - Reset for next task
 
+**Bi-weekly Process Review:**
+1. `/retrospective` - Analyze patterns, improve workflow
+2. Implement approved changes
+3. Track improvements over time
+
 ---
 
 ## Best Practices
@@ -101,6 +130,16 @@ Custom slash commands for this project.
 1. `/prepare-release X.Y.Z` - Full validation + version bump
 2. Push and merge PR to main
 3. Create GitHub Release with tag
+
+**After Incidents/Failures:**
+1. `/retrospective` - Analyze what went wrong
+2. Implement process improvements
+3. Prevent recurrence
+
+**Multi-Machine Workflow:**
+1. Run `/retrospective --collect` on each machine
+2. Git sync the exports (docs/retrospective/data/)
+3. Run `/retrospective --synthesize` to combine and analyze
 
 ## Git Hooks
 
