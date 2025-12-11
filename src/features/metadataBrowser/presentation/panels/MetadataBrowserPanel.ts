@@ -662,6 +662,15 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 			}
 		}
 
+		// Warn if rawDto is missing - indicates mapper may need to call setRawDto()
+		if (metadataRecord && rawEntity === null) {
+			this.logger.warn('Missing rawDto for metadata item - Properties tab may show incomplete data', {
+				tab: tab as string,
+				itemId,
+				metadataType: metadataRecord.constructor?.name ?? 'unknown'
+			});
+		}
+
 		// Debug logging for validation
 		const domainKeyCount = metadataRecord ? Object.keys(metadataRecord).filter(k => !k.startsWith('_')).length : 0;
 		const rawKeyCount = rawEntity ? Object.keys(rawEntity).length : 0;
