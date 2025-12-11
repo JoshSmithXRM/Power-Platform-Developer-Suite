@@ -591,6 +591,36 @@ When working across multiple machines:
    ```
    This combines all exports and runs the full retrospective.
 
+4. **After synthesis is complete and committed:**
+   ```bash
+   # Clean up temporary data exports
+   rm docs/retrospective/data/*.json
+   git add docs/retrospective/data/
+   git commit -m "chore(retro): clean up data exports"
+   git push
+   ```
+   The raw exports are preserved in git history if ever needed.
+
+---
+
+## CLEANUP
+
+After a retrospective is synthesized and committed, clean up temporary artifacts:
+
+**What to delete:**
+- `docs/retrospective/data/*.json` - Raw machine exports (temporary)
+
+**What to keep:**
+- `docs/retrospective/YYYY-MM-DD.md` - Synthesized findings (permanent record)
+- `docs/retrospective/history.json` - Metrics tracking (permanent)
+- `docs/retrospective/data/.gitkeep` - Preserves empty folder
+
+**Why clean up:**
+- Raw exports are redundant after synthesis
+- Findings doc and history.json capture all important information
+- Keeps repo clean
+- Git history preserves raw data if ever needed
+
 ---
 
 ## FREQUENCY
