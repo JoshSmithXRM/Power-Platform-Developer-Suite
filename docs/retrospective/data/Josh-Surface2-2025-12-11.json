@@ -1,0 +1,209 @@
+{
+  "machineId": "Josh-Surface2",
+  "exportDate": "2025-12-11",
+  "period": {
+    "start": "2025-11-11",
+    "end": "2025-12-11",
+    "source": "last 30 days (default)"
+  },
+
+  "conversationInsights": {
+    "sessionCount": 31,
+    "totalSizeMB": 42,
+    "projectDirectories": [
+      "C--VS-Power-Platform-Developer-Suite"
+    ],
+
+    "correctionPatterns": {
+      "claudeAskingWithoutRecommending": {
+        "filesFound": 1,
+        "examples": ["2506cd68-08e9-4253-a660-1aaba9ecae90.jsonl - contains 'I'll decide'"]
+      },
+      "claudeMakingUnauthorizedDecisions": {
+        "filesFound": 1,
+        "examples": ["2506cd68-08e9-4253-a660-1aaba9ecae90.jsonl - contains correction phrase"]
+      },
+      "frustrationIndicators": {
+        "filesFound": 22,
+        "examples": ["Note: 'wrong' pattern has high false positive rate in code discussions"]
+      },
+      "yesManBehavior": {
+        "filesFound": 8,
+        "examples": [
+          "0e7cb757-0fff-4402-8ca1-be74b5f85712.jsonl",
+          "2506cd68-08e9-4253-a660-1aaba9ecae90.jsonl",
+          "4ca95f33-be07-4c02-8d24-51a0f833ac5a.jsonl",
+          "6181b8ad-dc2e-41f2-8a1b-404b1786f802.jsonl",
+          "6aff4f82-4502-4705-beea-a253b26a3631.jsonl",
+          "a5369bd8-04e4-442f-8cea-d10f5e4b12ef.jsonl",
+          "b20855d2-4e5e-4b3c-9fc8-5e8f3f1b6efb.jsonl",
+          "df2f5dcf-955a-4e86-a3b1-3a2103967172.jsonl"
+        ]
+      }
+    },
+
+    "commandUsage": {
+      "note": "Slash command grep returned empty - may indicate low command usage or grep pattern issue"
+    },
+
+    "extendedThinkingUsage": {
+      "sessionsWithExtendedThinking": 10,
+      "percentage": 32,
+      "observation": "Highest extended thinking usage across all machines (32% of sessions)"
+    },
+
+    "observations": [
+      "Yes-man behavior detected in 26% of sessions (8/31) - highest rate across machines",
+      "Extended thinking used in 32% of sessions - also highest across machines",
+      "Low correction pattern density (1 session) suggests good alignment OR smaller session count",
+      "Sessions are from Nov 17 - Dec 11 (24 days active)"
+    ],
+
+    "flaggedForReview": [
+      {
+        "file": "2506cd68-08e9-4253-a660-1aaba9ecae90.jsonl",
+        "reason": "Contains BOTH correction patterns AND yes-man behavior - interesting contrast",
+        "sizeMB": 0.17
+      },
+      {
+        "file": "0e7cb757-0fff-4402-8ca1-be74b5f85712.jsonl",
+        "reason": "Yes-man behavior in large session",
+        "sizeMB": 6.0
+      },
+      {
+        "file": "4ca95f33-be07-4c02-8d24-51a0f833ac5a.jsonl",
+        "reason": "Yes-man behavior in large session",
+        "sizeMB": 5.1
+      },
+      {
+        "file": "6aff4f82-4502-4705-beea-a253b26a3631.jsonl",
+        "reason": "Yes-man behavior",
+        "sizeMB": 1.2
+      }
+    ]
+  },
+
+  "gitSummary": {
+    "totalCommits": 164,
+    "commitsByType": {
+      "fix": 43,
+      "docs": 42,
+      "chore": 25,
+      "feat": 24,
+      "test": 5,
+      "refactor": 4,
+      "other": 21
+    },
+    "mostChangedFiles": [
+      {"file": "package.json", "changes": 26},
+      {"file": "CHANGELOG.md", "changes": 23},
+      {"file": "WebResourcesPanelComposed.ts", "changes": 19},
+      {"file": "VirtualTableRenderer.js", "changes": 18},
+      {"file": "E2E_TESTING_AND_FIXES_TODO.md", "changes": 17},
+      {"file": "CLAUDE.md", "changes": 16},
+      {"file": "PluginTraceViewerPanelComposed.ts", "changes": 15},
+      {"file": "EnvironmentVariablesPanelComposed.ts", "changes": 14},
+      {"file": "ConnectionReferencesPanelComposed.ts", "changes": 13},
+      {"file": "ImportJobViewerPanelComposed.ts", "changes": 12}
+    ],
+    "activeBranches": [
+      "feature/retrospective-process (current)",
+      "feature/deployment-settings-promotion",
+      "feature/plugin-registration",
+      "feature/data-explorer-phase-2"
+    ],
+    "observations": [
+      "26% fix commits (43/164) - higher than expected",
+      "26% docs commits (42/164) - significant process/documentation work",
+      "High churn on PanelComposed files - 6 different panels in top 10",
+      "VirtualTableRenderer.js high churn suggests active feature development"
+    ]
+  },
+
+  "prSummary": {
+    "recentPRs": 20,
+    "mergedInPeriod": 18,
+    "closedWithoutMerge": 1,
+    "externalReviewFindings": [
+      {
+        "pr": "#43",
+        "source": "Gemini",
+        "finding": "Security concern about MCP config with sensitive data",
+        "shouldCatchEarlier": true
+      },
+      {
+        "pr": "#42",
+        "source": "Gemini",
+        "finding": "Medium-severity: inconsistency in virtual scroll handler",
+        "shouldCatchEarlier": true
+      }
+    ],
+    "ciSuccessRate": 1.0,
+    "observations": [
+      "All CI runs successful in recent period",
+      "External reviewers (Gemini, Copilot) finding issues code-guardian should catch"
+    ]
+  },
+
+  "toolInventory": {
+    "commands": [
+      "cleanup-code",
+      "code-review",
+      "comprehensive-review",
+      "design",
+      "fix-technical-debt",
+      "handoff",
+      "new-panel",
+      "prepare-pr",
+      "prepare-release",
+      "retrospective",
+      "review-technical-debt"
+    ],
+    "agents": [
+      "code-guardian",
+      "design-architect"
+    ],
+    "claudeCodeVersion": "2.0.65",
+    "observations": [
+      "Full command suite available",
+      "Same version as other machines (2.0.65)"
+    ]
+  },
+
+  "highLevelObservations": {
+    "successes": [
+      "High extended thinking usage (32%) for complex decisions",
+      "100% CI success rate",
+      "Good commit discipline (conventional commits)"
+    ],
+    "failures": [
+      "Yes-man behavior in 26% of sessions - needs attention",
+      "External reviewers finding issues that should be caught locally"
+    ],
+    "crossMachineComparison": {
+      "Josh-Surface2": {
+        "sessions": 31,
+        "extendedThinking": "32%",
+        "yesManBehavior": "26%",
+        "corrections": "3%"
+      },
+      "Josh-PC": {
+        "sessions": 113,
+        "extendedThinking": "17%",
+        "yesManBehavior": "unknown",
+        "corrections": "5%"
+      },
+      "SKYNET": {
+        "sessions": 344,
+        "extendedThinking": "<1%",
+        "yesManBehavior": "unknown",
+        "corrections": "6%+"
+      }
+    },
+    "improvements": [
+      "Address yes-man behavior pattern in Claude responses",
+      "Update code-guardian to catch virtual scroll inconsistencies",
+      "Review security scanning for MCP config patterns"
+    ]
+  }
+}
