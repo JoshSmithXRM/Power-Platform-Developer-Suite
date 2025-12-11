@@ -764,7 +764,80 @@ await new Promise(resolve => setTimeout(resolve, 100));
 
 **Decision Point:** If logging in domain or excessive duplication, **REQUEST CHANGES**.
 
-### Step 9: Verify Manual Testing (2 min)
+### Step 9: Security & Sensitive Files Check (2 min)
+
+**Check for sensitive files that should not be committed:**
+
+```bash
+# Check for sensitive files in git
+git ls-files | grep -E "\.mcp\.json|\.env$|\.env\.|credentials|secrets"
+```
+
+**❌ RED FLAGS:**
+- `.mcp.json` committed (contains environment-specific connection strings)
+- `.env` or `.env.*` committed (contains secrets)
+- Any file with `credentials` or `secrets` in name
+- Hardcoded tenant IDs, client secrets, connection strings in committed files
+
+**✅ GOOD:**
+- `.mcp.json` in `.gitignore` (use `.mcp.json.template` instead)
+- `.env.example` with placeholder values only
+- Secrets loaded from environment variables
+
+**Decision Point:** If sensitive files committed, **STOP and REQUEST immediate removal**.
+
+### Step 10: Dead Code Detection (2 min)
+
+**Run ts-prune to find unused exports:**
+
+```bash
+npx ts-prune --error 2>/dev/null | grep -v "used in module" | head -20
+```
+
+**✅ CHECK:**
+- No unused exports in domain layer (entities, value objects)
+- No unused exports in application layer (use cases, mappers)
+- Infrastructure/presentation may have acceptable unused exports (extension points)
+
+**❌ RED FLAGS:**
+- Domain entity methods marked as unused
+- Use case classes never imported
+- ViewModel interfaces not used
+
+**Decision Point:** If significant dead code in domain/application, **REQUEST cleanup**.
+
+### Step 11: Test Coverage Quality (3 min)
+
+**Beyond coverage %, verify RIGHT things are tested:**
+
+**✅ CHECK:**
+- Domain entities: Business rules have explicit tests
+- Value objects: Validation logic tested
+- Use cases: Happy path AND error paths tested
+- Edge cases: Null handling, empty collections, boundary conditions
+
+**Scan for test quality:**
+
+```bash
+# Find test files for changed code
+git diff main --name-only | grep -E "\.(ts|tsx)$" | sed 's/\(.*\)\.\(ts\|tsx\)$/\1.test.\2/' | xargs ls 2>/dev/null
+```
+
+**❌ RED FLAGS:**
+- New domain entity with NO test file
+- Business rule added but no test for it
+- Complex orchestration with only happy-path test
+- Tests that don't assert meaningful behavior
+
+**✅ GOOD:**
+- Each business rule has at least one test
+- Error conditions tested
+- Edge cases covered
+- Tests document expected behavior
+
+**Decision Point:** If new business logic lacks tests, **REQUEST tests before approval**.
+
+### Step 12: Verify Manual Testing (2 min)
 
 **✅ CHECK:**
 - User confirmed manual testing (F5 in VS Code)
@@ -775,7 +848,7 @@ await new Promise(resolve => setTimeout(resolve, 100));
 
 If no: **REQUEST manual testing before approval**
 
-### Step 10: Make Decision (2 min)
+### Step 13: Make Decision (2 min)
 
 **Provide ONE of these decisions:**
 
@@ -901,6 +974,23 @@ Use this checklist for every review:
 - [ ] No duplication (3+ times)
 - [ ] Secrets redacted in logs
 - [ ] No console.log in production code
+
+**Security:**
+- [ ] No `.mcp.json` committed (use template instead)
+- [ ] No `.env` files committed (use `.env.example`)
+- [ ] No hardcoded secrets, tenant IDs, connection strings
+- [ ] Sensitive files in `.gitignore`
+
+**Dead Code:**
+- [ ] No unused exports in domain layer
+- [ ] No unused exports in application layer
+- [ ] ts-prune shows no critical dead code
+
+**Test Coverage Quality:**
+- [ ] New domain entities have test files
+- [ ] Business rules have explicit tests
+- [ ] Error paths tested (not just happy path)
+- [ ] Edge cases covered
 
 **Testing:**
 - [ ] Manual testing completed (F5 in VS Code)

@@ -78,7 +78,33 @@ If ANY threshold fails:
 
 ---
 
-## STEP 4: VERIFY CHANGELOG AGAINST COMMITS
+## STEP 4: RUN E2E SMOKE TESTS
+
+```bash
+npm run e2e:smoke
+```
+
+**Purpose:** Verify extension loads, commands register, and basic UI works.
+
+**Output:**
+```
+E2E Smoke Tests:
+✓ Extension activates successfully
+✓ Commands registered
+✓ Screenshots captured to e2e/screenshots/
+```
+
+**If fails:**
+- Check `e2e/screenshots/` for visual state
+- Check `e2e/results/claude-results.json` for detailed logs
+- Common issues: Panel initialization, missing dependencies, webview errors
+
+**Note:** E2E tests are supplementary to F5 testing, not a replacement.
+Skip this step if E2E infrastructure is not set up or if changes don't affect UI.
+
+---
+
+## STEP 5: VERIFY CHANGELOG AGAINST COMMITS
 
 **This is the critical step that prevents incomplete CHANGELOGs.**
 
@@ -137,9 +163,9 @@ If ANY threshold fails:
 
 ---
 
-## STEP 5: CODE REVIEW (Mandatory)
+## STEP 6: CODE REVIEW (Mandatory)
 
-**Prerequisites from Steps 1-4 must pass before code review.**
+**Prerequisites from Steps 1-5 must pass before code review.**
 
 1. **Invoke code-guardian agent:**
    Use the Task tool with `subagent_type='code-guardian'` to review all changes.
@@ -156,7 +182,7 @@ If ANY threshold fails:
 
 ---
 
-## STEP 6: SUMMARY
+## STEP 7: SUMMARY
 
 Show final status:
 
@@ -168,6 +194,7 @@ PR Readiness Check Complete
 ✓ Compilation: Passed
 ✓ Tests: 8030 passed
 ✓ Coverage: All thresholds met
+✓ E2E Smoke: Passed
 ✓ CHANGELOG: Verified against 5 commits
 ✓ Code Review: APPROVED
 
@@ -185,6 +212,7 @@ PR Readiness Check: FAILED
 ✓ Uncommitted changes: None
 ✓ Compilation: Passed
 ✗ Coverage: Domain statements 93.2% (threshold: 95%)
+- E2E Smoke: Not run (blocked by earlier failure)
 - CHANGELOG: Not checked (blocked by earlier failure)
 - Code Review: Not run (blocked by earlier failure)
 
@@ -217,6 +245,7 @@ Fix the issues above and re-run /prepare-pr
 |--------|-------------|------------------|
 | **When** | Any PR to main | Version releases only |
 | **Code review** | Includes code-guardian | Includes code-guardian |
+| **E2E smoke tests** | Yes (if applicable) | Yes (if applicable) |
 | **Version bump** | No | Yes |
 | **CHANGELOG date** | No change | Updates date |
 | **Package.json** | No change | Updates version |
@@ -262,7 +291,13 @@ Coverage Check:
 ✓ Domain statements: 96.3% (threshold: 95%)
 ✓ Application statements: 91.4% (threshold: 90%)
 
-Step 4: CHANGELOG verification
+Step 4: E2E Smoke Tests
+Running npm run e2e:smoke...
+✓ Extension activates
+✓ Commands registered
+✓ Screenshots saved
+
+Step 5: CHANGELOG verification
 Commits on this branch (3 total):
 - abc1234 feat: add deployment settings panel
 - def5678 fix: environment switching race condition
@@ -284,7 +319,7 @@ Does the CHANGELOG accurately reflect all user-facing changes? [y/n]
 
 User: y
 
-Claude: Step 5: Code Review
+Claude: Step 6: Code Review
 Running code-guardian review...
 [Invokes code-guardian agent]
 ✓ Code Review: APPROVED
@@ -296,6 +331,7 @@ PR Readiness Check Complete
 ✓ Compilation: Passed
 ✓ Tests: 8030 passed
 ✓ Coverage: All thresholds met
+✓ E2E Smoke: Passed
 ✓ CHANGELOG: Verified against 3 commits
 ✓ Code Review: APPROVED
 
