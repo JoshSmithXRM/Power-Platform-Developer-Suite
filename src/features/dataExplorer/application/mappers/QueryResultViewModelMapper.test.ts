@@ -303,5 +303,155 @@ describe('QueryResultViewModelMapper', () => {
 			// The column.name in ViewModel should also be 'CREATEDBY'
 			expect(viewModel.columns[0]!.name).toBe('CREATEDBY');
 		});
+
+		it('should show GUID in lookup column and name in companion name column', () => {
+			// Lookup columns should show GUID in main column, name in "name" column
+			const lookupValue: QueryLookupValue = {
+				id: 'abc-123-def',
+				name: 'John Smith',
+				entityType: 'contact',
+			};
+			const columns = [new QueryResultColumn('primarycontactid', 'Primary Contact', 'lookup')];
+			const rows = [
+				QueryResultRow.fromRecord({ primarycontactid: lookupValue as never }),
+			];
+			const queryResult = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(queryResult);
+
+			// Should have 2 columns: original (GUID) + name column
+			expect(viewModel.columns).toHaveLength(2);
+			expect(viewModel.columns.map(c => c.name)).toContain('primarycontactid');
+			expect(viewModel.columns.map(c => c.name)).toContain('primarycontactidname');
+
+			// Original column shows GUID
+			expect(viewModel.rows[0]!['primarycontactid']).toBe('abc-123-def');
+			// Name column shows display name
+			expect(viewModel.rows[0]!['primarycontactidname']).toBe('John Smith');
+		});
+
+		it('should handle null lookup values', () => {
+			// Null lookup should show empty string in both columns
+			const columns = [new QueryResultColumn('primarycontactid', 'Primary Contact', 'lookup')];
+			const rows = [
+				QueryResultRow.fromRecord({ primarycontactid: null as never }),
+			];
+			const queryResult = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(queryResult);
+
+			// Should have 2 columns
+			expect(viewModel.columns).toHaveLength(2);
+			// Both should be empty for null lookup
+			expect(viewModel.rows[0]!['primarycontactid']).toBe('');
+			expect(viewModel.rows[0]!['primarycontactidname']).toBe('');
+		});
+
+		it('should handle raw null optionset values', () => {
+			// Null optionset value (not wrapped in FormattedValue)
+			const columns = [new QueryResultColumn('statuscode', 'Status', 'optionset')];
+			const rows = [
+				QueryResultRow.fromRecord({ statuscode: null as never }),
+			];
+			const queryResult = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(queryResult);
+
+			// Should have 2 columns
+			expect(viewModel.columns).toHaveLength(2);
+			// Both should be empty for null
+			expect(viewModel.rows[0]!['statuscode']).toBe('');
+			expect(viewModel.rows[0]!['statuscodename']).toBe('');
+		});
+
+		it('should stringify unknown objects', () => {
+			// Unknown object type should be JSON stringified
+			const unknownValue = { custom: 'data', nested: { value: 42 } };
+			const columns = [new QueryResultColumn('customfield', 'Custom Field', 'unknown')];
+			const rows = [
+				QueryResultRow.fromRecord({ customfield: unknownValue as never }),
+			];
+			const queryResult = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(queryResult);
+
+			// Should JSON.stringify unknown objects
+			expect(viewModel.rows[0]!['customfield']).toBe('{"custom":"data","nested":{"value":42}}');
+		});
+	});
+
+	describe('columnsToShow filtering', () => {
+		it('should filter columns when columnsToShow is provided', () => {
+			const columns = [
+				new QueryResultColumn('name', 'Name', 'string'),
+				new QueryResultColumn('revenue', 'Revenue', 'money'),
+				new QueryResultColumn('status', 'Status', 'string'),
+			];
+			const rows = [
+				QueryResultRow.fromRecord({ name: 'Contoso', revenue: 1000000, status: 'Active' }),
+			];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result, ['name', 'status']);
+
+			expect(viewModel.columns).toHaveLength(2);
+			expect(viewModel.columns.map(c => c.name)).toContain('name');
+			expect(viewModel.columns.map(c => c.name)).toContain('status');
+			expect(viewModel.columns.map(c => c.name)).not.toContain('revenue');
+		});
+
+		it('should filter row data when columnsToShow is provided', () => {
+			const columns = [
+				new QueryResultColumn('name', 'Name', 'string'),
+				new QueryResultColumn('revenue', 'Revenue', 'money'),
+			];
+			const rows = [
+				QueryResultRow.fromRecord({ name: 'Contoso', revenue: 1000000 }),
+			];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result, ['name']);
+
+			// Row data should only have 'name'
+			expect(Object.keys(viewModel.rows[0] || {})).toEqual(['name']);
+		});
+
+		it('should filter rowLookups when columnsToShow is provided', () => {
+			const lookupValue: QueryLookupValue = {
+				id: '123',
+				name: 'John Smith',
+				entityType: 'contact',
+			};
+			const columns = [
+				new QueryResultColumn('name', 'Name', 'string'),
+				new QueryResultColumn('primarycontactid', 'Primary Contact', 'lookup'),
+			];
+			const rows = [
+				QueryResultRow.fromRecord({ name: 'Contoso', primarycontactid: lookupValue as never }),
+			];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result, ['name']);
+
+			// rowLookups should not include primarycontactid since it's filtered out
+			expect(viewModel.rowLookups[0]!['primarycontactid']).toBeUndefined();
+		});
+
+		it('should be case-insensitive when filtering columns', () => {
+			const columns = [
+				new QueryResultColumn('Name', 'Name', 'string'),
+				new QueryResultColumn('Revenue', 'Revenue', 'money'),
+			];
+			const rows = [
+				QueryResultRow.fromRecord({ Name: 'Contoso', Revenue: 1000000 }),
+			];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			// Use lowercase in columnsToShow
+			const viewModel = mapper.toViewModel(result, ['name']);
+
+			expect(viewModel.columns).toHaveLength(1);
+			expect(viewModel.columns[0]!.name).toBe('Name');
+		});
 	});
 });

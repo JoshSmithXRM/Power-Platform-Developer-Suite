@@ -227,4 +227,42 @@ describe('EntityKey', () => {
             expect(key.includesAttribute('id')).toBe(true);
         });
     });
+
+    describe('raw DTO methods', () => {
+        it('should initially have null raw DTO', () => {
+            const key = createValidEntityKey();
+            expect(key.getRawDto()).toBeNull();
+        });
+
+        it('should store and retrieve raw DTO', () => {
+            const key = createValidEntityKey();
+            const rawDto = { LogicalName: 'key_account_name', MetadataId: '12345' };
+
+            key.setRawDto(rawDto);
+
+            expect(key.getRawDto()).toBe(rawDto);
+        });
+
+        it('should allow overwriting raw DTO', () => {
+            const key = createValidEntityKey();
+            const firstDto = { LogicalName: 'key1' };
+            const secondDto = { LogicalName: 'key2' };
+
+            key.setRawDto(firstDto);
+            key.setRawDto(secondDto);
+
+            expect(key.getRawDto()).toBe(secondDto);
+        });
+
+        it('should return false for hasRawDto when no DTO is set', () => {
+            const key = createValidEntityKey();
+            expect(key.hasRawDto()).toBe(false);
+        });
+
+        it('should return true for hasRawDto after setting DTO', () => {
+            const key = createValidEntityKey();
+            key.setRawDto({ LogicalName: 'key_account_name' });
+            expect(key.hasRawDto()).toBe(true);
+        });
+    });
 });

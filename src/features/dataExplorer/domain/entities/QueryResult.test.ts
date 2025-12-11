@@ -204,4 +204,63 @@ describe('QueryResult', () => {
 			expect(result.getCellValue(0, 'missing')).toBeNull();
 		});
 	});
+
+	describe('withFilteredColumns', () => {
+		it('should return original result when columnNames is empty', () => {
+			const columns = [createColumn('name'), createColumn('revenue')];
+			const rows = [createRow({ name: 'Test', revenue: 1000 })];
+			const result = new QueryResult(columns, rows, 10, false, null, '<fetch/>', 50);
+
+			const filtered = result.withFilteredColumns([]);
+
+			expect(filtered).toBe(result);
+		});
+
+		it('should filter columns to only those specified', () => {
+			const columns = [createColumn('name'), createColumn('revenue'), createColumn('status')];
+			const rows = [createRow({ name: 'Test', revenue: 1000, status: 'Active' })];
+			const result = new QueryResult(columns, rows, 10, false, null, '<fetch/>', 50);
+
+			const filtered = result.withFilteredColumns(['name', 'status']);
+
+			expect(filtered.columns).toHaveLength(2);
+			expect(filtered.columns[0]!.logicalName).toBe('name');
+			expect(filtered.columns[1]!.logicalName).toBe('status');
+			expect(filtered.rows).toBe(rows);
+			expect(filtered.executedFetchXml).toBe('<fetch/>');
+		});
+
+		it('should filter columns case-insensitively', () => {
+			const columns = [createColumn('Name'), createColumn('REVENUE')];
+			const rows = [createRow({ Name: 'Test', REVENUE: 1000 })];
+			const result = new QueryResult(columns, rows, null, false, null, '', 0);
+
+			const filtered = result.withFilteredColumns(['name', 'revenue']);
+
+			expect(filtered.columns).toHaveLength(2);
+		});
+
+		it('should return original result when no columns match', () => {
+			const columns = [createColumn('name'), createColumn('revenue')];
+			const result = new QueryResult(columns, [], null, false, null, '', 0);
+
+			const filtered = result.withFilteredColumns(['missing', 'nonexistent']);
+
+			expect(filtered).toBe(result);
+		});
+
+		it('should preserve other properties', () => {
+			const columns = [createColumn('name'), createColumn('revenue')];
+			const rows = [createRow({ name: 'Test', revenue: 1000 })];
+			const result = new QueryResult(columns, rows, 100, true, 'cookie123', '<fetch/>', 75);
+
+			const filtered = result.withFilteredColumns(['name']);
+
+			expect(filtered.totalRecordCount).toBe(100);
+			expect(filtered.moreRecords).toBe(true);
+			expect(filtered.pagingCookie).toBe('cookie123');
+			expect(filtered.executedFetchXml).toBe('<fetch/>');
+			expect(filtered.executionTimeMs).toBe(75);
+		});
+	});
 });

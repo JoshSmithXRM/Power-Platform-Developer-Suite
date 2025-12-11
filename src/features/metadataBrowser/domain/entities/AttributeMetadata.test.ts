@@ -409,4 +409,110 @@ describe('AttributeMetadata', () => {
             expect(attr.hasNumericConstraints()).toBe(false);
         });
     });
+
+    describe('raw DTO methods', () => {
+        it('should initially have null raw DTO', () => {
+            const attr = createValidAttribute();
+            expect(attr.getRawDto()).toBeNull();
+        });
+
+        it('should store and retrieve raw DTO', () => {
+            const attr = createValidAttribute();
+            const rawDto = { LogicalName: 'name', MetadataId: '12345', AttributeType: 'StringType' };
+
+            attr.setRawDto(rawDto);
+
+            expect(attr.getRawDto()).toBe(rawDto);
+        });
+
+        it('should allow overwriting raw DTO', () => {
+            const attr = createValidAttribute();
+            const firstDto = { LogicalName: 'name' };
+            const secondDto = { LogicalName: 'email' };
+
+            attr.setRawDto(firstDto);
+            attr.setRawDto(secondDto);
+
+            expect(attr.getRawDto()).toBe(secondDto);
+        });
+
+        it('should return false for hasRawDto when no DTO is set', () => {
+            const attr = createValidAttribute();
+            expect(attr.hasRawDto()).toBe(false);
+        });
+
+        it('should return true for hasRawDto after setting DTO', () => {
+            const attr = createValidAttribute();
+            attr.setRawDto({ LogicalName: 'name' });
+            expect(attr.hasRawDto()).toBe(true);
+        });
+    });
+
+    describe('virtual field methods', () => {
+        it('should return true for isVirtualField when attributeOf is set', () => {
+            const attr = createValidAttribute({ attributeOf: 'createdby' });
+            expect(attr.isVirtualField()).toBe(true);
+        });
+
+        it('should return false for isVirtualField when attributeOf is null', () => {
+            const attr = createValidAttribute({ attributeOf: null });
+            expect(attr.isVirtualField()).toBe(false);
+        });
+
+        it('should return parent attribute name from getParentAttribute', () => {
+            const attr = createValidAttribute({ attributeOf: 'createdby' });
+            expect(attr.getParentAttribute()).toBe('createdby');
+        });
+
+        it('should return null from getParentAttribute when not virtual', () => {
+            const attr = createValidAttribute({ attributeOf: null });
+            expect(attr.getParentAttribute()).toBeNull();
+        });
+    });
+
+    describe('sourceType methods', () => {
+        it('should return true for isCalculatedField when sourceType is 1', () => {
+            const attr = createValidAttribute({ sourceType: 1 });
+            expect(attr.isCalculatedField()).toBe(true);
+        });
+
+        it('should return false for isCalculatedField when sourceType is not 1', () => {
+            const attr = createValidAttribute({ sourceType: 0 });
+            expect(attr.isCalculatedField()).toBe(false);
+        });
+
+        it('should return true for isRollupField when sourceType is 2', () => {
+            const attr = createValidAttribute({ sourceType: 2 });
+            expect(attr.isRollupField()).toBe(true);
+        });
+
+        it('should return false for isRollupField when sourceType is not 2', () => {
+            const attr = createValidAttribute({ sourceType: 0 });
+            expect(attr.isRollupField()).toBe(false);
+        });
+    });
+
+    describe('formula methods', () => {
+        it('should return true for hasFormula when formulaDefinition is set', () => {
+            const attr = createValidAttribute({ formulaDefinition: 'field1 + field2' });
+            expect(attr.hasFormula()).toBe(true);
+        });
+
+        it('should return false for hasFormula when formulaDefinition is null', () => {
+            const attr = createValidAttribute({ formulaDefinition: null });
+            expect(attr.hasFormula()).toBe(false);
+        });
+    });
+
+    describe('deprecation methods', () => {
+        it('should return true for isDeprecated when deprecatedVersion is set', () => {
+            const attr = createValidAttribute({ deprecatedVersion: '9.0.0.0' });
+            expect(attr.isDeprecated()).toBe(true);
+        });
+
+        it('should return false for isDeprecated when deprecatedVersion is null', () => {
+            const attr = createValidAttribute({ deprecatedVersion: null });
+            expect(attr.isDeprecated()).toBe(false);
+        });
+    });
 });

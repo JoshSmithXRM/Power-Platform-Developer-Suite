@@ -167,6 +167,33 @@ describe('OptionMetadata', () => {
             expect(option.color).toBeNull();
         });
     });
+
+    describe('raw DTO methods', () => {
+        it('should initially have null raw DTO', () => {
+            const option = OptionMetadata.create({ value: 1, label: 'Active' });
+            expect(option.getRawDto()).toBeNull();
+        });
+
+        it('should store and retrieve raw DTO', () => {
+            const option = OptionMetadata.create({ value: 1, label: 'Active' });
+            const rawDto = { Value: 1, Label: { LocalizedLabels: [] } };
+
+            option.setRawDto(rawDto);
+
+            expect(option.getRawDto()).toBe(rawDto);
+        });
+
+        it('should allow overwriting raw DTO', () => {
+            const option = OptionMetadata.create({ value: 1, label: 'Active' });
+            const firstDto = { Value: 1 };
+            const secondDto = { Value: 2 };
+
+            option.setRawDto(firstDto);
+            option.setRawDto(secondDto);
+
+            expect(option.getRawDto()).toBe(secondDto);
+        });
+    });
 });
 
 describe('OptionSetMetadata', () => {
@@ -813,6 +840,42 @@ describe('OptionSetMetadata', () => {
             // Act & Assert
             expect(customSet.isCustom).toBe(true);
             expect(systemSet.isCustom).toBe(false);
+        });
+    });
+
+    describe('raw DTO methods', () => {
+        it('should initially have null raw DTO', () => {
+            const optionSet = OptionSetMetadata.create({
+                isGlobal: true,
+                options: [],
+            });
+            expect(optionSet.getRawDto()).toBeNull();
+        });
+
+        it('should store and retrieve raw DTO', () => {
+            const optionSet = OptionSetMetadata.create({
+                isGlobal: true,
+                options: [],
+            });
+            const rawDto = { Name: 'statecode', IsGlobal: true };
+
+            optionSet.setRawDto(rawDto);
+
+            expect(optionSet.getRawDto()).toBe(rawDto);
+        });
+
+        it('should allow overwriting raw DTO', () => {
+            const optionSet = OptionSetMetadata.create({
+                isGlobal: true,
+                options: [],
+            });
+            const firstDto = { Name: 'status1' };
+            const secondDto = { Name: 'status2' };
+
+            optionSet.setRawDto(firstDto);
+            optionSet.setRawDto(secondDto);
+
+            expect(optionSet.getRawDto()).toBe(secondDto);
         });
     });
 });

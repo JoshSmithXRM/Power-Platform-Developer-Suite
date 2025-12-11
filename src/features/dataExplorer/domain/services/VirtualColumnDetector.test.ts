@@ -236,5 +236,23 @@ describe('VirtualColumnDetector', () => {
 
 			expect(filtered).toEqual(['name', 'accountid']);
 		});
+
+		it('should match virtual column to aliased result through virtualResultNames map', () => {
+			// User requested 'createdbyname' with alias 'creator'
+			// Original columns stores the ALIAS as the column name
+			// virtualResultNames maps 'createdbyname' -> 'creator'
+			// Result has 'creator' (not 'createdbyname')
+			// So 'createdbyname' in original should match 'creator' in result via the map
+			const resultColumns = ['accountid', 'creator'];
+			const originalColumns = ['accountid', 'createdbyname']; // Virtual column name before alias resolution
+			const virtualColumns = [
+				{ virtualColumn: 'createdbyname', parentColumn: 'createdby', alias: 'creator' },
+			];
+
+			const filtered = detector.filterResultColumns(resultColumns, originalColumns, virtualColumns);
+
+			// 'createdbyname' should match 'creator' via virtualResultNames map
+			expect(filtered).toEqual(['accountid', 'creator']);
+		});
 	});
 });
