@@ -9,16 +9,27 @@
 #
 # Setup: git config core.hooksPath .githooks
 
-# Helper function to create Windows symlink (silent on failure)
+# Cross-platform symlink creation
 create_symlink() {
     local source="$1"
     local target="$2"
 
-    local WIN_TARGET WIN_SOURCE
-    WIN_TARGET=$(cygpath -w "$(pwd)/$target" 2>/dev/null) || return 0
-    WIN_SOURCE=$(cygpath -w "$source" 2>/dev/null) || return 0
+    # Ensure parent directory exists
+    if [[ "$target" == */* ]]; then
+        mkdir -p "$(dirname "$target")"
+    fi
 
-    cmd //c "mklink $WIN_TARGET $WIN_SOURCE" > /dev/null 2>&1
+    if command -v cygpath >/dev/null 2>&1; then
+        # Windows (Git Bash/Cygwin)
+        local WIN_TARGET WIN_SOURCE
+        WIN_TARGET=$(cygpath -w "$(pwd)/$target" 2>/dev/null) || return 0
+        WIN_SOURCE=$(cygpath -w "$source" 2>/dev/null) || return 0
+        cmd //c "mklink \"$WIN_TARGET\" \"$WIN_SOURCE\"" > /dev/null 2>&1
+    else
+        # Unix (macOS/Linux)
+        ln -s "$source" "$target" 2>/dev/null
+    fi
+
     [ $? -eq 0 ] && echo "✓ Linked: $target"
 }
 
@@ -32,22 +43,18 @@ CURRENT_DIR=$(pwd)
 # Skip if we're in the main repo (not a worktree)
 [ "$CURRENT_DIR" = "$MAIN_REPO_ROOT" ] && exit 0
 
-# --- Symlink .mcp.json ---
-MCP_SOURCE="$MAIN_REPO_ROOT/.mcp.json"
-if [ -f "$MCP_SOURCE" ] && [ ! -e ".mcp.json" ]; then
-    create_symlink "$MCP_SOURCE" ".mcp.json"
-fi
+# Files to symlink from main repo
+FILES_TO_LINK=(
+    ".mcp.json"
+    ".claude/settings.local.json"
+    ".env.e2e.local"
+)
 
-# --- Symlink .claude/settings.local.json ---
-CLAUDE_SOURCE="$MAIN_REPO_ROOT/.claude/settings.local.json"
-if [ -f "$CLAUDE_SOURCE" ] && [ ! -e ".claude/settings.local.json" ]; then
-    create_symlink "$CLAUDE_SOURCE" ".claude/settings.local.json"
-fi
-
-# --- Symlink .env.e2e.local ---
-ENV_SOURCE="$MAIN_REPO_ROOT/.env.e2e.local"
-if [ -f "$ENV_SOURCE" ] && [ ! -e ".env.e2e.local" ]; then
-    create_symlink "$ENV_SOURCE" ".env.e2e.local"
-fi
+for target in "${FILES_TO_LINK[@]}"; do
+    source="$MAIN_REPO_ROOT/$target"
+    if [ -f "$source" ] && [ ! -e "$target" ]; then
+        create_symlink "$source" "$target"
+    fi
+done
 
 exit 0
