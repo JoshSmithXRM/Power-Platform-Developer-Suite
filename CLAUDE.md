@@ -159,7 +159,9 @@ cascading issues from earlier mistakes.
 - `/design [feature]` - Invoke design-architect for feature design
 - `/new-panel [name]` - Scaffold new VS Code panel with Clean Architecture
 - `/cleanup-code` - Find/fix logging and comment violations
-- `/code-review` - Invoke code-guardian for approval
+- `/prepare-pr` - Full PR validation (compile, tests, coverage, CHANGELOG, code review)
+- `/prepare-release X.Y.Z` - Release prep (everything in /prepare-pr + version bump)
+- `/code-review` - Standalone code review (now included in /prepare-pr)
 - `/review-technical-debt` - Audit technical debt, clean up resolved items
 - `/fix-technical-debt` - Interactively fix technical debt items
 - `/handoff` - Generate session summary for context handoff
@@ -413,7 +415,8 @@ See `.claude/agents/` for agent definitions.
 | When | Action |
 |------|--------|
 | Complex feature (3+ files) | `/design` first |
-| Before PR | `/code-review` (mandatory) |
+| Before PR | `/prepare-pr` (includes code review) |
+| For releases | `/prepare-release X.Y.Z` (includes code review + version bump) |
 | End session | `/handoff` |
 | Context full/switching tasks | `/clear` |
 | Uncertain architecture | "think harder" before designing |

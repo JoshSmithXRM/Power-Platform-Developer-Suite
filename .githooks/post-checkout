@@ -37,6 +37,16 @@ if [ -f "$SETTINGS_SOURCE" ] && [ -d ".claude" ] && [ ! -e "$SETTINGS_TARGET" ];
     create_symlink "$SETTINGS_SOURCE" "$SETTINGS_TARGET"
 fi
 
+# --- MCP Configuration Symlink ---
+# Source: User's home directory (optional - for Claude Code MCP servers)
+# Target: .mcp.json
+MCP_SOURCE="$HOME/.ppds-mcp.json"
+MCP_TARGET=".mcp.json"
+
+if [ -f "$MCP_SOURCE" ] && [ ! -e "$MCP_TARGET" ]; then
+    create_symlink "$MCP_SOURCE" "$MCP_TARGET"
+fi
+
 # --- E2E Environment Symlink ---
 # Source: Main repo's .env.e2e.local (optional - for E2E testing)
 # Target: .env.e2e.local in worktree

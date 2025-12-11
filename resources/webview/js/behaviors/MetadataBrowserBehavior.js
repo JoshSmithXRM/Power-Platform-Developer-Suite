@@ -1415,7 +1415,7 @@ window.createBehavior({
 			// Handle Label objects - extract the user-facing label
 			// Note: Option metadata uses 'Label' instead of 'DisplayName'
 			if (key === 'DisplayName' || key === 'Description' || key === 'Label') {
-				if (typeof value === 'object' && value !== null) {
+				if (typeof value === 'object') {
 					const label = value.UserLocalizedLabel?.Label || value.LocalizedLabels?.[0]?.Label;
 					if (label) {
 						result.push({ name: displayName, rawKey: key, value: label });

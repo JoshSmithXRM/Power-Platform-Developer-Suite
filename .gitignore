@@ -25,6 +25,9 @@ package.json.backup
 .claude/settings.local.json
 *.local.json
 
+# MCP configuration (contains environment-specific connection info)
+.mcp.json
+
 # OS
 Thumbs.db
 nul

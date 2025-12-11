@@ -19,6 +19,7 @@ Automatically creates symlinks when creating worktrees:
 | Target | Source | Purpose |
 |--------|--------|---------|
 | `.claude/settings.local.json` | `$HOME/.ppds-claude-settings.json` | Claude Code settings (API keys, preferences) |
+| `.mcp.json` | `$HOME/.ppds-mcp.json` | MCP server configuration (Dataverse connection) |
 | `.env.e2e.local` | Main repo's `.env.e2e.local` | E2E test credentials (Dataverse connection) |
 
 **Note:** These symlinks are only created if:
@@ -27,6 +28,28 @@ Automatically creates symlinks when creating worktrees:
 - You're in a worktree (not the main repo)
 
 The hook fails gracefully - if source files don't exist, nothing happens.
+
+## Main Repo Setup (Per Machine)
+
+The post-checkout hook only runs for worktrees. For the main repo on each machine, manually create symlinks:
+
+**Windows (Git Bash / PowerShell with Developer Mode):**
+```bash
+# Claude settings
+mklink .claude\settings.local.json %USERPROFILE%\.ppds-claude-settings.json
+
+# MCP configuration
+mklink .mcp.json %USERPROFILE%\.ppds-mcp.json
+```
+
+**macOS/Linux:**
+```bash
+# Claude settings
+ln -s ~/.ppds-claude-settings.json .claude/settings.local.json
+
+# MCP configuration
+ln -s ~/.ppds-mcp.json .mcp.json
+```
 
 ## Creating Source Files
 
@@ -37,6 +60,28 @@ Create `~/.ppds-claude-settings.json`:
 ```json
 {
   "apiKey": "your-anthropic-api-key"
+}
+```
+
+### MCP Configuration (Optional)
+
+Create `~/.ppds-mcp.json` for Claude Code MCP server integration:
+
+```json
+{
+  "mcpServers": {
+    "dataverse": {
+      "type": "stdio",
+      "command": "Microsoft.PowerPlatform.Dataverse.MCP",
+      "args": [
+        "--ConnectionUrl", "https://make.powerautomate.com/environments/<your-env-id>/connections?apiName=shared_commondataserviceforapps&connectionName=<your-connection-id>",
+        "--MCPServerName", "DataverseMCPServer",
+        "--TenantId", "<your-tenant-id>",
+        "--BackendProtocol", "HTTP"
+      ],
+      "env": {}
+    }
+  }
 }
 ```
 
