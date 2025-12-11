@@ -562,6 +562,10 @@ export function activate(context: vscode.ExtensionContext): void {
 	const updatePluginPackageCommand = vscode.commands.registerCommand(
 		'power-platform-dev-suite.updatePluginPackage',
 		async (contextMenuContext?: { nodeId?: string; packageId?: string }) => {
+			container.logger.debug('updatePluginPackage command invoked', {
+				contextMenuContext: JSON.stringify(contextMenuContext),
+			});
+
 			const panel = PluginRegistrationPanelComposed.getActivePanel();
 			if (!panel) {
 				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
@@ -569,6 +573,12 @@ export function activate(context: vscode.ExtensionContext): void {
 			}
 			// packageId is set when clicking on an assembly-in-package, nodeId when clicking on package directly
 			const packageId = contextMenuContext?.packageId ?? contextMenuContext?.nodeId;
+			container.logger.debug('updatePluginPackage resolved packageId', {
+				packageId,
+				fromPackageId: contextMenuContext?.packageId,
+				fromNodeId: contextMenuContext?.nodeId,
+			});
+
 			if (!packageId) {
 				vscode.window.showWarningMessage('No package selected.');
 				return;

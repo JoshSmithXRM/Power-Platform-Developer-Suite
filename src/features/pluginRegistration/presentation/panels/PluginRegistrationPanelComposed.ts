@@ -196,14 +196,49 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	}
 
 	/**
-	 * Get the currently active panel for command routing.
-	 * Returns the panel if there's exactly one, or the most recently focused one.
+	 * Get the currently active (focused) panel for command routing.
+	 * Returns the active panel if one exists, otherwise falls back to first visible,
+	 * then first panel in the map.
+	 *
+	 * Priority:
+	 * 1. Active (focused) panel - user is currently interacting with it
+	 * 2. Visible panel - panel is shown but not focused
+	 * 3. First panel - fallback when no panels are visible
 	 */
 	public static getActivePanel(): PluginRegistrationPanelComposed | undefined {
-		// For now, return the first panel if any exist
-		// In practice, there's usually only one per environment
 		const panels = Array.from(PluginRegistrationPanelComposed.panels.values());
-		return panels.length > 0 ? panels[0] : undefined;
+		if (panels.length === 0) {
+			return undefined;
+		}
+
+		// First priority: find the active (focused) panel
+		const activePanel = panels.find((p) => p.isActive());
+		if (activePanel) {
+			return activePanel;
+		}
+
+		// Second priority: find any visible panel
+		const visiblePanel = panels.find((p) => p.isVisible());
+		if (visiblePanel) {
+			return visiblePanel;
+		}
+
+		// Fallback: return first panel
+		return panels[0];
+	}
+
+	/**
+	 * Check if this panel is currently active (focused).
+	 */
+	public isActive(): boolean {
+		return this.panel.active;
+	}
+
+	/**
+	 * Check if this panel is currently visible.
+	 */
+	public isVisible(): boolean {
+		return this.panel.visible;
 	}
 
 	private async initializeAndLoadData(): Promise<void> {
@@ -558,32 +593,54 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	public async updateAssembly(assemblyId: string): Promise<void> {
 		this.logger.info('Updating plugin assembly', { assemblyId });
 
+		// Fetch assembly and environment info for better messaging
+		const [assembly, environment] = await Promise.all([
+			this.repositories.assembly.findById(this.currentEnvironmentId, assemblyId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+
+		const assemblyName = assembly?.getName() ?? 'Unknown Assembly';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
 		// Show file picker
 		const fileUri = await this.pickAssemblyFile();
 		if (!fileUri) {
 			return; // User cancelled
 		}
 
-		try {
-			// Read file and convert to base64
-			const fileContent = await vscode.workspace.fs.readFile(fileUri);
-			const base64Content = Buffer.from(fileContent).toString('base64');
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Uploading ${assemblyName} to ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					// Read file and convert to base64
+					const fileContent = await vscode.workspace.fs.readFile(fileUri);
+					const base64Content = Buffer.from(fileContent).toString('base64');
 
-			await this.useCases.updateAssembly.execute(
-				this.currentEnvironmentId,
-				assemblyId,
-				base64Content
-			);
+					await this.useCases.updateAssembly.execute(
+						this.currentEnvironmentId,
+						assemblyId,
+						base64Content
+					);
 
-			// Refresh the subtree (assembly + all children)
-			await this.refreshAssemblySubtree(assemblyId);
+					// Refresh the subtree (assembly + all children)
+					await this.refreshAssemblySubtree(assemblyId);
 
-			void vscode.window.showInformationMessage('Plugin assembly updated.');
-		} catch (error: unknown) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-			this.logger.error('Failed to update plugin assembly', error);
-			void vscode.window.showErrorMessage(`Failed to update assembly: ${errorMessage}`);
-		}
+					void vscode.window.showInformationMessage(
+						`${assemblyName} updated successfully in ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to update plugin assembly', error);
+					void vscode.window.showErrorMessage(
+						`Failed to update ${assemblyName} in ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
 	}
 
 	/**
@@ -592,32 +649,54 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	public async updatePackage(packageId: string): Promise<void> {
 		this.logger.info('Updating plugin package', { packageId });
 
+		// Fetch package and environment info for better messaging
+		const [pkg, environment] = await Promise.all([
+			this.repositories.package.findById(this.currentEnvironmentId, packageId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+
+		const packageName = pkg?.getName() ?? 'Unknown Package';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
 		// Show file picker
 		const fileUri = await this.pickPackageFile();
 		if (!fileUri) {
 			return; // User cancelled
 		}
 
-		try {
-			// Read file and convert to base64
-			const fileContent = await vscode.workspace.fs.readFile(fileUri);
-			const base64Content = Buffer.from(fileContent).toString('base64');
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Uploading ${packageName} to ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					// Read file and convert to base64
+					const fileContent = await vscode.workspace.fs.readFile(fileUri);
+					const base64Content = Buffer.from(fileContent).toString('base64');
 
-			await this.useCases.updatePackage.execute(
-				this.currentEnvironmentId,
-				packageId,
-				base64Content
-			);
+					await this.useCases.updatePackage.execute(
+						this.currentEnvironmentId,
+						packageId,
+						base64Content
+					);
 
-			// Refresh the subtree (package + all children)
-			await this.refreshPackageSubtree(packageId);
+					// Refresh the subtree (package + all children)
+					await this.refreshPackageSubtree(packageId);
 
-			void vscode.window.showInformationMessage('Plugin package updated.');
-		} catch (error: unknown) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-			this.logger.error('Failed to update plugin package', error);
-			void vscode.window.showErrorMessage(`Failed to update package: ${errorMessage}`);
-		}
+					void vscode.window.showInformationMessage(
+						`${packageName} updated successfully in ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to update plugin package', error);
+					void vscode.window.showErrorMessage(
+						`Failed to update ${packageName} in ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
 	}
 
 	// ========================================
