@@ -201,4 +201,42 @@ describe('ManyToManyRelationship', () => {
             expect(rel.getOtherEntity('cr9a7_custom_entity_2')).toBe('cr9a7_custom_entity_1');
         });
     });
+
+    describe('raw DTO methods', () => {
+        it('should initially have null raw DTO', () => {
+            const rel = createValidRelationship();
+            expect(rel.getRawDto()).toBeNull();
+        });
+
+        it('should store and retrieve raw DTO', () => {
+            const rel = createValidRelationship();
+            const rawDto = { SchemaName: 'contact_account', MetadataId: '12345' };
+
+            rel.setRawDto(rawDto);
+
+            expect(rel.getRawDto()).toBe(rawDto);
+        });
+
+        it('should allow overwriting raw DTO', () => {
+            const rel = createValidRelationship();
+            const firstDto = { SchemaName: 'rel1' };
+            const secondDto = { SchemaName: 'rel2' };
+
+            rel.setRawDto(firstDto);
+            rel.setRawDto(secondDto);
+
+            expect(rel.getRawDto()).toBe(secondDto);
+        });
+
+        it('should return false for hasRawDto when no DTO is set', () => {
+            const rel = createValidRelationship();
+            expect(rel.hasRawDto()).toBe(false);
+        });
+
+        it('should return true for hasRawDto after setting DTO', () => {
+            const rel = createValidRelationship();
+            rel.setRawDto({ SchemaName: 'contact_account' });
+            expect(rel.hasRawDto()).toBe(true);
+        });
+    });
 });

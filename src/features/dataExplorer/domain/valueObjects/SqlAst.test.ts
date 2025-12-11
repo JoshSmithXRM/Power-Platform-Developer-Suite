@@ -514,5 +514,149 @@ describe('SqlAst Value Objects', () => {
 				expect(aggregates).toHaveLength(0);
 			});
 		});
+
+		describe('withAdditionalColumns', () => {
+			it('should return same statement when additionalColumns is empty', () => {
+				const col = new SqlColumnRef(null, 'name', null, false);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([col], from, [], null, [], null);
+
+				const result = statement.withAdditionalColumns([]);
+
+				expect(result).toBe(statement);
+			});
+
+			it('should add additional columns to the end', () => {
+				const col = new SqlColumnRef(null, 'name', null, false);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([col], from, [], null, [], null);
+
+				const result = statement.withAdditionalColumns(['createdby', 'modifiedby']);
+
+				expect(result.columns).toHaveLength(3);
+				expect(result.columns[0]).toBe(col);
+				expect((result.columns[1] as SqlColumnRef).columnName).toBe('createdby');
+				expect((result.columns[2] as SqlColumnRef).columnName).toBe('modifiedby');
+			});
+
+			it('should preserve leading comments', () => {
+				const col = new SqlColumnRef(null, 'name', null, false);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([col], from, [], null, [], null);
+				statement.leadingComments = ['-- test comment'];
+
+				const result = statement.withAdditionalColumns(['id']);
+
+				expect(result.leadingComments).toEqual(['-- test comment']);
+			});
+
+			it('should preserve other properties', () => {
+				const col = new SqlColumnRef(null, 'name', null, false);
+				const from = new SqlTableRef('account', 'a');
+				const join = new SqlJoin('INNER', new SqlTableRef('contact', 'c'), new SqlColumnRef('a', 'contactid', null, false), new SqlColumnRef('c', 'contactid', null, false));
+				const orderBy = new SqlOrderByItem(col, 'ASC');
+				const statement = new SqlSelectStatement([col], from, [join], null, [orderBy], 100, true, [col]);
+
+				const result = statement.withAdditionalColumns(['id']);
+
+				expect(result.from).toBe(from);
+				expect(result.joins).toHaveLength(1);
+				expect(result.orderBy).toHaveLength(1);
+				expect(result.top).toBe(100);
+				expect(result.distinct).toBe(true);
+				expect(result.groupBy).toHaveLength(1);
+			});
+		});
+
+		describe('withVirtualColumnsReplaced', () => {
+			it('should return same statement when virtualToParent is empty', () => {
+				const col = new SqlColumnRef(null, 'name', null, false);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([col], from, [], null, [], null);
+
+				const result = statement.withVirtualColumnsReplaced(new Map());
+
+				expect(result).toBe(statement);
+			});
+
+			it('should replace virtual columns with parent columns', () => {
+				const virtualCol = new SqlColumnRef(null, 'createdbyname', null, false);
+				const regularCol = new SqlColumnRef(null, 'name', null, false);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([virtualCol, regularCol], from, [], null, [], null);
+
+				const virtualToParent = new Map([['createdbyname', 'createdby']]);
+				const result = statement.withVirtualColumnsReplaced(virtualToParent);
+
+				expect(result.columns).toHaveLength(2);
+				expect((result.columns[0] as SqlColumnRef).columnName).toBe('createdby');
+				expect((result.columns[1] as SqlColumnRef).columnName).toBe('name');
+			});
+
+			it('should not duplicate parent columns', () => {
+				const virtual1 = new SqlColumnRef(null, 'createdbyname', null, false);
+				const virtual2 = new SqlColumnRef(null, 'createdbytype', null, false);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([virtual1, virtual2], from, [], null, [], null);
+
+				const virtualToParent = new Map([
+					['createdbyname', 'createdby'],
+					['createdbytype', 'createdby'],
+				]);
+				const result = statement.withVirtualColumnsReplaced(virtualToParent);
+
+				expect(result.columns).toHaveLength(1);
+				expect((result.columns[0] as SqlColumnRef).columnName).toBe('createdby');
+			});
+
+			it('should handle case-insensitive matching', () => {
+				const virtualCol = new SqlColumnRef(null, 'CreatedByName', null, false);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([virtualCol], from, [], null, [], null);
+
+				const virtualToParent = new Map([['createdbyname', 'createdby']]);
+				const result = statement.withVirtualColumnsReplaced(virtualToParent);
+
+				expect(result.columns).toHaveLength(1);
+				expect((result.columns[0] as SqlColumnRef).columnName).toBe('createdby');
+			});
+
+			it('should preserve aggregate columns', () => {
+				const agg = new SqlAggregateColumn('COUNT', null, false, 'total');
+				const virtualCol = new SqlColumnRef(null, 'createdbyname', null, false);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([agg, virtualCol], from, [], null, [], null);
+
+				const virtualToParent = new Map([['createdbyname', 'createdby']]);
+				const result = statement.withVirtualColumnsReplaced(virtualToParent);
+
+				expect(result.columns).toHaveLength(2);
+				expect(result.columns[0]).toBe(agg);
+			});
+
+			it('should preserve wildcard columns', () => {
+				const wildcard = new SqlColumnRef(null, '*', null, true);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([wildcard], from, [], null, [], null);
+
+				const virtualToParent = new Map([['createdbyname', 'createdby']]);
+				const result = statement.withVirtualColumnsReplaced(virtualToParent);
+
+				expect(result.columns).toHaveLength(1);
+				expect(result.columns[0]).toBe(wildcard);
+			});
+
+			it('should preserve leading comments', () => {
+				const col = new SqlColumnRef(null, 'createdbyname', null, false);
+				const from = new SqlTableRef('account', null);
+				const statement = new SqlSelectStatement([col], from, [], null, [], null);
+				statement.leadingComments = ['-- virtual column test'];
+
+				const virtualToParent = new Map([['createdbyname', 'createdby']]);
+				const result = statement.withVirtualColumnsReplaced(virtualToParent);
+
+				expect(result.leadingComments).toEqual(['-- virtual column test']);
+			});
+		});
 	});
 });

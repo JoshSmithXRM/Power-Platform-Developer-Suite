@@ -20,6 +20,17 @@
 			"problemMatcher": [],
 			"label": "npm: compile:no-lint",
 			"detail": "webpack"
+		},
+		{
+			"type": "npm",
+			"script": "compile:fast",
+			"label": "npm: compile:fast",
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "silent",
+				"showReuseMessage": false
+			},
+			"detail": "Quick build (no lint/tests)"
 		}
 	]
 }

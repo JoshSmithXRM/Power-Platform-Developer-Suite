@@ -37,10 +37,11 @@ export class EntityMetadataMapper {
 	 * details are not needed. Provides entity-level metadata only.
 	 *
 	 * @param dto - Entity metadata DTO from Dataverse API
+	 * @param preserveRawDto - Whether to preserve the raw DTO for Raw Data tab (default: true)
 	 * @returns EntityMetadata domain entity with empty collections
 	 */
-	public mapDtoToEntityWithoutAttributes(dto: EntityMetadataDto): EntityMetadata {
-		return EntityMetadata.create({
+	public mapDtoToEntityWithoutAttributes(dto: EntityMetadataDto, preserveRawDto: boolean = true): EntityMetadata {
+		const entity = EntityMetadata.create({
 			metadataId: dto.MetadataId,
 			logicalName: LogicalName.create(dto.LogicalName),
 			schemaName: SchemaName.create(dto.SchemaName),
@@ -59,7 +60,7 @@ export class EntityMetadataMapper {
 			isActivity: dto.IsActivity ?? false,
 			hasNotes: dto.HasNotes ?? false,
 			hasActivities: dto.HasActivities ?? false,
-			isValidForAdvancedFind: dto.IsValidForAdvancedFind ?? true,
+			isValidForAdvancedFind: dto.IsValidForAdvancedFind?.Value ?? true,
 			isAuditEnabled: dto.IsAuditEnabled?.Value ?? false,
 			isValidForQueue: dto.IsValidForQueue?.Value ?? false,
 			oneToManyRelationships: [],
@@ -68,6 +69,12 @@ export class EntityMetadataMapper {
 			keys: [],
 			privileges: []
 		});
+
+		if (preserveRawDto) {
+			entity.setRawDto(dto as unknown as Record<string, unknown>);
+		}
+
+		return entity;
 	}
 
 	/**
@@ -77,17 +84,18 @@ export class EntityMetadataMapper {
 	 * keys, and privileges. Composes sub-mappers to build full entity metadata.
 	 *
 	 * @param dto - Entity metadata DTO from Dataverse API
+	 * @param preserveRawDto - Whether to preserve the raw DTO for Raw Data tab (default: true)
 	 * @returns EntityMetadata domain entity with complete metadata
 	 */
-	public mapDtoToEntityWithAttributes(dto: EntityMetadataDto): EntityMetadata {
-		const attributes = dto.Attributes?.map(attrDto => this.attributeMapper.mapDtoToEntity(attrDto)) || [];
-		const oneToManyRels = dto.OneToManyRelationships?.map(relDto => this.relationshipMapper.mapOneToManyDtoToEntity(relDto)) || [];
-		const manyToOneRels = dto.ManyToOneRelationships?.map(relDto => this.relationshipMapper.mapOneToManyDtoToEntity(relDto)) || [];
-		const manyToManyRels = dto.ManyToManyRelationships?.map(relDto => this.relationshipMapper.mapManyToManyDtoToEntity(relDto)) || [];
-		const keys = dto.Keys?.map(keyDto => this.keyMapper.mapDtoToEntity(keyDto)) || [];
-		const privileges = dto.Privileges?.map(privDto => this.privilegeMapper.mapDtoToEntity(privDto)) || [];
+	public mapDtoToEntityWithAttributes(dto: EntityMetadataDto, preserveRawDto: boolean = true): EntityMetadata {
+		const attributes = dto.Attributes?.map(attrDto => this.attributeMapper.mapDtoToEntity(attrDto, preserveRawDto)) || [];
+		const oneToManyRels = dto.OneToManyRelationships?.map(relDto => this.relationshipMapper.mapOneToManyDtoToEntity(relDto, preserveRawDto)) || [];
+		const manyToOneRels = dto.ManyToOneRelationships?.map(relDto => this.relationshipMapper.mapOneToManyDtoToEntity(relDto, preserveRawDto)) || [];
+		const manyToManyRels = dto.ManyToManyRelationships?.map(relDto => this.relationshipMapper.mapManyToManyDtoToEntity(relDto, preserveRawDto)) || [];
+		const keys = dto.Keys?.map(keyDto => this.keyMapper.mapDtoToEntity(keyDto, preserveRawDto)) || [];
+		const privileges = dto.Privileges?.map(privDto => this.privilegeMapper.mapDtoToEntity(privDto, preserveRawDto)) || [];
 
-		return EntityMetadata.create({
+		const entity = EntityMetadata.create({
 			metadataId: dto.MetadataId,
 			logicalName: LogicalName.create(dto.LogicalName),
 			schemaName: SchemaName.create(dto.SchemaName),
@@ -106,7 +114,7 @@ export class EntityMetadataMapper {
 			isActivity: dto.IsActivity ?? false,
 			hasNotes: dto.HasNotes ?? false,
 			hasActivities: dto.HasActivities ?? false,
-			isValidForAdvancedFind: dto.IsValidForAdvancedFind ?? true,
+			isValidForAdvancedFind: dto.IsValidForAdvancedFind?.Value ?? true,
 			isAuditEnabled: dto.IsAuditEnabled?.Value ?? false,
 			isValidForQueue: dto.IsValidForQueue?.Value ?? false,
 			oneToManyRelationships: oneToManyRels,
@@ -115,5 +123,11 @@ export class EntityMetadataMapper {
 			keys: keys,
 			privileges: privileges
 		});
+
+		if (preserveRawDto) {
+			entity.setRawDto(dto as unknown as Record<string, unknown>);
+		}
+
+		return entity;
 	}
 }

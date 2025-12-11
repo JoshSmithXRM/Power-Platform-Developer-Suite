@@ -1,4 +1,4 @@
-import { AttributeMetadata } from '../../domain/entities/AttributeMetadata';
+import { AttributeMetadata, type SourceType } from '../../domain/entities/AttributeMetadata';
 import { LogicalName } from '../../domain/valueObjects/LogicalName';
 import { SchemaName } from '../../domain/valueObjects/SchemaName';
 import { AttributeType } from '../../domain/valueObjects/AttributeType';
@@ -27,15 +27,19 @@ export class AttributeMetadataMapper {
 	 * value objects and typed metadata. Handles all attribute types including
 	 * primitives, option sets, lookups, and special types.
 	 *
+	 * Also preserves the original raw DTO for the Metadata Browser's Raw Data tab,
+	 * ensuring complete API response is available for display.
+	 *
 	 * @param dto - Attribute metadata DTO from Dataverse API
-	 * @returns AttributeMetadata domain entity
+	 * @param preserveRawDto - Whether to preserve the original DTO (default: true)
+	 * @returns AttributeMetadata domain entity with optional raw DTO attached
 	 */
-	public mapDtoToEntity(dto: AttributeMetadataDto): AttributeMetadata {
+	public mapDtoToEntity(dto: AttributeMetadataDto, preserveRawDto: boolean = true): AttributeMetadata {
 		const attributeType = dto.AttributeTypeName?.Value || dto.AttributeType || 'String';
 
 		const optionSet = this.optionSetMapper.mapOptionSetDtoToValueObject(dto.OptionSet, dto.GlobalOptionSet);
 
-		return AttributeMetadata.create({
+		const entity = AttributeMetadata.create({
 			metadataId: dto.MetadataId,
 			logicalName: LogicalName.create(dto.LogicalName),
 			schemaName: SchemaName.create(dto.SchemaName),
@@ -65,7 +69,34 @@ export class AttributeMetadataMapper {
 			canBeSecuredForUpdate: dto.CanBeSecuredForUpdate ?? false,
 			isFilterable: dto.IsFilterable ?? false,
 			isSearchable: dto.IsSearchable ?? false,
-			isRetrievable: dto.IsRetrievable ?? true
+			isRetrievable: dto.IsRetrievable ?? true,
+			// Virtual field detection (CRITICAL for IntelliSense filtering)
+			attributeOf: dto.AttributeOf ?? null,
+			isLogical: dto.IsLogical ?? false,
+			// Source and calculation
+			sourceType: this.mapSourceType(dto.SourceType),
+			formulaDefinition: dto.FormulaDefinition ?? null,
+			// Versioning
+			introducedVersion: dto.IntroducedVersion ?? null,
+			deprecatedVersion: dto.DeprecatedVersion ?? null
 		});
+
+		// Preserve the original raw DTO for Raw Data tab display
+		if (preserveRawDto) {
+			entity.setRawDto(dto as unknown as Record<string, unknown>);
+		}
+
+		return entity;
+	}
+
+	/**
+	 * Maps source type from DTO to domain type.
+	 * 0 = Simple, 1 = Calculated, 2 = Rollup, null = unknown
+	 */
+	private mapSourceType(sourceType: number | null | undefined): SourceType {
+		if (sourceType === 0 || sourceType === 1 || sourceType === 2) {
+			return sourceType;
+		}
+		return null;
 	}
 }

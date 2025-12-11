@@ -338,4 +338,62 @@ Bulk update or delete records with preview and confirmation.
 
 ---
 
-**Last Updated**: 2025-12-08 (Added Load Views from user feedback)
+## Technical Debt
+
+### Unified Query Execution Layer
+**Status**: Needs Refactor
+**Priority**: Medium
+**Estimated Effort**: 8-12 hours
+**Discovered**: 2025-12-10
+
+**Problem**:
+Data Explorer and Notebooks have separate query execution paths that handle virtual columns differently:
+
+| Component | Execution Path | Virtual Column Detection |
+|-----------|----------------|-------------------------|
+| Notebooks (SQL) | `ExecuteSqlQueryUseCase` | ✅ Has detection + transformation |
+| Notebooks (FetchXML) | `ExecuteFetchXmlQueryUseCase` | ❌ No detection |
+| Data Explorer Visual Builder | `ExecuteFetchXmlQueryUseCase` | ❌ No detection |
+| Data Explorer SQL mode | `ExecuteSqlQueryUseCase` | ✅ Has detection, but mapper not wired |
+
+**Impact**:
+- Virtual field filtering works in Notebooks SQL but not in Data Explorer
+- Bug fixes need to be applied in multiple places
+- "Open in Notebook" ports queries that behave differently
+
+**Root Cause**:
+Virtual column detection was added to `ExecuteSqlQueryUseCase` because it has access to the SQL AST. `ExecuteFetchXmlQueryUseCase` takes raw FetchXML and doesn't parse columns.
+
+**Proposed Solution**:
+Extract query execution to a shared `QueryExecutionService`:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    QueryExecutionService                     │
+├─────────────────────────────────────────────────────────────┤
+│ - Virtual column detection (shared)                          │
+│ - Query execution (shared)                                   │
+│ - Result mapping with columnsToShow (shared)                 │
+└─────────────────────────────────────────────────────────────┘
+         ▲                              ▲
+         │                              │
+┌─────────────────┐          ┌─────────────────────┐
+│ ExecuteSqlQuery │          │ ExecuteFetchXmlQuery │
+│    UseCase      │          │      UseCase         │
+└─────────────────┘          └─────────────────────┘
+    (SQL parsing)              (FetchXML parsing)
+```
+
+**Work Items**:
+1. Create `QueryExecutionService` in application layer
+2. Move virtual column detection from use case to service
+3. Both use cases delegate to shared service
+4. Update Data Explorer and Notebooks to use consistent paths
+5. Add tests for unified behavior
+
+**Workaround (Current)**:
+Filter virtual fields from column picker so users can't select them. Virtual-only SELECT remains an edge case for raw FetchXML input.
+
+---
+
+**Last Updated**: 2025-12-10 (Added Unified Query Execution Layer tech debt)

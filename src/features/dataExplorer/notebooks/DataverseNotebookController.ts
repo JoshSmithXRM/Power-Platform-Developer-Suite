@@ -50,9 +50,16 @@ export class DataverseNotebookController {
 	private selectedEnvironmentUrl: string | undefined;
 	private statusBarItem: vscode.StatusBarItem;
 	private textChangeListener: vscode.Disposable | undefined;
+	private notebookCloseListener: vscode.Disposable;
 
 	/** Stores last query results by cell URI for export functionality */
 	private readonly cellResults = new Map<string, QueryResultViewModel>();
+
+	/** Tracks active cell executions for cancellation support */
+	private readonly activeExecutions = new Map<string, AbortController>();
+
+	/** Flag to stop execution loop when interrupt is requested */
+	private executionInterrupted = false;
 
 	constructor(
 		private readonly getEnvironments: () => Promise<EnvironmentInfo[]>,
@@ -73,6 +80,7 @@ export class DataverseNotebookController {
 		this.controller.supportedLanguages = ['sql', 'fetchxml'];
 		this.controller.supportsExecutionOrder = true;
 		this.controller.executeHandler = this.executeHandler.bind(this);
+		this.controller.interruptHandler = this.interruptHandler.bind(this);
 
 		// Create status bar item for environment selection
 		this.statusBarItem = vscode.window.createStatusBarItem(
@@ -84,6 +92,18 @@ export class DataverseNotebookController {
 
 		// Register auto-switch listener for cell language detection
 		this.registerAutoSwitchListener();
+
+		// Register notebook close listener to abort queries when notebook is closed
+		this.notebookCloseListener = vscode.workspace.onDidCloseNotebookDocument(
+			(notebook) => {
+				if (notebook.notebookType === this.notebookType) {
+					this.logger.info('Notebook closed, aborting active queries', {
+						uri: notebook.uri.toString(),
+					});
+					this.interruptHandler(notebook);
+				}
+			}
+		);
 
 		// Check all open notebooks and show status bar if any are ppdsnb
 		this.checkOpenNotebooks();
@@ -257,7 +277,11 @@ export class DataverseNotebookController {
 	 * Gets the VS Code disposables for cleanup.
 	 */
 	public getDisposables(): vscode.Disposable[] {
-		const disposables: vscode.Disposable[] = [this.controller, this.statusBarItem];
+		const disposables: vscode.Disposable[] = [
+			this.controller,
+			this.statusBarItem,
+			this.notebookCloseListener,
+		];
 		if (this.textChangeListener) {
 			disposables.push(this.textChangeListener);
 		}
@@ -353,8 +377,39 @@ export class DataverseNotebookController {
 		_notebook: vscode.NotebookDocument,
 		_controller: vscode.NotebookController
 	): Promise<void> {
+		// Reset interrupt flag at start of new execution batch
+		this.executionInterrupted = false;
+
 		for (const cell of cells) {
+			// Stop if interrupt was requested
+			if (this.executionInterrupted) {
+				this.logger.info('Skipping remaining cells due to interrupt');
+				break;
+			}
 			await this.executeCell(cell);
+		}
+	}
+
+	/**
+	 * Handles interrupt requests (stop button) by aborting active executions.
+	 */
+	private interruptHandler(notebook: vscode.NotebookDocument): void {
+		this.logger.info('Interrupt requested for notebook', {
+			uri: notebook.uri.toString(),
+		});
+
+		// Set flag to stop execution loop
+		this.executionInterrupted = true;
+
+		// Abort all active executions for cells in this notebook
+		for (const cell of notebook.getCells()) {
+			const cellUri = cell.document.uri.toString();
+			const abortController = this.activeExecutions.get(cellUri);
+			if (abortController) {
+				this.logger.debug('Aborting cell execution', { cellUri });
+				abortController.abort();
+				this.activeExecutions.delete(cellUri);
+			}
 		}
 	}
 
@@ -365,6 +420,11 @@ export class DataverseNotebookController {
 		const execution = this.controller.createNotebookCellExecution(cell);
 		execution.executionOrder = Date.now();
 		execution.start(Date.now());
+
+		// Create AbortController for cancellation support
+		const cellUri = cell.document.uri.toString();
+		const abortController = new AbortController();
+		this.activeExecutions.set(cellUri, abortController);
 
 		try {
 			// Check if environment is selected
@@ -406,13 +466,56 @@ export class DataverseNotebookController {
 				contentLength: cellContent.length,
 			});
 
-			// Execute based on language
-			const result = isFetchXml
-				? await this.executeFetchXmlUseCase.execute(this.selectedEnvironmentId, cellContent)
-				: await this.executeSqlUseCase.execute(this.selectedEnvironmentId, cellContent);
+			// Execute based on language (with abort signal)
+			let result;
+			let columnsToShow: string[] | null = null;
+			const signal = abortController.signal;
 
-			// Map to view model
-			const viewModel = this.resultMapper.toViewModel(result);
+			if (isFetchXml) {
+				result = await this.executeFetchXmlUseCase.execute(this.selectedEnvironmentId, cellContent, signal);
+			} else {
+				const sqlResult = await this.executeSqlUseCase.execute(this.selectedEnvironmentId, cellContent, signal);
+				result = sqlResult.result;
+				columnsToShow = sqlResult.columnsToShow;
+			}
+
+			// Check if aborted while query was running
+			if (signal.aborted) {
+				this.logger.info('Notebook cell execution cancelled (after query returned)');
+				execution.replaceOutput([
+					new vscode.NotebookCellOutput([
+						vscode.NotebookCellOutputItem.text('Query cancelled', 'text/plain'),
+					]),
+				]);
+				execution.end(false, Date.now());
+				return;
+			}
+
+			// Map to view model (with optional column filter for virtual column support)
+			const viewModel = this.resultMapper.toViewModel(result, columnsToShow);
+
+			// DEBUG: Log detailed info about the mapping result to diagnose race conditions
+			// This logging helps identify cases where data exists but doesn't display
+			const firstRow = viewModel.rows[0];
+			this.logger.debug('Notebook cell query completed', {
+				rowCount: viewModel.rows.length,
+				columnCount: viewModel.columns.length,
+				columnNames: viewModel.columns.map((c) => c.name),
+				firstRowKeys: firstRow ? Object.keys(firstRow) : [],
+				hasEnvironmentUrl: !!this.selectedEnvironmentUrl,
+				entityLogicalName: viewModel.entityLogicalName,
+			});
+
+			// Verify column/row key alignment (helps diagnose "no data" issues)
+			if (firstRow) {
+				const missingColumns = viewModel.columns.filter((col) => !(col.name in firstRow));
+				if (missingColumns.length > 0) {
+					this.logger.error('REGRESSION BUG: Column/row key mismatch detected', {
+						missingColumnNames: missingColumns.map((c) => c.name),
+						availableRowKeys: Object.keys(firstRow),
+					});
+				}
+			}
 
 			// Store results for export functionality
 			this.cellResults.set(cell.document.uri.toString(), viewModel);
@@ -428,6 +531,18 @@ export class DataverseNotebookController {
 
 			execution.end(true, Date.now());
 		} catch (error) {
+			// Check if this was an abort/cancellation
+			if (abortController.signal.aborted) {
+				this.logger.info('Notebook cell execution cancelled');
+				execution.replaceOutput([
+					new vscode.NotebookCellOutput([
+						vscode.NotebookCellOutputItem.text('Query cancelled', 'text/plain'),
+					]),
+				]);
+				execution.end(false, Date.now());
+				return;
+			}
+
 			this.logger.error('Notebook cell execution failed', error);
 
 			const errorMessage = this.formatError(error);
@@ -447,6 +562,9 @@ export class DataverseNotebookController {
 			]);
 
 			execution.end(false, Date.now());
+		} finally {
+			// Clean up the abort controller
+			this.activeExecutions.delete(cellUri);
 		}
 	}
 
@@ -498,12 +616,15 @@ export class DataverseNotebookController {
 		viewModel: QueryResultViewModel,
 		environmentUrl: string | undefined
 	): string {
-		const totalRowCount = viewModel.rows.length;
-		const executionTime = viewModel.executionTimeMs;
-
-		if (totalRowCount === 0) {
-			return this.renderEmptyResults(viewModel.columns.length, executionTime);
+		if (viewModel.rows.length === 0) {
+			return this.renderEmptyResults();
 		}
+
+		// Generate unique IDs for this cell's elements to prevent cross-cell interference
+		// When multiple cells have outputs, each needs unique IDs so getElementById finds the right element
+		const uniqueId = this.generateUniqueId();
+		const scrollContainerId = `scrollContainer_${uniqueId}`;
+		const tbodyId = `tableBody_${uniqueId}`;
 
 		// Build header
 		const headerCells = viewModel.columns
@@ -517,32 +638,24 @@ export class DataverseNotebookController {
 		// Transform to simple format to minimize memory
 		const rowData = this.prepareRowDataForVirtualTable(viewModel, environmentUrl);
 
-		// Status bar
-		const statusBar = `<div class="status-bar">
-			<span class="results-count">${totalRowCount} row${totalRowCount !== 1 ? 's' : ''}</span>
-			<span class="execution-time">${executionTime}ms</span>
-			${viewModel.hasMoreRecords ? '<span class="more-records">More records available</span>' : ''}
-		</div>`;
-
 		return `
 			<style>
 				${this.getNotebookStyles()}
 			</style>
 			<div class="results-container">
-				<div class="virtual-scroll-container" id="scrollContainer">
+				<div class="virtual-scroll-container" id="${scrollContainerId}">
 					<table class="results-table">
 						<thead>
 							<tr>${headerCells}</tr>
 						</thead>
-						<tbody id="tableBody">
+						<tbody id="${tbodyId}">
 							<!-- Rows rendered by JavaScript using spacer row approach -->
 						</tbody>
 					</table>
 				</div>
-				${statusBar}
 			</div>
 			<script>
-				${this.getVirtualScrollScript(rowData, viewModel.columns.length)}
+				${this.getVirtualScrollScript(rowData, viewModel.columns.length, scrollContainerId, tbodyId)}
 			</script>
 		`;
 	}
@@ -599,17 +712,22 @@ export class DataverseNotebookController {
 				font-family: var(--vscode-font-family);
 				color: var(--vscode-foreground);
 				background: var(--vscode-editor-background);
+				margin: 0;
+				padding: 0;
 			}
 			.virtual-scroll-container {
-				height: ${DataverseNotebookController.CONTAINER_HEIGHT}px;
+				max-height: ${DataverseNotebookController.CONTAINER_HEIGHT}px;
 				overflow-y: auto;
 				overflow-x: auto;
 				position: relative;
+				margin: 0;
+				padding: 0;
 			}
 			.results-table {
 				width: max-content;
 				min-width: 100%;
 				border-collapse: collapse;
+				margin: 0;
 			}
 			.header-cell {
 				padding: 8px 12px;
@@ -636,6 +754,7 @@ export class DataverseNotebookController {
 				padding: 8px 12px;
 				white-space: nowrap;
 				vertical-align: middle;
+				text-align: left;
 			}
 			.data-cell a {
 				color: var(--vscode-textLink-foreground);
@@ -649,71 +768,59 @@ export class DataverseNotebookController {
 				padding: 0 !important;
 				border: none !important;
 			}
-			.status-bar {
-				display: flex;
-				align-items: center;
-				gap: 20px;
-				padding: 10px 16px;
-				background: var(--vscode-editorWidget-background);
-				border-top: 1px solid var(--vscode-panel-border);
-				font-size: 12px;
-				color: var(--vscode-descriptionForeground);
-			}
-			.results-count { font-weight: 500; }
-			.execution-time { font-family: var(--vscode-editor-font-family); }
-			.more-records { color: var(--vscode-editorWarning-foreground); }
 		`;
 	}
 
 	/**
 	 * Returns inline JavaScript for virtual scrolling.
 	 * Uses shared VirtualScrollScriptGenerator for single source of truth.
+	 *
+	 * @param rowData - Pre-rendered row data
+	 * @param columnCount - Number of columns
+	 * @param scrollContainerId - Unique ID for the scroll container element
+	 * @param tbodyId - Unique ID for the tbody element
 	 */
-	private getVirtualScrollScript(rowData: string[][], columnCount: number): string {
+	private getVirtualScrollScript(
+		rowData: string[][],
+		columnCount: number,
+		scrollContainerId: string,
+		tbodyId: string
+	): string {
 		return generateVirtualScrollScript(JSON.stringify(rowData), {
 			rowHeight: DataverseNotebookController.ROW_HEIGHT,
 			overscan: DataverseNotebookController.OVERSCAN,
-			scrollContainerId: 'scrollContainer',
-			tbodyId: 'tableBody',
+			scrollContainerId,
+			tbodyId,
 			columnCount
 		});
 	}
 
 	/**
+	 * Generates a unique ID for element identification.
+	 * Uses a combination of timestamp and random string to ensure uniqueness
+	 * across multiple cell outputs rendered in the same notebook.
+	 */
+	private generateUniqueId(): string {
+		const timestamp = Date.now().toString(36);
+		const random = Math.random().toString(36).substring(2, 8);
+		return `${timestamp}_${random}`;
+	}
+
+	/**
 	 * Renders empty results message.
 	 */
-	private renderEmptyResults(columnCount: number, executionTime: number): string {
+	private renderEmptyResults(): string {
 		return `
 			<style>
-				.results-container {
-					font-family: var(--vscode-font-family);
-					color: var(--vscode-foreground);
-					background: var(--vscode-editor-background);
-				}
 				.no-results {
-					padding: 40px 20px;
+					font-family: var(--vscode-font-family);
+					padding: 20px;
 					text-align: center;
 					color: var(--vscode-descriptionForeground);
 					font-style: italic;
 				}
-				.status-bar {
-					display: flex;
-					align-items: center;
-					gap: 20px;
-					padding: 10px 16px;
-					background: var(--vscode-editorWidget-background);
-					border-top: 1px solid var(--vscode-panel-border);
-					font-size: 12px;
-					color: var(--vscode-descriptionForeground);
-				}
 			</style>
-			<div class="results-container">
-				<div class="no-results">No results returned</div>
-				<div class="status-bar">
-					<span class="results-count">0 rows</span>
-					<span class="execution-time">${executionTime}ms</span>
-				</div>
-			</div>
+			<div class="no-results">No results returned</div>
 		`;
 	}
 

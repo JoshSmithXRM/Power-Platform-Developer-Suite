@@ -52,12 +52,14 @@ export class OptionSetMetadataMapper {
 	 * Maps option metadata DTO to value object.
 	 */
 	public mapOptionMetadataDtoToValueObject(dto: OptionMetadataDto): OptionMetadata {
-		return OptionMetadata.create({
+		const option = OptionMetadata.create({
 			value: dto.Value,
 			label: MetadataLabelExtractor.extractLabel(dto.Label) || String(dto.Value),
 			description: MetadataLabelExtractor.extractLabel(dto.Description),
 			color: dto.Color ?? null
 		});
+		option.setRawDto(dto as unknown as Record<string, unknown>);
+		return option;
 	}
 
 	/**

@@ -10,11 +10,12 @@ Custom slash commands for this project.
 | `/design [feature]` | Invoke design-architect for feature design |
 | `/new-panel [name]` | Scaffold new VS Code panel with Clean Architecture |
 
-### Code Quality
+### Code Quality & PR Validation
 | Command | Purpose |
 |---------|---------|
 | `/cleanup-code [scope]` | Find/fix logging and comment violations |
-| `/code-review [scope]` | Invoke code-guardian for approval |
+| `/prepare-pr` | Full PR validation (compile, tests, coverage, CHANGELOG, code review) |
+| `/code-review [scope]` | Standalone code review (now included in /prepare-pr) |
 | `/comprehensive-review` | 8-agent parallel codebase review (quarterly) |
 
 ### Technical Debt
@@ -35,15 +36,26 @@ Custom slash commands for this project.
 
 ## Usage
 
+### `/prepare-pr`
+**Purpose:** Full PR validation before creating any pull request
+**What it checks:**
+- Compilation (npm run compile)
+- Tests with coverage (explicit numbers shown)
+- CHANGELOG vs git log cross-reference
+- Code review (code-guardian approval)
+
+**Frequency:** Before every PR to main
+**Duration:** 3-10 minutes (depends on test suite size and review scope)
+
+### `/prepare-release`
+**Purpose:** Prepare all release artifacts (everything in /prepare-pr + version bump)
+**Frequency:** Before each version release
+**Duration:** 5-15 minutes
+
 ### `/fix-technical-debt`
 **Purpose:** Interactively fix technical debt items - select item → verify → plan → implement → review
 **Frequency:** As needed per sprint planning
 **Duration:** 2-6 hours (depends on item complexity)
-
-### `/prepare-release`
-**Purpose:** Prepare all release artifacts (version bump, changelog date, release notes)
-**Frequency:** Before each version release
-**Duration:** 2-5 minutes
 
 ---
 
@@ -53,12 +65,14 @@ Custom slash commands for this project.
 1. `/design` - Create technical design
 2. Implement inside-out
 3. `/cleanup-code uncommitted` - Fix violations
-4. `/code-review` - Get approval
+4. `/prepare-pr` - Full validation + code review
+5. Create PR
 
 **New Panel:**
 1. `/new-panel` - Design + scaffold
 2. Implement per design
-3. `/code-review` - Get approval
+3. `/prepare-pr` - Full validation + code review
+4. Create PR
 
 **Sprint Maintenance:**
 1. `/review-technical-debt` - Audit items
@@ -72,9 +86,9 @@ Custom slash commands for this project.
 
 ## Best Practices
 
-**Before Feature Complete:**
+**Before Any PR:**
 1. `/cleanup-code` - Fix code quality issues
-2. `/code-review` - Get code-guardian approval
+2. `/prepare-pr` - Full validation (compile, tests, coverage, CHANGELOG, code review)
 
 **Quarterly Maintenance:**
 1. `/review-technical-debt` - Clean up resolved issues
@@ -84,7 +98,7 @@ Custom slash commands for this project.
 1. `/fix-technical-debt` - Address priority debt items
 
 **Before Release:**
-1. `/prepare-release X.Y.Z` - Bump version, create release notes
+1. `/prepare-release X.Y.Z` - Full validation + version bump
 2. Push and merge PR to main
 3. Create GitHub Release with tag
 

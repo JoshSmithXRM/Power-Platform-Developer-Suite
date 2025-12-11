@@ -4,10 +4,32 @@ import { AttributeType } from '../valueObjects/AttributeType';
 import { OptionSetMetadata } from '../valueObjects/OptionSetMetadata';
 
 /**
+ * Source type for calculated and rollup fields.
+ * 0 = Simple (standard attribute)
+ * 1 = Calculated (formula-based)
+ * 2 = Rollup (aggregated from related records)
+ */
+export type SourceType = 0 | 1 | 2 | null;
+
+/**
+ * Raw DTO preserved for serialization.
+ * This is the original API response before domain mapping.
+ * Used by the serializer to show complete raw data in Metadata Browser.
+ */
+export type RawAttributeDto = Record<string, unknown>;
+
+/**
  * Domain entity representing Dataverse attribute metadata.
  * Rich domain model with behavior methods (not anemic).
  */
 export class AttributeMetadata {
+    /**
+     * Original raw DTO from API response.
+     * Preserved for Raw Data tab display - contains ALL fields from Dataverse API.
+     * Optional: only set when entity is created from repository with DTO.
+     */
+    private _rawDto: RawAttributeDto | null = null;
+
     private constructor(
         public readonly metadataId: string,
         public readonly logicalName: LogicalName,
@@ -42,7 +64,19 @@ export class AttributeMetadata {
         // Behavior
         public readonly isFilterable: boolean,
         public readonly isSearchable: boolean,
-        public readonly isRetrievable: boolean
+        public readonly isRetrievable: boolean,
+        // Virtual field detection (CRITICAL for IntelliSense filtering)
+        /** Parent attribute logical name. If set, this is a virtual field (e.g., "createdbyname" -> "createdby") */
+        public readonly attributeOf: string | null,
+        /** Whether this is a logical/computed attribute */
+        public readonly isLogical: boolean,
+        // Source and calculation
+        /** 0=simple, 1=calculated, 2=rollup */
+        public readonly sourceType: SourceType,
+        public readonly formulaDefinition: string | null,
+        // Versioning
+        public readonly introducedVersion: string | null,
+        public readonly deprecatedVersion: string | null
     ) {}
 
     public static create(props: {
@@ -76,6 +110,15 @@ export class AttributeMetadata {
         isFilterable?: boolean;
         isSearchable?: boolean;
         isRetrievable?: boolean;
+        // Virtual field detection
+        attributeOf?: string | null;
+        isLogical?: boolean;
+        // Source and calculation
+        sourceType?: SourceType;
+        formulaDefinition?: string | null;
+        // Versioning
+        introducedVersion?: string | null;
+        deprecatedVersion?: string | null;
     }): AttributeMetadata {
         if (!props.metadataId || props.metadataId.trim().length === 0) {
             throw new Error('Invalid AttributeMetadata: metadataId cannot be empty');
@@ -119,7 +162,13 @@ export class AttributeMetadata {
             props.canBeSecuredForUpdate ?? false,
             props.isFilterable ?? false,
             props.isSearchable ?? false,
-            props.isRetrievable ?? true
+            props.isRetrievable ?? true,
+            props.attributeOf ?? null,
+            props.isLogical ?? false,
+            props.sourceType ?? null,
+            props.formulaDefinition ?? null,
+            props.introducedVersion ?? null,
+            props.deprecatedVersion ?? null
         );
     }
 
@@ -207,5 +256,77 @@ export class AttributeMetadata {
      */
     public hasNumericConstraints(): boolean {
         return this.minValue !== null || this.maxValue !== null || this.precision !== null;
+    }
+
+    // Virtual field detection methods (CRITICAL for IntelliSense filtering)
+
+    /**
+     * Checks if this is a virtual field (has a parent attribute).
+     * Virtual fields like "createdbyname" have AttributeOf set to their parent ("createdby").
+     * These fields should be hidden from SELECT and ORDER BY IntelliSense but shown in WHERE.
+     */
+    public isVirtualField(): boolean {
+        return this.attributeOf !== null;
+    }
+
+    /**
+     * Gets the parent attribute logical name for virtual fields.
+     * Returns null if this is not a virtual field.
+     */
+    public getParentAttribute(): string | null {
+        return this.attributeOf;
+    }
+
+    /**
+     * Checks if this is a calculated field (formula-based).
+     */
+    public isCalculatedField(): boolean {
+        return this.sourceType === 1;
+    }
+
+    /**
+     * Checks if this is a rollup field (aggregated from related records).
+     */
+    public isRollupField(): boolean {
+        return this.sourceType === 2;
+    }
+
+    /**
+     * Checks if this field has a formula definition.
+     */
+    public hasFormula(): boolean {
+        return this.formulaDefinition !== null;
+    }
+
+    /**
+     * Checks if this attribute is deprecated.
+     */
+    public isDeprecated(): boolean {
+        return this.deprecatedVersion !== null;
+    }
+
+    // Raw DTO preservation (for Metadata Browser Raw Data tab)
+
+    /**
+     * Sets the original raw DTO from API response.
+     * Called by the mapper after creating the entity to preserve complete API data.
+     */
+    public setRawDto(dto: RawAttributeDto): void {
+        this._rawDto = dto;
+    }
+
+    /**
+     * Gets the original raw DTO if available.
+     * Returns null if entity was created without preserving the DTO.
+     */
+    public getRawDto(): RawAttributeDto | null {
+        return this._rawDto;
+    }
+
+    /**
+     * Checks if raw DTO is available.
+     */
+    public hasRawDto(): boolean {
+        return this._rawDto !== null;
     }
 }

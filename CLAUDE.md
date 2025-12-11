@@ -138,10 +138,17 @@ For complex/uncertain problems, trigger extended thinking modes:
 ## 🛠️ Common Commands
 
 **Development:**
-- `npm run compile` - TypeScript compilation (run after EVERY layer)
+- `npm run compile` - Full compilation with lint + tests (run before commits)
+- `npm run compile:fast` - Quick build only, no lint/tests (run after EVERY code change)
 - `npm test` - Run all tests (must pass before commits)
 - `npm run lint` - ESLint check
 - `npm run watch` - Continuous compilation during development
+
+**CRITICAL: Compile After Every Change**
+After ANY code edit (even a single line), run `npm run compile:fast` before proceeding.
+Do NOT batch multiple changes without verifying each compiles. Catch errors immediately,
+not after multiple files have been modified. This prevents wasted effort debugging
+cascading issues from earlier mistakes.
 
 **VS Code:**
 - `F5` - Launch Extension Development Host (manual testing required)
@@ -152,7 +159,9 @@ For complex/uncertain problems, trigger extended thinking modes:
 - `/design [feature]` - Invoke design-architect for feature design
 - `/new-panel [name]` - Scaffold new VS Code panel with Clean Architecture
 - `/cleanup-code` - Find/fix logging and comment violations
-- `/code-review` - Invoke code-guardian for approval
+- `/prepare-pr` - Full PR validation (compile, tests, coverage, CHANGELOG, code review)
+- `/prepare-release X.Y.Z` - Release prep (everything in /prepare-pr + version bump)
+- `/code-review` - Standalone code review (now included in /prepare-pr)
 - `/review-technical-debt` - Audit technical debt, clean up resolved items
 - `/fix-technical-debt` - Interactively fix technical debt items
 - `/handoff` - Generate session summary for context handoff
@@ -308,7 +317,8 @@ git worktree prune             # Clean up stale worktree references
 
 2. **Implementation phase** (inside-out, exploration mode)
    - Domain → Application → Infrastructure → Presentation
-   - `npm run compile` after EACH layer
+   - `npm run compile:fast` after EVERY file edit (not just per layer!)
+   - `npm run compile` (full) after completing each layer before commit
    - NO tests during exploration (focus on getting to F5 fast)
    - Commit per layer
    - F5 test and iterate until "feels right"
@@ -405,7 +415,8 @@ See `.claude/agents/` for agent definitions.
 | When | Action |
 |------|--------|
 | Complex feature (3+ files) | `/design` first |
-| Before PR | `/code-review` (mandatory) |
+| Before PR | `/prepare-pr` (includes code review) |
+| For releases | `/prepare-release X.Y.Z` (includes code review + version bump) |
 | End session | `/handoff` |
 | Context full/switching tasks | `/clear` |
 | Uncertain architecture | "think harder" before designing |

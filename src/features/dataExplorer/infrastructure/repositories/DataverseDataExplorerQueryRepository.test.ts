@@ -534,8 +534,10 @@ describe('DataverseDataExplorerQueryRepository', () => {
 				id: '11111111-1111-1111-1111-111111111111',
 			});
 
-			// The row data should also use 'CreatedByUser' as the key
-			expect(viewModel.rows[0]!['CreatedByUser']).toBe('John Doe');
+			// The lookup column shows GUID, the virtual name column shows display name
+			// This matches the mapper behavior: lookup columns show ID, *name columns show name
+			expect(viewModel.rows[0]!['CreatedByUser']).toBe('11111111-1111-1111-1111-111111111111');
+			expect(viewModel.rows[0]!['CreatedByUsername']).toBe('John Doe');
 		});
 
 		it('should preserve lookup value when Dataverse returns both alias key and _value pattern', async () => {
@@ -952,6 +954,108 @@ describe('DataverseDataExplorerQueryRepository', () => {
 			expect(viewModel.columns.map(c => c.name)).toContain('accountcategorycode');
 			// Value should be empty string for null
 			expect(viewModel.rows[0]!['accountcategorycode']).toBe('');
+		});
+	});
+
+	describe('aggregate query handling', () => {
+		it('should NOT create spurious name columns for aggregate COUNT results', async () => {
+			// Regression test: Aggregate queries return FormattedValue annotations too,
+			// but they should be identified as numbers, not optionsets.
+			// Bug: COUNT(id) alias "count" was getting a spurious "countname" column.
+			const fetchXml = `<fetch aggregate="true">
+  <entity name="et_salesopportunity">
+    <attribute name="et_salesopportunityid" alias="count" aggregate="count" />
+  </entity>
+</fetch>`;
+
+			// Dataverse returns aggregate results with FormattedValue
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#et_salesopportunitys',
+				value: [
+					{
+						count: 42,
+						'count@OData.Community.Display.V1.FormattedValue': '42',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery(
+				'env-123',
+				'et_salesopportunitys',
+				fetchXml
+			);
+
+			const mapper = new QueryResultViewModelMapper();
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have exactly 1 column: "count"
+			// Should NOT have "countname" (that's the bug we're fixing)
+			expect(viewModel.columns.map((c) => c.name)).toEqual(['count']);
+			expect(viewModel.columns.map((c) => c.name)).not.toContain('countname');
+
+			// The data type should be 'number', not 'optionset'
+			expect(result.columns[0]!.dataType).toBe('number');
+
+			// Value should render correctly
+			expect(viewModel.rows[0]!['count']).toBe('42');
+		});
+
+		it('should NOT create spurious name columns for aggregate SUM results', async () => {
+			const fetchXml = `<fetch aggregate="true">
+  <entity name="invoice">
+    <attribute name="totalamount" alias="total" aggregate="sum" />
+  </entity>
+</fetch>`;
+
+			// SUM typically returns decimal with formatted value
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#invoices',
+				value: [
+					{
+						total: 12345.67,
+						'total@OData.Community.Display.V1.FormattedValue': '$12,345.67',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery('env-123', 'invoices', fetchXml);
+
+			const mapper = new QueryResultViewModelMapper();
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have exactly 1 column: "total", no "totalname"
+			expect(viewModel.columns.map((c) => c.name)).toEqual(['total']);
+			expect(viewModel.columns.map((c) => c.name)).not.toContain('totalname');
+		});
+
+		it('should handle aggregate COUNT with large numbers and locale formatting', async () => {
+			const fetchXml = `<fetch aggregate="true">
+  <entity name="contact">
+    <attribute name="contactid" alias="recordcount" aggregate="count" />
+  </entity>
+</fetch>`;
+
+			// Large count with locale-formatted value (thousands separator)
+			mockApiService.get.mockResolvedValue({
+				'@odata.context': 'https://org.crm.dynamics.com/api/data/v9.2/$metadata#contacts',
+				value: [
+					{
+						recordcount: 1234567,
+						'recordcount@OData.Community.Display.V1.FormattedValue': '1,234,567',
+					},
+				],
+			});
+
+			const result = await repository.executeQuery('env-123', 'contacts', fetchXml);
+
+			// Should be identified as number, not optionset
+			expect(result.columns[0]!.dataType).toBe('number');
+
+			const mapper = new QueryResultViewModelMapper();
+			const viewModel = mapper.toViewModel(result);
+
+			// Should NOT have "recordcountname" column
+			expect(viewModel.columns.map((c) => c.name)).not.toContain('recordcountname');
 		});
 	});
 

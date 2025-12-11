@@ -528,4 +528,82 @@ describe('SecurityPrivilege', () => {
             expect(privilege.supportsGlobalAccess()).toBe(false);
         });
     });
+
+    describe('raw DTO methods', () => {
+        it('should initially have null raw DTO', () => {
+            const privilege = SecurityPrivilege.create({
+                privilegeId: 'priv-123',
+                name: 'prvRead',
+                privilegeType: 2,
+                canBeBasic: true,
+                canBeLocal: false,
+                canBeDeep: false,
+                canBeGlobal: false
+            });
+            expect(privilege.getRawDto()).toBeNull();
+        });
+
+        it('should store and retrieve raw DTO', () => {
+            const privilege = SecurityPrivilege.create({
+                privilegeId: 'priv-123',
+                name: 'prvRead',
+                privilegeType: 2,
+                canBeBasic: true,
+                canBeLocal: false,
+                canBeDeep: false,
+                canBeGlobal: false
+            });
+            const rawDto = { PrivilegeId: 'priv-123', Name: 'prvRead' };
+
+            privilege.setRawDto(rawDto);
+
+            expect(privilege.getRawDto()).toBe(rawDto);
+        });
+
+        it('should allow overwriting raw DTO', () => {
+            const privilege = SecurityPrivilege.create({
+                privilegeId: 'priv-123',
+                name: 'prvRead',
+                privilegeType: 2,
+                canBeBasic: true,
+                canBeLocal: false,
+                canBeDeep: false,
+                canBeGlobal: false
+            });
+            const firstDto = { PrivilegeId: 'priv-1' };
+            const secondDto = { PrivilegeId: 'priv-2' };
+
+            privilege.setRawDto(firstDto);
+            privilege.setRawDto(secondDto);
+
+            expect(privilege.getRawDto()).toBe(secondDto);
+        });
+
+        it('should return false for hasRawDto when no DTO is set', () => {
+            const privilege = SecurityPrivilege.create({
+                privilegeId: 'priv-123',
+                name: 'prvRead',
+                privilegeType: 2,
+                canBeBasic: true,
+                canBeLocal: false,
+                canBeDeep: false,
+                canBeGlobal: false
+            });
+            expect(privilege.hasRawDto()).toBe(false);
+        });
+
+        it('should return true for hasRawDto after setting DTO', () => {
+            const privilege = SecurityPrivilege.create({
+                privilegeId: 'priv-123',
+                name: 'prvRead',
+                privilegeType: 2,
+                canBeBasic: true,
+                canBeLocal: false,
+                canBeDeep: false,
+                canBeGlobal: false
+            });
+            privilege.setRawDto({ PrivilegeId: 'priv-123' });
+            expect(privilege.hasRawDto()).toBe(true);
+        });
+    });
 });

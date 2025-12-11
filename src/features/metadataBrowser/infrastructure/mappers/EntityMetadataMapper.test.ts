@@ -100,7 +100,7 @@ describe('EntityMetadataMapper', () => {
 					IsActivity: false,
 					HasNotes: true,
 					HasActivities: true,
-					IsValidForAdvancedFind: true,
+					IsValidForAdvancedFind: createManagedProperty(true),
 					IsAuditEnabled: createManagedProperty(true),
 					IsValidForQueue: createManagedProperty(false)
 				};
@@ -324,7 +324,7 @@ describe('EntityMetadataMapper', () => {
 
 				// Assert
 				expect(mockAttributeMapper.mapDtoToEntity).toHaveBeenCalledTimes(1);
-				expect(mockAttributeMapper.mapDtoToEntity).toHaveBeenCalledWith(dto.Attributes![0]);
+				expect(mockAttributeMapper.mapDtoToEntity).toHaveBeenCalledWith(dto.Attributes![0], true);
 				expect(result.attributes).toHaveLength(1);
 				expect(result.attributes[0]).toBe(mockAttribute);
 			});

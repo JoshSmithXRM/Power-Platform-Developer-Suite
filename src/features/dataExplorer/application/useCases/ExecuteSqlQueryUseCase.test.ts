@@ -1,7 +1,9 @@
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
 import type { IDataExplorerQueryRepository } from '../../domain/repositories/IDataExplorerQueryRepository';
+import type { IntelliSenseMetadataCache } from '../services/IntelliSenseMetadataCache';
 import { SqlParseError } from '../../domain/errors/SqlParseError';
 import { createTestQueryResult } from '../../../../shared/testing/factories/QueryResultFactory';
+import { AttributeSuggestion } from '../../domain/valueObjects/AttributeSuggestion';
 
 import { ExecuteSqlQueryUseCase } from './ExecuteSqlQueryUseCase';
 
@@ -38,7 +40,7 @@ describe('ExecuteSqlQueryUseCase', () => {
 			mockRepository.getEntitySetName.mockResolvedValue('accounts');
 			mockRepository.executeQuery.mockResolvedValue(queryResult);
 
-			const result = await useCase.execute(
+			const { result, columnsToShow } = await useCase.execute(
 				'env-123',
 				'SELECT name FROM account'
 			);
@@ -54,6 +56,7 @@ describe('ExecuteSqlQueryUseCase', () => {
 				undefined
 			);
 			expect(result.getRowCount()).toBe(2);
+			expect(columnsToShow).toBeNull(); // No virtual columns, no filter needed
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				'Executing SQL query',
 				expect.any(Object)
@@ -66,7 +69,7 @@ describe('ExecuteSqlQueryUseCase', () => {
 			mockRepository.getEntitySetName.mockResolvedValue('accounts');
 			mockRepository.executeQuery.mockResolvedValue(queryResult);
 
-			const result = await useCase.execute(
+			const { result } = await useCase.execute(
 				'env-123',
 				"SELECT name FROM account WHERE statecode = 0"
 			);
@@ -215,6 +218,112 @@ describe('ExecuteSqlQueryUseCase', () => {
 				expect.any(String),
 				abortController.signal
 			);
+		});
+	});
+
+	describe('execute with virtual column transformation', () => {
+		let useCaseWithCache: ExecuteSqlQueryUseCase;
+		let mockMetadataCache: jest.Mocked<IntelliSenseMetadataCache>;
+
+		beforeEach(() => {
+			mockMetadataCache = {
+				getAttributeSuggestions: jest.fn(),
+				getEntitySuggestions: jest.fn(),
+				clearCache: jest.fn(),
+				clearEntityCache: jest.fn(),
+			} as unknown as jest.Mocked<IntelliSenseMetadataCache>;
+
+			useCaseWithCache = new ExecuteSqlQueryUseCase(
+				mockRepository,
+				mockLogger,
+				mockMetadataCache
+			);
+		});
+
+		it('should transform virtual columns when metadataCache is provided', async () => {
+			const queryResult = createTestQueryResult({ rowCount: 1 });
+
+			// Mock metadata showing createdbyname is virtual (has attributeOf)
+			const attributes = [
+				AttributeSuggestion.create('createdby', 'Created By', 'Lookup', false, null),
+				AttributeSuggestion.create('createdbyname', 'Created By Name', 'String', false, 'createdby'),
+			];
+			mockMetadataCache.getAttributeSuggestions.mockResolvedValue(attributes);
+			mockRepository.getEntitySetName.mockResolvedValue('accounts');
+			mockRepository.executeQuery.mockResolvedValue(queryResult);
+
+			const { result, columnsToShow } = await useCaseWithCache.execute(
+				'env-123',
+				'SELECT createdbyname FROM account'
+			);
+
+			// Should have transformed createdbyname to createdby in FetchXML
+			expect(mockRepository.executeQuery).toHaveBeenCalledWith(
+				'env-123',
+				'accounts',
+				expect.stringContaining('name="createdby"'),
+				undefined
+			);
+			// Should return columnsToShow for filtering
+			expect(columnsToShow).not.toBeNull();
+			expect(columnsToShow).toContain('createdbyname');
+			expect(result.getRowCount()).toBe(1);
+		});
+
+		it('should skip virtual column check for SELECT * queries', async () => {
+			const queryResult = createTestQueryResult({ rowCount: 1 });
+
+			mockRepository.getEntitySetName.mockResolvedValue('accounts');
+			mockRepository.executeQuery.mockResolvedValue(queryResult);
+
+			const { columnsToShow } = await useCaseWithCache.execute(
+				'env-123',
+				'SELECT * FROM account'
+			);
+
+			// Should not call metadata cache for SELECT *
+			expect(mockMetadataCache.getAttributeSuggestions).not.toHaveBeenCalled();
+			expect(columnsToShow).toBeNull();
+		});
+
+		it('should not transform when no virtual columns are present', async () => {
+			const queryResult = createTestQueryResult({ rowCount: 1 });
+
+			const attributes = [
+				AttributeSuggestion.create('name', 'Name', 'String', false, null),
+				AttributeSuggestion.create('revenue', 'Revenue', 'Money', false, null),
+			];
+			mockMetadataCache.getAttributeSuggestions.mockResolvedValue(attributes);
+			mockRepository.getEntitySetName.mockResolvedValue('accounts');
+			mockRepository.executeQuery.mockResolvedValue(queryResult);
+
+			const { columnsToShow } = await useCaseWithCache.execute(
+				'env-123',
+				'SELECT name, revenue FROM account'
+			);
+
+			// No transformation needed - columnsToShow should be null
+			expect(columnsToShow).toBeNull();
+		});
+
+		it('should handle multiple virtual columns from same parent', async () => {
+			const queryResult = createTestQueryResult({ rowCount: 1 });
+
+			const attributes = [
+				AttributeSuggestion.create('createdby', 'Created By', 'Lookup', false, null),
+				AttributeSuggestion.create('createdbyname', 'Created By Name', 'String', false, 'createdby'),
+			];
+			mockMetadataCache.getAttributeSuggestions.mockResolvedValue(attributes);
+			mockRepository.getEntitySetName.mockResolvedValue('accounts');
+			mockRepository.executeQuery.mockResolvedValue(queryResult);
+
+			const { result, columnsToShow } = await useCaseWithCache.execute(
+				'env-123',
+				'SELECT name, createdbyname FROM account'
+			);
+
+			expect(columnsToShow).not.toBeNull();
+			expect(result).toBeDefined();
 		});
 	});
 });

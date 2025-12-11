@@ -2,10 +2,23 @@ import { LogicalName } from '../valueObjects/LogicalName';
 import { SchemaName } from '../valueObjects/SchemaName';
 
 /**
+ * Raw DTO preserved for serialization.
+ * This is the original API response before domain mapping.
+ * Used by the serializer to show complete raw data in Metadata Browser.
+ */
+export type RawEntityKeyDto = Record<string, unknown>;
+
+/**
  * Domain entity representing an alternate key in Dataverse.
  * Rich domain model with behavior methods.
  */
 export class EntityKey {
+    /**
+     * Original raw DTO from API response.
+     * Preserved for Raw Data tab display - contains ALL fields from Dataverse API.
+     */
+    private _rawDto: RawEntityKeyDto | null = null;
+
     private constructor(
         public readonly metadataId: string,
         public readonly logicalName: LogicalName,
@@ -79,5 +92,30 @@ export class EntityKey {
      */
     public includesAttribute(attributeName: string): boolean {
         return this.keyAttributes.includes(attributeName);
+    }
+
+    // Raw DTO preservation (for Metadata Browser Raw Data tab)
+
+    /**
+     * Sets the original raw DTO from API response.
+     * Called by the mapper after creating the entity to preserve complete API data.
+     */
+    public setRawDto(dto: RawEntityKeyDto): void {
+        this._rawDto = dto;
+    }
+
+    /**
+     * Gets the original raw DTO if available.
+     * Returns null if entity was created without preserving the DTO.
+     */
+    public getRawDto(): RawEntityKeyDto | null {
+        return this._rawDto;
+    }
+
+    /**
+     * Checks if raw DTO is available.
+     */
+    public hasRawDto(): boolean {
+        return this._rawDto !== null;
     }
 }

@@ -768,31 +768,61 @@ window.createBehavior({
 
 	/**
 	 * Shows detail panel with metadata
+	 *
+	 * IMPORTANT: Properties tab and Raw Data tab both render from rawEntity
+	 * (the complete API response) when available. This ensures developers see
+	 * ALL fields from the Dataverse API, not a filtered subset.
 	 */
 	showDetailPanel(data) {
-		const { tab, itemId, metadata, rawEntity } = data;
+		const { tab, itemId, metadata, rawEntity, fieldCounts } = data;
+
+		// DEBUG: Log what webview received
+		console.log('[MetadataBrowser] showDetailPanel received:', {
+			tab,
+			itemId,
+			hasMetadata: !!metadata,
+			hasRawEntity: !!rawEntity,
+			rawEntityKeys: rawEntity ? Object.keys(rawEntity) : [],
+			metadataKeys: metadata ? Object.keys(metadata) : []
+		});
 
 		if (!metadata) {
 			console.error('[MetadataBrowser] No metadata provided to showDetailPanel');
 			return;
 		}
 
-		// Set title
+		// Use rawEntity (complete API response) for display, fall back to domain entity
+		const displayData = rawEntity || metadata;
+		console.log('[MetadataBrowser] Using displayData:', { source: rawEntity ? 'rawEntity' : 'metadata', keys: Object.keys(displayData) });
+
+		// Set title with optional field count indicator (dev mode)
 		const title = document.getElementById('detailPanelTitle');
 		if (title) {
-			title.textContent = this.getDetailTitle(tab, itemId);
+			let titleText = this.getDetailTitle(tab, itemId);
+
+			// Add field count badge for dev mode visibility
+			if (fieldCounts) {
+				const fieldCount = fieldCounts.raw || fieldCounts.domain;
+				const hasComplete = fieldCounts.hasRawDto;
+				const badge = hasComplete
+					? `<span class="field-count-badge complete">${fieldCount} fields</span>`
+					: `<span class="field-count-badge incomplete" title="Raw DTO not available - showing domain entity fields only">⚠ ${fieldCounts.domain} fields (incomplete)</span>`;
+				titleText += ` ${badge}`;
+			}
+
+			title.innerHTML = titleText;
 		}
 
-		// Update properties tab content (target INNER element by ID)
+		// Update properties tab content - USE rawEntity for complete data
 		const propertiesContent = document.getElementById('metadataPropertiesContent');
 		if (propertiesContent) {
-			this.renderProperties(metadata, propertiesContent);
+			this.renderProperties(displayData, propertiesContent, tab);
 		}
 
-		// Update raw data tab content (target INNER element by ID)
+		// Update raw data tab content - USE rawEntity for complete data
 		const rawDataContent = document.getElementById('metadataRawDataContent');
 		if (rawDataContent) {
-			this.renderRawData(rawEntity || metadata, rawDataContent);
+			this.renderRawData(displayData, rawDataContent);
 		}
 
 		// Show panel
@@ -917,16 +947,108 @@ window.createBehavior({
 	},
 
 	/**
-	 * Renders properties in detail panel
+	 * Priority fields to show at the top of Properties tab, in order.
+	 * Type-specific ordering ensures the most relevant fields appear first.
 	 */
-	renderProperties(metadata, container) {
+	getPriorityFields(metadataType) {
+		// Type-specific priority fields
+		const priorityByType = {
+			choiceValues: [
+				'Value',            // Option value (integer)
+				'Label',            // Display label
+				'Description',      // Description
+				'Color',            // Color hex code
+			],
+			privileges: [
+				'PrivilegeId',      // Unique identifier
+				'Name',             // Privilege name
+				'PrivilegeType',    // Type (Read, Write, etc.)
+			],
+			keys: [
+				'MetadataId',       // Unique identifier
+				'LogicalName',      // Logical name
+				'SchemaName',       // Schema name
+				'DisplayName',      // Display name
+				'EntityLogicalName', // Parent entity
+				'KeyAttributes',    // Key columns
+			],
+			manyToMany: [
+				'MetadataId',                    // Unique identifier
+				'SchemaName',                    // Schema identifier
+				'RelationshipType',              // Type discriminator
+				'IntersectEntityName',           // Junction table name
+				'Entity1LogicalName',            // First entity
+				'Entity1IntersectAttribute',     // First entity's key in junction
+				'Entity1NavigationPropertyName', // Navigation property name
+				'Entity2LogicalName',            // Second entity
+				'Entity2IntersectAttribute',     // Second entity's key in junction
+				'Entity2NavigationPropertyName', // Navigation property name
+			],
+			oneToMany: [
+				'MetadataId',                    // Unique identifier
+				'SchemaName',                    // Schema identifier
+				'RelationshipType',              // Type discriminator
+				'ReferencedEntity',              // Parent entity
+				'ReferencedAttribute',           // Parent entity key
+				'ReferencedEntityNavigationPropertyName', // Parent nav property
+				'ReferencingEntity',             // Child entity
+				'ReferencingAttribute',          // Foreign key in child
+				'ReferencingEntityNavigationPropertyName', // Child nav property
+			],
+			manyToOne: [
+				'MetadataId',                    // Unique identifier
+				'SchemaName',                    // Schema identifier
+				'RelationshipType',              // Type discriminator
+				'ReferencedEntity',              // Parent entity
+				'ReferencedAttribute',           // Parent entity key
+				'ReferencedEntityNavigationPropertyName', // Parent nav property
+				'ReferencingEntity',             // Child entity
+				'ReferencingAttribute',          // Foreign key in child
+				'ReferencingEntityNavigationPropertyName', // Child nav property
+			],
+		};
+
+		// Return type-specific fields if available
+		if (metadataType && priorityByType[metadataType]) {
+			return priorityByType[metadataType];
+		}
+
+		// Default priority fields (attributes, etc.)
+		return [
+			'@odata.type',      // Type discriminator - critical for understanding concrete type
+			'MetadataId',       // Unique identifier
+			'LogicalName',      // Primary identifier
+			'SchemaName',       // Schema identifier
+			'DisplayName',      // Display name (after schema name)
+			'Description',      // Description
+			'AttributeType',    // Type (for attributes)
+			'AttributeTypeName', // Detailed type name
+			'RequiredLevel',    // Required level (None, Recommended, Required)
+			'AttributeOf',      // Parent attribute (for virtual fields)
+			'EntityLogicalName', // Parent entity
+		];
+	},
+
+	/**
+	 * Renders properties in detail panel.
+	 * Priority fields appear first, then remaining fields sorted alphabetically.
+	 * @param {object} metadata - The metadata object to render
+	 * @param {HTMLElement} container - The container element
+	 * @param {string} metadataType - The type of metadata (attributes, privileges, manyToMany, etc.)
+	 */
+	renderProperties(metadata, container, metadataType) {
 		if (!container) {
 			console.error('[MetadataBrowser] Properties container not provided');
 			return;
 		}
 
 		const properties = this.flattenMetadata(metadata);
-		container.innerHTML = properties.map(prop => {
+
+		// Sort properties: priority fields first (in order), then alphabetically
+		const priorityFields = this.getPriorityFields(metadataType);
+		const sortedProperties = this.sortPropertiesByPriority(properties, priorityFields);
+
+		container.innerHTML = sortedProperties.map(prop => {
 			if (prop.isTable) {
 				// Render as a table
 				return `
@@ -948,69 +1070,378 @@ window.createBehavior({
 	},
 
 	/**
-	 * Flattens metadata object into key-value pairs
-	 * Special handling for option sets - renders as tables
+	 * Sorts properties with priority fields first, then alphabetically.
+	 */
+	sortPropertiesByPriority(properties, priorityFields) {
+		// Create a map of original key names to their priority index
+		const priorityMap = new Map();
+		priorityFields.forEach((field, index) => {
+			// Store both the raw field name and formatted version for matching
+			priorityMap.set(field, index);
+			priorityMap.set(this.formatPropertyName(field), index);
+		});
+
+		return [...properties].sort((a, b) => {
+			const aPriority = this.getPropertyPriority(a.name, a.rawKey, priorityMap);
+			const bPriority = this.getPropertyPriority(b.name, b.rawKey, priorityMap);
+
+			// Both have priority - sort by priority order
+			if (aPriority !== -1 && bPriority !== -1) {
+				return aPriority - bPriority;
+			}
+
+			// Only a has priority - a comes first
+			if (aPriority !== -1) return -1;
+
+			// Only b has priority - b comes first
+			if (bPriority !== -1) return 1;
+
+			// Neither has priority - sort alphabetically by display name
+			return a.name.localeCompare(b.name);
+		});
+	},
+
+	/**
+	 * Gets priority index for a property (-1 if not a priority field).
+	 */
+	getPropertyPriority(displayName, rawKey, priorityMap) {
+		// Check raw key first (exact match)
+		if (rawKey && priorityMap.has(rawKey)) {
+			return priorityMap.get(rawKey);
+		}
+		// Check display name
+		if (priorityMap.has(displayName)) {
+			return priorityMap.get(displayName);
+		}
+		return -1;
+	},
+
+	/**
+	 * Checks if an object is a Dataverse "managed property" wrapper.
+	 * These have a Value property plus metadata like CanBeChanged, ManagedPropertyLogicalName.
+	 * We want to unwrap these to show just the value with the parent key name.
+	 */
+	isManagedPropertyWrapper(obj) {
+		if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+			return false;
+		}
+		const keys = Object.keys(obj);
+		// Must have Value property
+		if (!keys.includes('Value')) {
+			return false;
+		}
+		// Common managed property indicators
+		const managedPropertyKeys = ['CanBeChanged', 'ManagedPropertyLogicalName'];
+		return keys.some(k => managedPropertyKeys.includes(k));
+	},
+
+	/**
+	 * Checks if an object is a simple value wrapper like { Value: "something" }
+	 * Used for AttributeTypeName, RequiredLevel (when not managed property), etc.
+	 */
+	isSimpleValueWrapper(obj) {
+		if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+			return false;
+		}
+		const keys = Object.keys(obj);
+		// Single Value property, or Value with only null/undefined other values
+		if (keys.length === 1 && keys[0] === 'Value') {
+			return true;
+		}
+		if (keys.includes('Value') && keys.length <= 3) {
+			// Check if other keys have null/undefined values
+			const otherKeys = keys.filter(k => k !== 'Value');
+			return otherKeys.every(k => obj[k] === null || obj[k] === undefined);
+		}
+		return false;
+	},
+
+	/**
+	 * Keys to skip entirely - they add noise without value
+	 */
+	getSkipKeys() {
+		return new Set([
+			'@odata.context',    // Just request URL
+			'HasChanged',        // Always null
+			'GlobalOptionSet',   // Duplicate of OptionSet (same data)
+		]);
+	},
+
+	/**
+	 * Keys that contain large nested metadata objects.
+	 * These should be rendered as summary sections, not flattened.
+	 */
+	isLargeNestedObject(key, value) {
+		if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+			return false;
+		}
+		// OptionSet contains full option metadata with nested Labels
+		if (key === 'OptionSet' && value.Options) {
+			return true;
+		}
+		// TrueOption/FalseOption for boolean attributes
+		if ((key === 'TrueOption' || key === 'FalseOption') && value.Label) {
+			return true;
+		}
+		return false;
+	},
+
+	/**
+	 * Renders a large nested object (OptionSet, TrueOption, FalseOption) as multiple property items
+	 * Returns an array of property items to be added to the result
+	 */
+	renderLargeNestedObjectProperties(key, value) {
+		const result = [];
+
+		// For OptionSet, render key properties as individual items + options table
+		if (key === 'OptionSet' && value.Options && Array.isArray(value.Options)) {
+			// Add individual properties
+			if (value.Name) {
+				result.push({ name: 'Option Set Name', rawKey: 'OptionSet.Name', value: value.Name });
+			}
+			if (value.OptionSetType) {
+				result.push({ name: 'Option Set Type', rawKey: 'OptionSet.OptionSetType', value: value.OptionSetType });
+			}
+			if (value.IsGlobal !== undefined) {
+				result.push({ name: 'Option Set Is Global', rawKey: 'OptionSet.IsGlobal', value: value.IsGlobal ? 'Yes' : 'No' });
+			}
+			if (value.IsManaged !== undefined) {
+				result.push({ name: 'Option Set Is Managed', rawKey: 'OptionSet.IsManaged', value: value.IsManaged ? 'Yes' : 'No' });
+			}
+
+			// Add options table
+			const optionsTable = this.renderOptionsTable(value.Options.map(opt => ({
+				value: opt.Value,
+				label: opt.Label?.UserLocalizedLabel?.Label || opt.Label?.LocalizedLabels?.[0]?.Label || String(opt.Value),
+				color: opt.Color || '#0000ff'
+			})));
+
+			result.push({
+				name: 'Option Set Values',
+				rawKey: 'OptionSet.Options',
+				value: optionsTable,
+				isTable: true
+			});
+
+			return result;
+		}
+
+		// For TrueOption/FalseOption, show label and value
+		if ((key === 'TrueOption' || key === 'FalseOption') && value.Label) {
+			const label = value.Label?.UserLocalizedLabel?.Label || value.Label?.LocalizedLabels?.[0]?.Label || '';
+			const optValue = value.Value;
+			result.push({
+				name: this.formatPropertyName(key),
+				rawKey: key,
+				value: `${label} (${optValue})`
+			});
+			return result;
+		}
+
+		return null;
+	},
+
+	/**
+	 * Checks if an object is a "complex configuration" object that should be
+	 * rendered as a collapsible section rather than flattened.
+	 * Examples: Entity1AssociatedMenuConfiguration, CascadeConfiguration
+	 */
+	isComplexConfigObject(key, value) {
+		if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+			return false;
+		}
+		// Objects ending in "Configuration" with multiple properties
+		if (key.endsWith('Configuration') && Object.keys(value).length > 2) {
+			return true;
+		}
+		// CascadeConfiguration-like objects
+		if (key === 'CascadeConfiguration') {
+			return true;
+		}
+		return false;
+	},
+
+	/**
+	 * Renders a complex configuration object as a collapsible section.
+	 */
+	renderComplexConfigSection(key, value) {
+		const displayName = this.formatPropertyName(key);
+		const properties = [];
+
+		for (const propKey in value) {
+			if (!value.hasOwnProperty(propKey)) continue;
+
+			const propValue = value[propKey];
+
+			// Skip null/undefined
+			if (propValue === null || propValue === undefined) continue;
+
+			// Handle nested Label objects (extract just the label text)
+			if (propKey === 'Label' && typeof propValue === 'object') {
+				const labelText = propValue.UserLocalizedLabel?.Label || propValue.LocalizedLabels?.[0]?.Label;
+				if (labelText) {
+					properties.push({ name: this.formatPropertyName(propKey), value: labelText });
+				}
+				continue;
+			}
+
+			// Handle managed properties inside config objects
+			if (this.isManagedPropertyWrapper(propValue)) {
+				const unwrapped = propValue.Value;
+				if (unwrapped !== null && unwrapped !== undefined) {
+					properties.push({
+						name: this.formatPropertyName(propKey),
+						value: typeof unwrapped === 'boolean' ? (unwrapped ? 'Yes' : 'No') : String(unwrapped)
+					});
+				}
+				continue;
+			}
+
+			// Simple values
+			if (typeof propValue === 'boolean') {
+				properties.push({ name: this.formatPropertyName(propKey), value: propValue ? 'Yes' : 'No' });
+			} else if (typeof propValue !== 'object') {
+				properties.push({ name: this.formatPropertyName(propKey), value: String(propValue) });
+			}
+			// Skip nested objects within config (don't go deeper)
+		}
+
+		// Build table HTML for the config section
+		const rows = properties.map(p =>
+			`<tr><td class="config-prop-name">${escapeHtml(p.name)}</td><td class="config-prop-value">${escapeHtml(p.value)}</td></tr>`
+		).join('');
+
+		const tableHtml = `
+			<table class="config-table">
+				<tbody>${rows}</tbody>
+			</table>
+		`;
+
+		return {
+			name: displayName,
+			rawKey: key,
+			value: tableHtml,
+			isTable: true,
+			isConfig: true
+		};
+	},
+
+	/**
+	 * Flattens metadata object into key-value pairs.
+	 *
+	 * Handles special cases:
+	 * - Skip noisy keys (HasChanged, GlobalOptionSet duplicate)
+	 * - Large nested objects (OptionSet, TrueOption/FalseOption) as summary sections
+	 * - Complex configuration objects as collapsible sections
+	 * - Managed property wrappers (Value + CanBeChanged) unwrapped to just show value
+	 * - Simple value wrappers ({ Value: "x" }) unwrapped
+	 * - Label objects extract UserLocalizedLabel
+	 * - Skip LocalizedLabels arrays (we use UserLocalizedLabel instead)
 	 */
 	flattenMetadata(obj, prefix = '') {
 		const result = [];
+		const skipKeys = this.getSkipKeys();
 
 		for (const key in obj) {
 			if (!obj.hasOwnProperty(key)) continue;
 
 			const value = obj[key];
 
+			// Skip null/undefined/empty values
 			if (value === null || value === undefined || value === '') {
 				continue;
 			}
 
-			// Special handling for optionSet.options array
-			if (key === 'options' && Array.isArray(value) && value.length > 0 &&
-			    value[0].hasOwnProperty('value') && value[0].hasOwnProperty('label')) {
-				result.push({
-					name: 'Option Set Values',
-					value: this.renderOptionsTable(value),
-					isTable: true
-				});
+			// Skip noisy keys at top level
+			if (!prefix && skipKeys.has(key)) {
 				continue;
 			}
 
-			// Check if this is a value object (object with only 'value' property)
-			if (typeof value === 'object' && !Array.isArray(value) && value.hasOwnProperty('value')) {
-				const keys = Object.keys(value);
-				// If object only has 'value' property (or value + maybe null/undefined fields), unwrap it
-				if (keys.length === 1 || (keys.length <= 3 && keys.includes('value'))) {
-					const unwrappedValue = value.value;
-					const displayName = this.formatPropertyName(prefix ? `${prefix}.${key}` : key);
+			// Skip LocalizedLabels arrays - we extract UserLocalizedLabel instead
+			if (key === 'LocalizedLabels' && Array.isArray(value)) {
+				continue;
+			}
 
-					if (unwrappedValue === null || unwrappedValue === undefined || unwrappedValue === '') {
-						continue;
-					}
+			// Skip UserLocalizedLabel when we're inside a Label object (already handled by parent)
+			if (key === 'UserLocalizedLabel' && prefix) {
+				continue;
+			}
 
-					if (typeof unwrappedValue === 'boolean') {
-						result.push({ name: displayName, value: unwrappedValue ? 'Yes' : 'No' });
-					} else {
-						result.push({ name: displayName, value: String(unwrappedValue) });
-					}
+			const fullKey = prefix ? `${prefix}.${key}` : key;
+			const displayName = this.formatPropertyName(fullKey);
+
+			// Handle large nested objects (OptionSet, TrueOption, FalseOption) at top level
+			if (!prefix && this.isLargeNestedObject(key, value)) {
+				const properties = this.renderLargeNestedObjectProperties(key, value);
+				if (properties) {
+					result.push(...properties);
 					continue;
 				}
 			}
 
-			const fullKey = prefix ? `${prefix}.${key}` : key;
+			// Handle complex configuration objects as collapsible sections
+			// Only at top level (no prefix) to avoid nesting issues
+			if (!prefix && this.isComplexConfigObject(key, value)) {
+				result.push(this.renderComplexConfigSection(key, value));
+				continue;
+			}
 
+			// Handle managed property wrappers - unwrap to show just the value
+			if (this.isManagedPropertyWrapper(value)) {
+				const unwrappedValue = value.Value;
+				if (unwrappedValue !== null && unwrappedValue !== undefined && unwrappedValue !== '') {
+					if (typeof unwrappedValue === 'boolean') {
+						result.push({ name: displayName, rawKey: key, value: unwrappedValue ? 'Yes' : 'No' });
+					} else {
+						result.push({ name: displayName, rawKey: key, value: String(unwrappedValue) });
+					}
+				}
+				continue;
+			}
+
+			// Handle simple value wrappers like { Value: "LookupType" }
+			if (this.isSimpleValueWrapper(value)) {
+				const unwrappedValue = value.Value;
+				if (unwrappedValue !== null && unwrappedValue !== undefined && unwrappedValue !== '') {
+					if (typeof unwrappedValue === 'boolean') {
+						result.push({ name: displayName, rawKey: key, value: unwrappedValue ? 'Yes' : 'No' });
+					} else {
+						result.push({ name: displayName, rawKey: key, value: String(unwrappedValue) });
+					}
+				}
+				continue;
+			}
+
+			// Handle Label objects - extract the user-facing label
+			// Note: Option metadata uses 'Label' instead of 'DisplayName'
+			if (key === 'DisplayName' || key === 'Description' || key === 'Label') {
+				if (typeof value === 'object') {
+					const label = value.UserLocalizedLabel?.Label || value.LocalizedLabels?.[0]?.Label;
+					if (label) {
+						result.push({ name: displayName, rawKey: key, value: label });
+						continue;
+					}
+				}
+			}
+
+			// Standard value handling
 			if (typeof value === 'boolean') {
-				result.push({ name: this.formatPropertyName(fullKey), value: value ? 'Yes' : 'No' });
+				result.push({ name: displayName, rawKey: key, value: value ? 'Yes' : 'No' });
 			} else if (typeof value === 'object' && !Array.isArray(value)) {
+				// Recurse into nested objects
 				result.push(...this.flattenMetadata(value, fullKey));
 			} else if (Array.isArray(value)) {
-				value.forEach((item, index) => {
-					if (typeof item === 'object') {
-						result.push(...this.flattenMetadata(item, `${fullKey}[${index}]`));
-					} else {
-						result.push({ name: this.formatPropertyName(`${fullKey}[${index}]`), value: String(item) });
-					}
-				});
+				// Handle arrays - simple values as comma-separated, skip complex object arrays
+				if (value.length === 0) {
+					continue; // Skip empty arrays
+				}
+				if (typeof value[0] !== 'object') {
+					// Simple array like Targets: ["account", "contact"]
+					result.push({ name: displayName, rawKey: key, value: value.join(', ') });
+				}
+				// Skip arrays of complex objects (like Options, LocalizedLabels) - handled specially above
 			} else {
-				result.push({ name: this.formatPropertyName(fullKey), value: String(value) });
+				result.push({ name: displayName, rawKey: key, value: String(value) });
 			}
 		}
 
@@ -1018,8 +1449,12 @@ window.createBehavior({
 	},
 
 	/**
-	 * Formats property name from camelCase to Title Case
-	 * Examples: logicalName -> Logical Name, metadataId -> Metadata ID
+	 * Formats property name from camelCase/PascalCase to Title Case
+	 * Examples:
+	 *   logicalName -> Logical Name
+	 *   MetadataId -> Metadata ID
+	 *   IsValidODataAttribute -> Is Valid OData Attribute
+	 *   ImeMode -> IME Mode
 	 */
 	formatPropertyName(key) {
 		// Remove prefixes from nested keys (e.g., "logicalName" not "prefix.logicalName")
@@ -1033,16 +1468,59 @@ window.createBehavior({
 			return this.formatPropertyName(baseName) + ' ' + index;
 		}
 
-		// Convert camelCase to Title Case
-		const formatted = lastPart
-			// Insert space before uppercase letters
-			.replace(/([A-Z])/g, ' $1')
+		// Known acronyms/terms to preserve (matched in original casing before splitting)
+		// These get temporarily replaced with placeholders, then restored after splitting
+		// ORDER MATTERS: longer/more specific terms first to avoid partial matches
+		const preserveTerms = [
+			'OData',  // Must be before 'ID' since OData contains 'D'
+			'GUID',
+			'XML',
+			'URL',
+			'API',
+			'CRM',
+			'IME',
+		];
+
+		// Replace known terms with placeholders before splitting
+		let processed = lastPart;
+		const placeholders = {};
+		let placeholderIndex = 0;
+		for (const term of preserveTerms) {
+			if (processed.includes(term)) {
+				const placeholder = `__TERM${placeholderIndex}__`;
+				placeholders[placeholder] = term;
+				processed = processed.replace(new RegExp(term, 'g'), placeholder);
+				placeholderIndex++;
+			}
+		}
+
+		// Convert camelCase/PascalCase to Title Case
+		const formatted = processed
+			// Insert space before uppercase letters preceded by lowercase
+			.replace(/([a-z])([A-Z])/g, '$1 $2')
+			// Insert space before uppercase letter followed by lowercase (after acronym)
+			.replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
 			// Capitalize first letter
 			.replace(/^./, str => str.toUpperCase())
 			.trim();
 
-		// Special case: ID should be uppercase
-		return formatted.replace(/\bId\b/g, 'ID');
+		// Restore preserved terms from placeholders
+		// Add spaces around restored terms if adjacent to letters (the placeholder breaks word boundaries)
+		let result = formatted;
+		for (const [placeholder, term] of Object.entries(placeholders)) {
+			result = result.replace(new RegExp(placeholder, 'g'), (match, offset, str) => {
+				const before = str[offset - 1];
+				const after = str[offset + match.length];
+				const needsSpaceBefore = before && /[a-zA-Z]/.test(before);
+				const needsSpaceAfter = after && /[a-zA-Z]/.test(after);
+				return (needsSpaceBefore ? ' ' : '') + term + (needsSpaceAfter ? ' ' : '');
+			});
+		}
+
+		// Handle "Id" at word boundary -> "ID"
+		result = result.replace(/\bId\b/g, 'ID');
+
+		return result;
 	},
 
 	/**

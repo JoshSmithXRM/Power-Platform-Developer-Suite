@@ -20,8 +20,6 @@ import type { OpenInMakerUseCase } from '../../application/useCases/OpenInMakerU
 import type { MetadataTab } from '../../application/viewModels/DetailPanelViewModel';
 import type { IEntityMetadataRepository } from '../../domain/repositories/IEntityMetadataRepository';
 import { MetadataBrowserLayoutSection } from '../sections/MetadataBrowserLayoutSection';
-import { AttributeMetadataSerializer } from '../serializers/AttributeMetadataSerializer';
-import type { AttributeMetadata } from '../../domain/entities/AttributeMetadata';
 import { EnvironmentScopedPanel, type EnvironmentInfo } from '../../../../shared/infrastructure/ui/panels/EnvironmentScopedPanel';
 import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 
@@ -67,7 +65,6 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	private readonly coordinator: PanelCoordinator<MetadataBrowserCommands>;
 	private readonly scaffoldingBehavior: HtmlScaffoldingBehavior;
 	private readonly stateRepository: VSCodePanelStateRepository;
-	private readonly attributeMetadataSerializer: AttributeMetadataSerializer;
 
 	// Current state
 	private currentEnvironmentId: string;
@@ -98,7 +95,6 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 			context.workspaceState,
 			logger
 		);
-		this.attributeMetadataSerializer = new AttributeMetadataSerializer();
 
 		logger.debug('MetadataBrowserPanel: Initializing');
 
@@ -503,6 +499,9 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	/**
 	 * Handles entity selection from tree.
 	 * Loads all entity metadata and displays in tabs.
+	 *
+	 * Race condition guard: If user clicks another entity while loading,
+	 * the stale result is discarded to prevent showing wrong data.
 	 */
 	private async handleSelectEntity(logicalName: string): Promise<void> {
 		this.logger.debug('Selecting entity', { logicalName });
@@ -519,6 +518,15 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 				this.currentEnvironmentId,
 				logicalName
 			);
+
+			// Race condition guard: discard result if user selected something else while loading
+			if (this.currentSelectionId !== logicalName || this.currentSelectionType !== 'entity') {
+				this.logger.debug('Selection changed during load, discarding stale result', {
+					requested: logicalName,
+					current: this.currentSelectionId
+				});
+				return;
+			}
 
 			// Send all tab data to client
 			const postData = {
@@ -548,6 +556,9 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	/**
 	 * Handles choice selection from tree.
 	 * Loads choice metadata and displays choice values.
+	 *
+	 * Race condition guard: If user clicks another item while loading,
+	 * the stale result is discarded to prevent showing wrong data.
 	 */
 	private async handleSelectChoice(name: string): Promise<void> {
 		this.logger.debug('Selecting choice', { name });
@@ -563,6 +574,15 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 				this.currentEnvironmentId,
 				name
 			);
+
+			// Race condition guard: discard result if user selected something else while loading
+			if (this.currentSelectionId !== name || this.currentSelectionType !== 'choice') {
+				this.logger.debug('Selection changed during load, discarding stale result', {
+					requested: name,
+					current: this.currentSelectionId
+				});
+				return;
+			}
 
 			// Send choice data to client
 			await this.panel.postMessage({
@@ -608,6 +628,10 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 
 	/**
 	 * Opens detail panel with metadata for selected item.
+	 *
+	 * Extracts _rawDto from ANY metadata type for complete field display.
+	 * The _rawDto contains the unfiltered API response - this is what the
+	 * Properties tab and Raw Data tab should display.
 	 */
 	private async handleOpenDetailPanel(
 		tab: MetadataTab,
@@ -616,11 +640,47 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	): Promise<void> {
 		this.logger.debug('Opening detail panel', { tab: tab as string, itemId });
 
-		// Serialize to raw API format if it's an AttributeMetadata entity
+		// Extract _rawDto generically from ANY metadata type
+		// This works for Attributes, Relationships, Keys, Privileges, etc.
+		// The _rawDto is preserved by mappers and contains the complete API response
 		let rawEntity: Record<string, unknown> | null = null;
-		if (this.isAttributeMetadata(metadata)) {
-			rawEntity = this.attributeMetadataSerializer.serializeToRaw(metadata);
+		const metadataRecord = metadata as Record<string, unknown>;
+
+		// DEBUG: Log what we received
+		this.logger.debug('handleOpenDetailPanel received metadata', {
+			tab: tab as string,
+			itemId,
+			metadataKeys: metadataRecord ? Object.keys(metadataRecord) : [],
+			has_rawDto: metadataRecord ? '_rawDto' in metadataRecord : false,
+			rawDtoValue: metadataRecord?.['_rawDto'] ? 'present' : 'missing'
+		});
+
+		if (metadataRecord && typeof metadataRecord === 'object') {
+			// Check for _rawDto property (set by mappers, preserved through JSON serialization)
+			if (metadataRecord['_rawDto'] && typeof metadataRecord['_rawDto'] === 'object') {
+				rawEntity = metadataRecord['_rawDto'] as Record<string, unknown>;
+			}
 		}
+
+		// Warn if rawDto is missing - indicates mapper may need to call setRawDto()
+		if (metadataRecord && rawEntity === null) {
+			this.logger.warn('Missing rawDto for metadata item - Properties tab may show incomplete data', {
+				tab: tab as string,
+				itemId,
+				metadataType: metadataRecord.constructor?.name ?? 'unknown'
+			});
+		}
+
+		// Debug logging for validation
+		const domainKeyCount = metadataRecord ? Object.keys(metadataRecord).filter(k => !k.startsWith('_')).length : 0;
+		const rawKeyCount = rawEntity ? Object.keys(rawEntity).length : 0;
+		this.logger.debug('Detail panel field counts', {
+			tab: tab as string,
+			itemId,
+			hasRawDto: rawEntity !== null,
+			domainEntityFields: domainKeyCount,
+			rawDtoFields: rawKeyCount
+		});
 
 		const postData = {
 			command: 'showDetailPanel',
@@ -628,7 +688,13 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 				tab: tab as string,
 				itemId,
 				metadata,
-				rawEntity
+				rawEntity,
+				// Include field counts for dev mode indicator
+				fieldCounts: {
+					domain: domainKeyCount,
+					raw: rawKeyCount,
+					hasRawDto: rawEntity !== null
+				}
 			}
 		};
 		await this.panel.postMessage(postData);
@@ -874,19 +940,5 @@ export class MetadataBrowserPanel extends EnvironmentScopedPanel<MetadataBrowser
 	private isValidMetadataTab(value: string): value is MetadataTab {
 		const validTabs: readonly string[] = ['attributes', 'keys', 'relationships', 'privileges', 'choiceValues'];
 		return validTabs.includes(value);
-	}
-
-	/**
-	 * Type guard to check if metadata is AttributeMetadata entity.
-	 */
-	private isAttributeMetadata(metadata: unknown): metadata is AttributeMetadata {
-		return (
-			typeof metadata === 'object' &&
-			metadata !== null &&
-			'logicalName' in metadata &&
-			'schemaName' in metadata &&
-			'attributeType' in metadata &&
-			'metadataId' in metadata
-		);
 	}
 }

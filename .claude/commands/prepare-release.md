@@ -84,7 +84,20 @@ Run these checks and STOP if any fail:
    ```bash
    npm test -- --coverage
    ```
-   If coverage thresholds not met: Report which thresholds failed, STOP
+
+   **IMPORTANT: Display coverage summary explicitly:**
+   ```
+   Coverage Check:
+   ✓ Global: 87.2% statements (threshold: 85%)
+   ✓ Global: 82.1% branches (threshold: 80%)
+   ✓ Domain: 96.3% statements (threshold: 95%)
+   ✓ Application: 91.4% statements (threshold: 90%)
+   ```
+
+   If ANY threshold fails:
+   - Show EXACTLY which threshold failed and by how much
+   - Example: "✗ Domain: 93.2% statements (threshold: 95%) - FAILED by 1.8%"
+   - STOP - coverage must be fixed before release
 
    Current thresholds (from jest.config.js):
    - Global: 85% statements, 85% lines, 85% functions, 80% branches
@@ -93,7 +106,48 @@ Run these checks and STOP if any fail:
 
 ---
 
-## STEP 4: VERIFY CHANGELOG
+## STEP 4: VERIFY CHANGELOG AGAINST COMMITS
+
+**This step ensures the CHANGELOG accurately reflects what's being released.**
+
+1. **Get all commits since main:**
+   ```bash
+   git log main..HEAD --oneline --no-merges
+   ```
+
+2. **Display commits to user:**
+   ```
+   Commits to be included in this release:
+   - abc1234 feat: add new panel for X
+   - def5678 fix: resolve null reference in Y
+   - ghi9012 refactor: extract Z to domain service
+   ```
+
+3. **Read CHANGELOG.md** and cross-reference:
+   - For each commit, verify there's a corresponding CHANGELOG entry
+   - Group by category (Added, Changed, Fixed, etc.)
+   - Flag any commits that appear missing
+
+4. **Show comparison:**
+   ```
+   CHANGELOG entries found:
+   - Added: New panel for X ← matches abc1234
+   - Fixed: Null reference in Y ← matches def5678
+
+   Potentially missing:
+   - ghi9012 refactor: extract Z to domain service (may not need entry if internal)
+   ```
+
+5. **Require explicit confirmation:**
+   Ask: "Does this CHANGELOG accurately reflect all user-facing changes? [y/n]"
+   - If no: STOP - user must update CHANGELOG first
+   - If yes: Continue to next step
+
+**This step cannot be skipped.** The CHANGELOG is the user-facing record of changes.
+
+---
+
+## STEP 5: VERIFY CHANGELOG FORMAT
 
 Read `CHANGELOG.md` and check:
 
@@ -108,7 +162,7 @@ Read `CHANGELOG.md` and check:
 
 ---
 
-## STEP 5: CHECK/UPDATE PACKAGE.JSON VERSION
+## STEP 6: CHECK/UPDATE PACKAGE.JSON VERSION
 
 Read `package.json` and check version field:
 
@@ -120,7 +174,7 @@ Read `package.json` and check version field:
 
 ---
 
-## STEP 6: VERIFY README VERSION BADGE
+## STEP 7: VERIFY README VERSION BADGE
 
 Check `README.md` for version badge:
 
@@ -133,7 +187,7 @@ Check `README.md` for version badge:
 
 ---
 
-## STEP 7: CLEAN UP WORK TRACKING DOCUMENTS
+## STEP 8: CLEAN UP WORK TRACKING DOCUMENTS
 
 Check for work tracking documents in `docs/work/`:
 
@@ -147,7 +201,7 @@ Check for work tracking documents in `docs/work/`:
 
 ---
 
-## STEP 8: COMMIT CHANGES
+## STEP 9: COMMIT CHANGES
 
 If any files were modified (package.json, CHANGELOG.md):
 
@@ -164,7 +218,7 @@ If any files were modified (package.json, CHANGELOG.md):
 
 ---
 
-## STEP 9: SUMMARY
+## STEP 10: SUMMARY
 
 Show completion summary:
 

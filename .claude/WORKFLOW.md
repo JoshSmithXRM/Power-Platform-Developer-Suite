@@ -198,27 +198,28 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 
 ---
 
-### Phase 8: Code Review (MANDATORY Before PR)
+### Phase 8: PR Validation (MANDATORY Before PR)
 
 **Purpose:** Catch issues before merge.
 
-**Prerequisites (must pass):**
+**Run `/prepare-pr`** which validates:
 ```
-□ npm run compile passes
-□ npm test passes (tests written in Phase 7)
-□ F5 validation complete (Phase 6)
-□ Bugs found during testing fixed (tracked in TODO doc)
-□ No any types or console.log
-□ Domain entities have behavior methods
+□ Compilation passes
+□ Tests pass with coverage thresholds (explicit numbers shown)
+□ CHANGELOG matches commit history (cross-referenced with git log)
+□ No uncommitted changes
+□ Code review (code-guardian) APPROVED
 ```
 
-**Review:**
+**Prerequisites before running:**
 ```
-□ Run /code-review
-□ Address any CHANGES REQUESTED
-□ Get APPROVED status
-□ Update tracking doc
+□ F5 validation complete (Phase 6)
+□ Bugs found during testing fixed (tracked in TODO doc)
 ```
+
+**If CHANGES REQUESTED:**
+- Address all issues raised by code-guardian
+- Re-run `/prepare-pr`
 
 ---
 
@@ -229,10 +230,8 @@ Comprehensive guide for feature development, bug fixes, and refactoring.
 **Pre-PR Checklist (MANDATORY):**
 ```
 □ Ensure all tracking doc boxes checked
-□ npm run compile passes (0 errors, 0 warnings)
-□ npm test passes
 □ Manual testing (F5) complete
-□ Update CHANGELOG.md [Unreleased] section with changes
+□ Run /prepare-pr (validates compile, tests, coverage, CHANGELOG, code review)
 □ Final commit if any remaining changes
 ```
 
@@ -388,7 +387,8 @@ Use when uncertain or evaluating options:
 |------|--------|
 | **Start session** | CLAUDE.md auto-loaded, read tracking doc if continuing work |
 | **Complex feature** | `/design` first (after Discovery) |
-| **Before PR** | `/code-review` (mandatory) |
+| **Before PR** | `/prepare-pr` (includes code review) |
+| **For releases** | `/prepare-release X.Y.Z` (includes code review + version bump) |
 | **End session** | `/handoff` for context |
 | **Context full** | `/clear` and restart |
 | **Switching features** | `/clear`, switch branch/worktree, read new tracking doc |

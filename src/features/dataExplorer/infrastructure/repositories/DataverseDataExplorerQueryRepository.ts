@@ -557,6 +557,16 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 			}
 		}
 
+		// Check if this is a lookup by looking for lookuplogicalname annotation
+		// This handles aliased lookups where Dataverse returns the alias directly
+		// e.g., "creator@Microsoft.Dynamics.CRM.lookuplogicalname": "systemuser"
+		const lookupAnnotationKey = `${attrName}@Microsoft.Dynamics.CRM.lookuplogicalname`;
+		for (const record of records) {
+			if (lookupAnnotationKey in record) {
+				return 'lookup';
+			}
+		}
+
 		// Find a record that has this attribute with a non-null value
 		for (const record of records) {
 			for (const key of possibleKeys) {
@@ -652,7 +662,18 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 		const formattedKey = `${key}@OData.Community.Display.V1.FormattedValue`;
 		if (formattedKey in record) {
 			if (typeof value === 'number') {
-				// Could be money or optionset - check if decimal
+				// Could be money, optionset, or aggregate - need to distinguish
+				const formattedValue = record[formattedKey] as string;
+
+				// Optionsets have text labels (e.g., "Preferred Customer")
+				// Aggregates/numbers have numeric formatted values (e.g., "42" or "1,234")
+				// Check if formattedValue is just a numeric string (possibly with locale formatting)
+				if (this.isNumericFormattedValue(formattedValue)) {
+					// This is likely an aggregate or numeric field, not an optionset
+					return 'number';
+				}
+
+				// Non-numeric formatted value - this is an optionset or money
 				if (Number.isInteger(value)) {
 					return 'optionset';
 				}
@@ -685,6 +706,25 @@ export class DataverseDataExplorerQueryRepository implements IDataExplorerQueryR
 		}
 
 		return 'unknown';
+	}
+
+	/**
+	 * Checks if a formatted value represents a numeric value.
+	 * Used to distinguish between optionset labels and numeric formatted values.
+	 *
+	 * @param formattedValue - The formatted value string from Dataverse
+	 * @returns true if the value is a numeric string (possibly with locale formatting)
+	 */
+	private isNumericFormattedValue(formattedValue: string): boolean {
+		// Remove common numeric formatting characters (thousands separator, currency symbols, etc.)
+		// Keep decimal point and minus sign for parsing
+		const cleanedValue = formattedValue
+			.replace(/[,\s]/g, '')  // Remove commas and spaces (thousands separators)
+			.replace(/^[$€£¥₹]/g, ''); // Remove common currency symbols at start
+
+		// Check if the cleaned value is a valid number
+		const numericValue = parseFloat(cleanedValue);
+		return !isNaN(numericValue) && isFinite(numericValue);
 	}
 
 	/**

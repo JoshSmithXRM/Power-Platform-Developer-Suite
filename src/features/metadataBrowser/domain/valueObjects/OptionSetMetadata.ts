@@ -3,6 +3,9 @@
  * Immutable.
  */
 export class OptionMetadata {
+    /** Raw API response for complete field display in Properties tab */
+    private _rawDto: Record<string, unknown> | null = null;
+
     private constructor(
         public readonly value: number,
         public readonly label: string,
@@ -23,6 +26,21 @@ export class OptionMetadata {
             props.color ?? null
         );
     }
+
+    /**
+     * Sets the raw DTO for complete field display.
+     * Called by mapper after creation.
+     */
+    public setRawDto(dto: Record<string, unknown>): void {
+        this._rawDto = dto;
+    }
+
+    /**
+     * Gets the raw DTO if available.
+     */
+    public getRawDto(): Record<string, unknown> | null {
+        return this._rawDto;
+    }
 }
 
 /**
@@ -30,6 +48,9 @@ export class OptionMetadata {
  * Can be local (inline) or global (shared across entities).
  */
 export class OptionSetMetadata {
+    /** Raw API response for complete field display in Properties tab */
+    private _rawDto: Record<string, unknown> | null = null;
+
     private constructor(
         public readonly name: string | null,
         public readonly displayName: string | null,
@@ -80,5 +101,20 @@ export class OptionSetMetadata {
      */
     public getOptionValues(): number[] {
         return this.options.map(opt => opt.value);
+    }
+
+    /**
+     * Sets the raw DTO for complete field display.
+     * Called by mapper after creation.
+     */
+    public setRawDto(dto: Record<string, unknown>): void {
+        this._rawDto = dto;
+    }
+
+    /**
+     * Gets the raw DTO if available.
+     */
+    public getRawDto(): Record<string, unknown> | null {
+        return this._rawDto;
     }
 }

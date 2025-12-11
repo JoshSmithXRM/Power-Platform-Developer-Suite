@@ -34,9 +34,12 @@ export class SecurityPrivilegeMapper {
 
 	/**
 	 * Maps a security privilege DTO to domain entity.
+	 *
+	 * @param dto - Security privilege DTO from Dataverse API
+	 * @param preserveRawDto - Whether to preserve the raw DTO for Raw Data tab (default: true)
 	 */
-	public mapDtoToEntity(dto: SecurityPrivilegeDto): SecurityPrivilege {
-		return SecurityPrivilege.create({
+	public mapDtoToEntity(dto: SecurityPrivilegeDto, preserveRawDto: boolean = true): SecurityPrivilege {
+		const entity = SecurityPrivilege.create({
 			privilegeId: dto.PrivilegeId,
 			name: dto.Name,
 			privilegeType: this.normalizePrivilegeType(dto.PrivilegeType),
@@ -47,5 +50,11 @@ export class SecurityPrivilegeMapper {
 			canBeEntityReference: dto.CanBeEntityReference ?? false,
 			canBeParentEntityReference: dto.CanBeParentEntityReference ?? false
 		});
+
+		if (preserveRawDto) {
+			entity.setRawDto(dto as unknown as Record<string, unknown>);
+		}
+
+		return entity;
 	}
 }

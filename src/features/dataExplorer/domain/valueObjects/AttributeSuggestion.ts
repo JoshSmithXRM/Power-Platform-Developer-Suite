@@ -29,7 +29,9 @@ export class AttributeSuggestion {
 		public readonly logicalName: string,
 		public readonly displayName: string,
 		public readonly attributeType: AttributeTypeHint,
-		public readonly isCustomAttribute: boolean
+		public readonly isCustomAttribute: boolean,
+		/** Parent attribute if this is a virtual field (e.g., createdbyname → createdby) */
+		public readonly attributeOf: string | null
 	) {}
 
 	/**
@@ -38,18 +40,29 @@ export class AttributeSuggestion {
 	 * @param displayName - The attribute display name (e.g., 'Account Name')
 	 * @param attributeType - The simplified type hint for display
 	 * @param isCustomAttribute - True if this is a custom attribute
+	 * @param attributeOf - Parent attribute if this is a virtual field
 	 */
 	public static create(
 		logicalName: string,
 		displayName: string,
 		attributeType: AttributeTypeHint,
-		isCustomAttribute: boolean
+		isCustomAttribute: boolean,
+		attributeOf: string | null = null
 	): AttributeSuggestion {
 		return new AttributeSuggestion(
 			logicalName,
 			displayName,
 			attributeType,
-			isCustomAttribute
+			isCustomAttribute,
+			attributeOf
 		);
+	}
+
+	/**
+	 * Returns true if this is a virtual field (has a parent attribute).
+	 * Virtual fields like `createdbyname` derive their value from parent fields.
+	 */
+	public isVirtual(): boolean {
+		return this.attributeOf !== null;
 	}
 }

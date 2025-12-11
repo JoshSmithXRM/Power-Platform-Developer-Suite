@@ -308,4 +308,84 @@ export class SqlSelectStatement {
 	public hasRowLimit(): boolean {
 		return this.top !== null;
 	}
+
+	/**
+	 * Creates a new statement with additional columns added.
+	 * Used for virtual column transformation - adds parent columns for virtual fields.
+	 */
+	public withAdditionalColumns(additionalColumns: string[]): SqlSelectStatement {
+		if (additionalColumns.length === 0) {
+			return this;
+		}
+
+		// Create new column refs for the additional columns
+		const newColumns: SqlSelectColumn[] = [
+			...this.columns,
+			...additionalColumns.map(name => new SqlColumnRef(null, name, null, false)),
+		];
+
+		const newStatement = new SqlSelectStatement(
+			newColumns,
+			this.from,
+			this.joins,
+			this.where,
+			this.orderBy,
+			this.top,
+			this.distinct,
+			this.groupBy
+		);
+		newStatement.leadingComments = this.leadingComments;
+		return newStatement;
+	}
+
+	/**
+	 * Creates a new statement with virtual columns replaced by their parent columns.
+	 * Used for transparent virtual column transformation.
+	 *
+	 * @param virtualToParent - Map of virtual column names to parent column names (case-insensitive keys)
+	 */
+	public withVirtualColumnsReplaced(virtualToParent: Map<string, string>): SqlSelectStatement {
+		if (virtualToParent.size === 0) {
+			return this;
+		}
+
+		const seenParents = new Set<string>();
+		const newColumns: SqlSelectColumn[] = [];
+
+		for (const col of this.columns) {
+			if (col instanceof SqlColumnRef && !col.isWildcard) {
+				const colLower = col.columnName.toLowerCase();
+				const parentName = virtualToParent.get(colLower);
+
+				if (parentName !== undefined) {
+					// This is a virtual column - replace with parent (if not already added)
+					const parentLower = parentName.toLowerCase();
+					if (!seenParents.has(parentLower)) {
+						seenParents.add(parentLower);
+						newColumns.push(new SqlColumnRef(col.tableName, parentName, null, false));
+					}
+				} else {
+					// Regular column - keep as-is
+					newColumns.push(col);
+					seenParents.add(colLower);
+				}
+			} else {
+				// Aggregate or wildcard - keep as-is
+				newColumns.push(col);
+			}
+		}
+
+		const newStatement = new SqlSelectStatement(
+			newColumns,
+			this.from,
+			this.joins,
+			this.where,
+			this.orderBy,
+			this.top,
+			this.distinct,
+			this.groupBy
+		);
+		newStatement.leadingComments = this.leadingComments;
+		return newStatement;
+	}
 }

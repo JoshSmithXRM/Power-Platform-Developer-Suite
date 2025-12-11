@@ -23,6 +23,91 @@ Future enhancements for the Metadata Browser panel.
 
 ---
 
+## High Priority (Missing Core Features)
+
+### Entity Metadata Display
+**Status**: Missing
+**Priority**: High
+**Estimated Effort**: 4-6 hours
+**Discovered**: 2025-12-10
+
+**Problem**:
+When selecting an entity in the Metadata Browser tree, there is no table or panel to display the entity's own metadata (display name, schema name, ownership type, etc.). Users can only see attributes, relationships, keys, and privileges - but not the entity-level properties.
+
+**Expected Behavior**:
+Clicking an entity should show entity metadata in a detail panel:
+- Display Name, Schema Name, Logical Name
+- Entity Set Name (plural for API)
+- Ownership Type (User, Organization, None)
+- Is Activity, Is Activity Party
+- Primary Key, Primary Name Attribute
+- Created/Modified dates
+- Description
+- Icon info
+- Raw JSON view
+
+**Implementation Notes**:
+- Entity metadata is already loaded (`EntityMetadata` domain entity)
+- Need to add detail panel/table view for entity properties
+- Similar pattern to attribute detail panel
+
+---
+
+### Global Option Set Metadata Display
+**Status**: Missing
+**Priority**: High
+**Estimated Effort**: 4-6 hours
+**Discovered**: 2025-12-10
+
+**Problem**:
+When selecting a global option set (choice) in the Metadata Browser tree, there is no panel to display the option set's metadata. Users can see the choice values but not the option set properties themselves.
+
+**Expected Behavior**:
+Clicking a global option set should show its metadata:
+- Display Name, Schema Name, Logical Name
+- Option Set Type (Picklist, State, Status, Boolean)
+- Is Global
+- Is Customizable
+- Is Managed
+- External Type Name (for virtual option sets)
+- Description
+- Created/Modified dates
+- Raw JSON view
+
+**Implementation Notes**:
+- Global option set metadata already loaded (`GlobalOptionSetMetadata` domain entity)
+- Need detail panel similar to entity/attribute panels
+- Should show alongside existing choice values table
+
+---
+
+### Solutions Tab for Metadata
+**Status**: Missing
+**Priority**: High
+**Estimated Effort**: 8-12 hours
+**Discovered**: 2025-12-10
+
+**Problem**:
+Metadata Browser has no way to browse metadata by solution. Users cannot see which entities/attributes belong to a specific solution, or filter the view to show only solution components.
+
+**Expected Behavior**:
+Add a "Solutions" tab or view mode:
+- List available solutions in environment
+- Drill into solution to see its components
+- Filter by component type (entities, option sets, etc.)
+- Show solution layer information (base vs overlay)
+
+**Technical Considerations**:
+- Query `solution` entity for list
+- Query `solutioncomponent` for components
+- Different from Solution Explorer (which focuses on solution management, not metadata browsing)
+- May overlap with Solution Explorer - consider if this belongs there instead
+
+**Alternative**:
+Could add "Solution" filter to existing Metadata Browser views instead of separate tab.
+
+---
+
 ## Medium Priority
 
 ### Metadata Comparison Between Environments
@@ -153,4 +238,4 @@ Create new entities, attributes, relationships from within the Metadata Browser.
 
 ---
 
-**Last Updated**: 2025-12-03
+**Last Updated**: 2025-12-10 (Added Entity Metadata Display, Global Option Set Metadata Display, Solutions Tab)

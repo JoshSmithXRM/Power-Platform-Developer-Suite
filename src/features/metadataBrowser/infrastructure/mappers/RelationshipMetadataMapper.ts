@@ -15,11 +15,14 @@ import type {
 export class RelationshipMetadataMapper {
 	/**
 	 * Maps a one-to-many relationship DTO to domain entity.
+	 *
+	 * @param dto - Relationship DTO from Dataverse API
+	 * @param preserveRawDto - Whether to preserve the raw DTO for Raw Data tab (default: true)
 	 */
-	public mapOneToManyDtoToEntity(dto: OneToManyRelationshipDto): OneToManyRelationship {
+	public mapOneToManyDtoToEntity(dto: OneToManyRelationshipDto, preserveRawDto: boolean = true): OneToManyRelationship {
 		const cascadeConfig = this.mapCascadeConfigurationDtoToValueObject(dto.CascadeConfiguration);
 
-		return OneToManyRelationship.create({
+		const entity = OneToManyRelationship.create({
 			metadataId: dto.MetadataId,
 			schemaName: dto.SchemaName,
 			referencedEntity: dto.ReferencedEntity,
@@ -35,13 +38,22 @@ export class RelationshipMetadataMapper {
 			isHierarchical: dto.IsHierarchical ?? false,
 			securityTypes: dto.SecurityTypes ?? null
 		});
+
+		if (preserveRawDto) {
+			entity.setRawDto(dto as unknown as Record<string, unknown>);
+		}
+
+		return entity;
 	}
 
 	/**
 	 * Maps a many-to-many relationship DTO to domain entity.
+	 *
+	 * @param dto - Relationship DTO from Dataverse API
+	 * @param preserveRawDto - Whether to preserve the raw DTO for Raw Data tab (default: true)
 	 */
-	public mapManyToManyDtoToEntity(dto: ManyToManyRelationshipDto): ManyToManyRelationship {
-		return ManyToManyRelationship.create({
+	public mapManyToManyDtoToEntity(dto: ManyToManyRelationshipDto, preserveRawDto: boolean = true): ManyToManyRelationship {
+		const entity = ManyToManyRelationship.create({
 			metadataId: dto.MetadataId,
 			schemaName: dto.SchemaName,
 			entity1LogicalName: dto.Entity1LogicalName,
@@ -54,6 +66,12 @@ export class RelationshipMetadataMapper {
 			entity1NavigationPropertyName: dto.Entity1NavigationPropertyName ?? null,
 			entity2NavigationPropertyName: dto.Entity2NavigationPropertyName ?? null
 		});
+
+		if (preserveRawDto) {
+			entity.setRawDto(dto as unknown as Record<string, unknown>);
+		}
+
+		return entity;
 	}
 
 	/**

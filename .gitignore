@@ -25,6 +25,9 @@ package.json.backup
 .claude/settings.local.json
 *.local.json
 
+# MCP configuration (contains environment-specific connection info)
+.mcp.json
+
 # OS
 Thumbs.db
 nul
@@ -44,3 +47,6 @@ e2e/results/*
 
 # VS Code test downloads
 .vscode-test/
+
+# Test notebooks - local scratch files
+test-notebooks/local/

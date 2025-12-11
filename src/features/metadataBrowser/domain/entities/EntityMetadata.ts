@@ -8,10 +8,24 @@ import { EntityKey } from './EntityKey';
 import { SecurityPrivilege } from './SecurityPrivilege';
 
 /**
+ * Raw DTO preserved for serialization.
+ * This is the original API response before domain mapping.
+ * Used by the serializer to show complete raw data in Metadata Browser.
+ */
+export type RawEntityDto = Record<string, unknown>;
+
+/**
  * Domain entity representing Dataverse entity metadata.
  * Rich domain model with behavior methods (not anemic).
  */
 export class EntityMetadata {
+    /**
+     * Original raw DTO from API response.
+     * Preserved for Raw Data tab display - contains ALL fields from Dataverse API.
+     * Optional: only set when entity is created from repository with DTO.
+     */
+    private _rawDto: RawEntityDto | null = null;
+
     private constructor(
         public readonly metadataId: string,
         public readonly logicalName: LogicalName,
@@ -256,5 +270,30 @@ export class EntityMetadata {
      */
     public getActiveKeys(): readonly EntityKey[] {
         return this.keys.filter(k => k.isActive());
+    }
+
+    // Raw DTO preservation (for Metadata Browser Raw Data tab)
+
+    /**
+     * Sets the original raw DTO from API response.
+     * Called by the mapper after creating the entity to preserve complete API data.
+     */
+    public setRawDto(dto: RawEntityDto): void {
+        this._rawDto = dto;
+    }
+
+    /**
+     * Gets the original raw DTO if available.
+     * Returns null if entity was created without preserving the DTO.
+     */
+    public getRawDto(): RawEntityDto | null {
+        return this._rawDto;
+    }
+
+    /**
+     * Checks if raw DTO is available.
+     */
+    public hasRawDto(): boolean {
+        return this._rawDto !== null;
     }
 }

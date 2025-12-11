@@ -2,7 +2,7 @@
     "name": "power-platform-developer-suite",
     "displayName": "Power Platform Developer Suite",
     "description": "A comprehensive VSCode extension for Power Platform development and administration - your complete toolkit for Dynamics 365, Dataverse, and Power Platform solutions",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "icon": "images/icon.png",
     "publisher": "JoshSmithXRM",
     "repository": {
@@ -232,6 +232,12 @@
             {
                 "command": "power-platform-dev-suite.openPersistenceInspector",
                 "title": "Persistence Inspector (Dev Only)",
+                "category": "Power Platform Developer Suite",
+                "enablement": "powerPlatformDevSuite.isDevelopment"
+            },
+            {
+                "command": "power-platform-dev-suite.devDumpRawMetadata",
+                "title": "Dump Raw Entity Metadata (Dev Only)",
                 "category": "Power Platform Developer Suite",
                 "enablement": "powerPlatformDevSuite.isDevelopment"
             },
