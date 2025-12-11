@@ -48,7 +48,18 @@ The goal is **actionable improvements** to documentation, commands, agents, and 
 
 ## PHASE 1: DATA COLLECTION (Automated)
 
-### 1.1 Conversation History Analysis
+**IMPORTANT: --collect is SHALLOW by design.**
+
+The goal of --collect is to gather metrics and FLAG files for later review - NOT to deeply analyze conversation content. Deep analysis happens in the discussion phase (Phase 2) where you and the user review flagged items together.
+
+| --collect Does | --collect Does NOT Do |
+|----------------|----------------------|
+| Count files, commits, PRs | Parse JSONL content deeply |
+| Grep for keyword patterns | Interpret what patterns mean |
+| Flag sessions for review | Explain "why" something happened |
+| Export raw metrics | Make judgments about quality |
+
+### 1.1 Conversation History Detection
 
 **Location:** `~/.claude/projects/` - find directories matching this project.
 
@@ -469,6 +480,19 @@ When running `--collect`, create this file with the following schema:
     "observations": [
       "Pattern: Most sessions don't use slash commands",
       "Pattern: Extended thinking rarely used"
+    ],
+
+    "flaggedForReview": [
+      {
+        "file": "fc0b1764-c960-42d8-9592-952e0a160a41.jsonl",
+        "reason": "Contains 'I'll decide' - possible missing recommendation",
+        "sizeMB": 8.5
+      },
+      {
+        "file": "cf6f36db-eb33-420b-a8e9-e8d781c01f80.jsonl",
+        "reason": "Contains 'STOP' - possible frustration",
+        "sizeMB": 2.8
+      }
     ]
   },
 
