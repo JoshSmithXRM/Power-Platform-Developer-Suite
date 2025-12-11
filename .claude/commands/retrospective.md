@@ -94,22 +94,22 @@ Search ALL files for patterns, but don't parse them:
 
 ```bash
 # Correction patterns - Claude asking without recommending
-grep -l "I'll decide\|let me decide\|I will decide" *.jsonl 2>/dev/null
+grep -l "I'll decide\|let me decide\|I will decide" ~/.claude/projects/[PROJECT]/*.jsonl 2>/dev/null
 
 # Correction patterns - Claude making unauthorized decisions
-grep -l "don't assume\|ask me first\|should have asked" *.jsonl 2>/dev/null
+grep -l "don't assume\|ask me first\|should have asked" ~/.claude/projects/[PROJECT]/*.jsonl 2>/dev/null
 
 # Frustration indicators
-grep -l "STOP\|NO NO\|wrong" *.jsonl 2>/dev/null
+grep -l "STOP\|NO NO\|wrong" ~/.claude/projects/[PROJECT]/*.jsonl 2>/dev/null
 
 # Yes-man behavior
-grep -l "You're absolutely right\|you're absolutely right" *.jsonl 2>/dev/null
+grep -l "You're absolutely right\|you're absolutely right" ~/.claude/projects/[PROJECT]/*.jsonl 2>/dev/null
 
 # Extended thinking usage
-grep -l "think hard\|think harder\|ultrathink" *.jsonl 2>/dev/null
+grep -l "think hard\|think harder\|ultrathink" ~/.claude/projects/[PROJECT]/*.jsonl 2>/dev/null
 
 # Slash command usage
-grep -o '"/[a-z-]*"' *.jsonl 2>/dev/null | sort | uniq -c | sort -rn | head -20
+grep -o '"/[a-z-]*"' ~/.claude/projects/[PROJECT]/*.jsonl 2>/dev/null | sort | uniq -c | sort -rn | head -20
 ```
 
 **Step 3: Sample Deep Analysis (2-3 sessions)**

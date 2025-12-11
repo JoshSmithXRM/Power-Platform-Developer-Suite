@@ -819,8 +819,8 @@ npx ts-prune --error 2>/dev/null | grep -v "used in module" | head -20
 **Scan for test quality:**
 
 ```bash
-# Find test files for changed code
-git diff main --name-only | grep -E "\.(ts|tsx)$" | sed 's/\(.*\)\.\(ts\|tsx\)$/\1.test.\2/' | xargs ls 2>/dev/null
+# Find test files for changed code (filter out test files first to avoid foo.test.test.ts)
+git diff main --name-only | grep -E "\.(ts|tsx)$" | grep -v "\.test\." | sed 's/\(.*\)\.\(ts\|tsx\)$/\1.test.\2/' | xargs ls 2>/dev/null
 ```
 
 **❌ RED FLAGS:**
