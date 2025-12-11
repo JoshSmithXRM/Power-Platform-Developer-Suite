@@ -119,19 +119,45 @@
 
 ## 🧠 Extended Thinking
 
-For complex/uncertain problems, trigger extended thinking modes:
+Extended thinking is expensive (tokens + time). Front-load during **design**, minimize during **execution**.
 
-- `"think"` - Standard extended reasoning (~10-20s extra thinking)
+### The Principle
+
+```
+DESIGN PHASE → think hard / think harder (get approach right)
+BUILD PHASE  → normal mode (execute the plan)
+DEBUG PHASE  → escalate as needed (normal → think → think hard)
+REVIEW PHASE → normal mode (code speaks for itself)
+```
+
+### Decision Matrix
+
+| Situation | Mode | Why |
+|-----------|------|-----|
+| Clear spec, just implementing | Normal | Plan exists, execute it |
+| Bug with obvious root cause | Normal | Fix it |
+| Unfamiliar code, need to understand | `think` | Build mental model |
+| 2-3 options, weighing tradeoffs | `think` | Structured comparison |
+| Medium feature design (3-6 files) | `think hard` | Architectural decisions matter |
+| Breaking large feature into slices | `think hard` | Strategy affects everything |
+| First approach failed, reconsidering | `think hard` | Need fresh perspective |
+| Complex multi-system architecture | `think harder` | High stakes, many interactions |
+| Security-sensitive decisions | `think harder` | Can't afford mistakes |
+| Major pivot, everything on table | `ultrathink` | Rare, last resort |
+
+### Build Mode Triggers
+
+Even during implementation, certain situations should prompt thinking:
+- "I'm not sure how this should work..." → `think`
+- "There are a few ways to do this..." → `think hard`
+- "This is getting complicated..." → `think hard`
+
+### Mode Reference
+
+- `"think"` - Standard extended reasoning (~10-20s)
 - `"think hard"` - More thorough analysis (~30-60s)
 - `"think harder"` - Deep analysis (~1-2min)
-- `"ultrathink"` - Maximum reasoning (rare, very expensive, ~2-5min)
-
-**When to use:**
-- ✅ Uncertain architectural approach (think hard)
-- ✅ Complex refactoring decisions (think)
-- ✅ Breaking down large features into slices (think hard)
-- ✅ Critical production decisions (think harder)
-- ❌ Simple CRUD features (normal mode sufficient)
+- `"ultrathink"` - Maximum reasoning (rare, ~2-5min)
 
 ---
 
