@@ -4,12 +4,13 @@
  *
  * Business Rules:
  * - Packages can contain multiple assemblies
- * - Managed packages cannot be modified
+ * - Managed packages CAN be updated (upload new .nupkg) - valid for hotfixes
+ * - Managed packages CANNOT be deleted
  * - Package version determines update vs new registration
  *
  * Rich behavior (NOT anemic):
- * - canUpdate(): boolean (checks if managed)
- * - canDelete(assemblyCount): boolean (checks if has assemblies)
+ * - canUpdate(): boolean (always true - managed packages can be updated)
+ * - canDelete(assemblyCount): boolean (checks if managed and has assemblies)
  * - getDisplayVersion(): string (formatted version)
  */
 export class PluginPackage {
@@ -24,10 +25,12 @@ export class PluginPackage {
 	) {}
 
 	/**
-	 * Business rule: Managed packages cannot be updated.
+	 * Business rule: Plugin packages can always be updated (upload new .nupkg).
+	 * Unlike assemblies, managed packages CAN receive content updates in Dataverse.
+	 * This allows deploying hotfixes to managed solutions.
 	 */
 	public canUpdate(): boolean {
-		return !this.isManaged;
+		return true;
 	}
 
 	/**

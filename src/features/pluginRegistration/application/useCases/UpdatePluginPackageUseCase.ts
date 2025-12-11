@@ -5,9 +5,11 @@ import type { IPluginPackageRepository } from '../../domain/interfaces/IPluginPa
  * Use case for updating a plugin package with new .nupkg content.
  *
  * Orchestration only - no business logic:
- * 1. Fetch package
- * 2. Validate via domain method (canUpdate)
- * 3. Call repository to update content
+ * 1. Fetch package (validate exists)
+ * 2. Call repository to update content
+ *
+ * Note: Both managed and unmanaged packages can be updated in Dataverse.
+ * This enables hotfix deployment to managed solutions.
  */
 export class UpdatePluginPackageUseCase {
 	constructor(
@@ -36,9 +38,8 @@ export class UpdatePluginPackageUseCase {
 			throw new Error(`Plugin package not found: ${packageId}`);
 		}
 
-		if (!pkg.canUpdate()) {
-			throw new Error('Cannot update managed package');
-		}
+		// No managed check - both managed and unmanaged packages can be updated
+		// Domain entity canUpdate() returns true for all packages
 
 		await this.packageRepository.updateContent(environmentId, packageId, base64Content);
 

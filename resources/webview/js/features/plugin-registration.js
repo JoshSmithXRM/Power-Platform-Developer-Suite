@@ -296,8 +296,11 @@ function buildVscodeContext(item) {
 		context.canDisable = item.metadata.canDisable === true;
 	} else if (item.type === 'assembly' && item.metadata) {
 		context.canUpdate = item.metadata.canUpdate === true;
-		context.packageId = item.metadata.packageId || null;
-		context.isStandalone = item.metadata.packageId === null;
+		// packageId can be a GUID string or null - preserve it exactly
+		// Note: use explicit check for null/undefined, not falsy check
+		const pkgId = item.metadata.packageId;
+		context.packageId = (pkgId !== null && pkgId !== undefined) ? pkgId : null;
+		context.isStandalone = pkgId === null || pkgId === undefined;
 	} else if (item.type === 'package' && item.metadata) {
 		context.canUpdate = item.metadata.canUpdate === true;
 	}
