@@ -1,0 +1,165 @@
+{
+  "machineId": "SKYNET",
+  "exportDate": "2025-12-11",
+  "periodStart": "2025-11-11",
+  "periodEnd": "2025-12-11",
+  "conversationInsights": {
+    "totalSessions": 344,
+    "totalSize": "207 MB",
+    "sessionsWithSlashCommands": 53,
+    "sessionsWithExtendedThinking": 1,
+    "correctionPatterns": {
+      "note": "High signal density across many sessions - correction patterns found in 20+ files",
+      "commonPhrases": ["ask me first", "let me decide", "don't assume"],
+      "observation": "Common patterns include Claude making assumptions without asking, proceeding with implementation choices before validation"
+    },
+    "promptingPatterns": {
+      "observation": "User frequently provides detailed context and requirements, but sometimes Claude proceeds without clarifying edge cases"
+    },
+    "decisionPoints": {
+      "majorDecisions": [
+        "Virtual table implementation approach",
+        "Memory optimization strategy for 5000+ row datasets",
+        "IntelliSense registration timing (activation vs on-demand)",
+        "MCP server integration for Dataverse"
+      ]
+    },
+    "worktrieHistory": {
+      "directories": [
+        "C--VS-Power-Platform-Developer-Suite",
+        "C--VS-Power-Platform-Developer-Suite-deployment-settings",
+        "C--VS-Power-Platform-Developer-Suite-plugin-registration",
+        "C--VS-Power-Platform-Developer-Suite-solution-diff"
+      ],
+      "observation": "Active parallel development across 4 worktrees"
+    }
+  },
+  "gitSummary": {
+    "totalCommitsLast30Days": 158,
+    "commitsByType": {
+      "feat": 5,
+      "fix": 17,
+      "refactor": 2,
+      "other": 54,
+      "merge": 80
+    },
+    "bugFixRatio": 0.108,
+    "refactorRatio": 0.013,
+    "featureRatio": 0.032,
+    "mostChangedFiles": [
+      {"file": "package.json", "changes": 26},
+      {"file": "CHANGELOG.md", "changes": 23},
+      {"file": "WebResourcesPanelComposed.ts", "changes": 19},
+      {"file": "VirtualTableRenderer.js", "changes": 18},
+      {"file": "E2E_TESTING_AND_FIXES_TODO.md", "changes": 17},
+      {"file": "CLAUDE.md", "changes": 16}
+    ],
+    "featureBranches": {
+      "active": [
+        "feature/deployment-settings-promotion",
+        "feature/plugin-registration",
+        "feature/retrospective-process",
+        "feature/solution-diff"
+      ],
+      "recentlyMerged": [
+        "fix/notebook-no-data-race-condition",
+        "feature/virtual-table-data-explorer",
+        "docs/roadmap-cleanup-release-process",
+        "feature/finish-data-explorer-web-resources-metadata",
+        "fix/critical-bugs-batch"
+      ]
+    }
+  },
+  "prSummary": {
+    "totalPRsLast30Days": 15,
+    "mergedPRs": 14,
+    "closedWithoutMerge": 1,
+    "prsWithExternalReviews": [
+      {
+        "pr": 43,
+        "title": "fix: notebook and metadata browser improvements (v0.3.3)",
+        "reviewers": ["gemini-code-assist", "copilot-pull-request-reviewer", "github-advanced-security"],
+        "keyFindings": [
+          "Gemini: One critical security concern (MCP config with sensitive data)",
+          "Gemini: Minor point about potential dead code",
+          "Copilot: 6 comments generated across 51/52 files reviewed"
+        ]
+      },
+      {
+        "pr": 42,
+        "title": "fix: v0.3.2 - Memory optimization and IntelliSense fixes",
+        "reviewers": ["gemini-code-assist", "copilot-pull-request-reviewer"],
+        "keyFindings": [
+          "Gemini: Medium-severity issue - inconsistency in virtual scroll handler implementation",
+          "Overall: Positive review, high-quality contribution noted"
+        ]
+      },
+      {
+        "pr": 39,
+        "title": "Release v0.3.0 - Data Explorer, Web Resources & Metadata Browser",
+        "reviewers": ["gemini-code-assist", "copilot-pull-request-reviewer", "github-advanced-security"],
+        "keyFindings": [
+          "Gemini: Minor suggestion for workflow documentation consistency",
+          "Copilot: Reviewed 84/204 changed files with no comments"
+        ]
+      }
+    ]
+  },
+  "ciSummary": {
+    "recentRuns": 20,
+    "successRate": 0.95,
+    "failedRuns": [
+      {
+        "branch": "fix/notebook-no-data-race-condition",
+        "workflow": "PR Validation",
+        "date": "2025-12-10T22:31:22Z",
+        "status": "Fixed in subsequent run"
+      }
+    ],
+    "observation": "CI pipeline is stable, single failure was addressed quickly"
+  },
+  "commandUsage": {
+    "availableCommands": [
+      "cleanup-code",
+      "code-review",
+      "comprehensive-review",
+      "design",
+      "fix-technical-debt",
+      "handoff",
+      "new-panel",
+      "prepare-release",
+      "retrospective",
+      "review-technical-debt"
+    ],
+    "availableAgents": [
+      "code-guardian",
+      "design-architect"
+    ],
+    "sessionsUsingCommands": 53,
+    "observation": "Commands are being used regularly (15% of sessions)"
+  },
+  "toolInventory": {
+    "claudeCodeVersion": "Check manually - claude --version",
+    "newFeaturesCheck": "Recommend web search for recent Claude Code updates"
+  },
+  "observations": {
+    "processSuccesses": [
+      "High PR merge rate (14/15)",
+      "Stable CI pipeline (95% success)",
+      "Active use of external code review tools (Gemini, Copilot)",
+      "Good commit message discipline (conventional commits)",
+      "Effective use of worktrees for parallel development"
+    ],
+    "processFailures": [
+      "Extended thinking rarely used (1 session out of 344)",
+      "Potential over-correction patterns in conversations",
+      "Large PRs (v0.3.0 had 204 changed files - Copilot could only review 84)"
+    ],
+    "potentialImprovements": [
+      "Consider breaking large PRs into smaller chunks for better review coverage",
+      "Use extended thinking more for complex architectural decisions",
+      "Address PR review findings from Gemini (security concern in PR#43, virtual scroll inconsistency in PR#42)",
+      "Review if /design command is being used enough before complex features"
+    ]
+  }
+}
