@@ -164,17 +164,11 @@ Even during implementation, certain situations should prompt thinking:
 ## 🛠️ Common Commands
 
 **Development:**
-- `npm run compile` - Full compilation with lint + tests (run before commits)
-- `npm run compile:fast` - Quick build only, no lint/tests (run after EVERY code change)
-- `npm test` - Run all tests (must pass before commits)
+- `npm run compile` - Full compilation with lint + tests
+- `npm run compile:fast` - Quick build only, no lint/tests
+- `npm test` - Run all tests
 - `npm run lint` - ESLint check
 - `npm run watch` - Continuous compilation during development
-
-**CRITICAL: Compile After Every Change**
-After ANY code edit (even a single line), run `npm run compile:fast` before proceeding.
-Do NOT batch multiple changes without verifying each compiles. Catch errors immediately,
-not after multiple files have been modified. This prevents wasted effort debugging
-cascading issues from earlier mistakes.
 
 **VS Code:**
 - `F5` - Launch Extension Development Host (manual testing required)
@@ -280,10 +274,10 @@ Use git worktrees for parallel feature development in separate Claude Code sessi
 git worktree add "../Power-Platform-Developer-Suite-[feature]" -b feature/[branch-name]
 ```
 
-**Conventions:**
-- **Location**: Always sibling directory (e.g., `../Power-Platform-Developer-Suite-data-explorer`)
-- **Naming**: `Power-Platform-Developer-Suite-[feature-shortname]`
-- **Branch**: Create new branch with `-b` flag
+**Auto-symlinked files:** The `post-checkout` hook automatically symlinks these gitignored files from main repo:
+- `.mcp.json` - Dataverse MCP connection
+- `.claude/settings.local.json` - Claude Code settings
+- `.env.e2e.local` - E2E test credentials
 
 **Managing worktrees:**
 ```bash
@@ -296,7 +290,6 @@ git worktree prune             # Clean up stale worktree references
 - Each worktree = separate Claude Code session
 - Don't switch branches within a worktree (defeats the purpose)
 - Remove worktree after feature is merged
-- Main repo stays on its own feature branch
 
 ---
 
@@ -343,10 +336,10 @@ git worktree prune             # Clean up stale worktree references
 
 2. **Implementation phase** (inside-out, exploration mode)
    - Domain → Application → Infrastructure → Presentation
-   - `npm run compile:fast` after EVERY file edit (not just per layer!)
-   - `npm run compile` (full) after completing each layer before commit
+   - `npm run compile:fast` after EVERY file edit - catch errors immediately, don't batch
+   - `npm run compile` (full) after completing each layer
    - NO tests during exploration (focus on getting to F5 fast)
-   - Commit per layer
+   - Commit per layer (WIP commits are fine - squash merge cleans up)
    - F5 test and iterate until "feels right"
 
 3. **Stabilization phase** (tests required before PR)
@@ -483,8 +476,4 @@ See `.claude/agents/` for agent definitions.
 
 ---
 
-**Development:** `npm run compile` (use after EVERY layer)
-
 **Git Commits & PRs:** No "Generated with Claude Code" footers, Co-authored-by lines, or AI attribution in commits or PR descriptions. Keep messages clean and conventional.
-
-**Remember:** Rich domain models with behavior. Business logic in domain, not use cases or panels.
