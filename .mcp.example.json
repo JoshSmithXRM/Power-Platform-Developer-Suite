@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "dataverse": {
+      "type": "stdio",
+      "command": "Microsoft.PowerPlatform.Dataverse.MCP",
+      "args": [
+        "--ConnectionUrl",
+        "https://make.powerapps.com/environments/<env-id>/connections?apiName=shared_commondataserviceforapps&connectionName=<connection-id>",
+        "--MCPServerName",
+        "DataverseMCPServer",
+        "--TenantId",
+        "<tenant-id>",
+        "--BackendProtocol",
+        "HTTP"
+      ],
+      "env": {}
+    }
+  }
+}

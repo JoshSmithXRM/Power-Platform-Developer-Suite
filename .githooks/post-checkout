@@ -2,72 +2,52 @@
 # Post-checkout hook: Auto-create symlinks for worktrees
 # This runs after git checkout and git worktree add
 #
-# Handles (gracefully - no errors if source files don't exist):
-# 1. Claude settings.local.json -> $HOME/.ppds-claude-settings.json
-# 2. .env.e2e.local -> main repo's .env.e2e.local (for E2E test credentials)
+# Symlinks worktree files to main repo (all gitignored):
+# - .mcp.json (Dataverse MCP connection)
+# - .claude/settings.local.json (Claude Code settings)
+# - .env.e2e.local (E2E test credentials)
 #
-# Setup: Run once to enable shared hooks:
-#   git config core.hooksPath .githooks
+# Setup: git config core.hooksPath .githooks
 
 # Helper function to create Windows symlink (silent on failure)
 create_symlink() {
     local source="$1"
     local target="$2"
 
-    # Convert paths for Windows mklink
     local WIN_TARGET WIN_SOURCE
     WIN_TARGET=$(cygpath -w "$(pwd)/$target" 2>/dev/null) || return 0
     WIN_SOURCE=$(cygpath -w "$source" 2>/dev/null) || return 0
 
-    # Create symlink using Windows mklink (suppress all output)
     cmd //c "mklink $WIN_TARGET $WIN_SOURCE" > /dev/null 2>&1
-
-    if [ $? -eq 0 ]; then
-        echo "✓ Created symlink: $target"
-    fi
+    [ $? -eq 0 ] && echo "✓ Linked: $target"
 }
 
-# --- Claude Settings Symlink ---
-# Source: User's home directory (optional - user creates this file)
-# Target: .claude/settings.local.json
-SETTINGS_SOURCE="$HOME/.ppds-claude-settings.json"
-SETTINGS_TARGET=".claude/settings.local.json"
-
-if [ -f "$SETTINGS_SOURCE" ] && [ -d ".claude" ] && [ ! -e "$SETTINGS_TARGET" ]; then
-    create_symlink "$SETTINGS_SOURCE" "$SETTINGS_TARGET"
-fi
-
-# --- MCP Configuration Symlink ---
-# Source: User's home directory (optional - for Claude Code MCP servers)
-# Target: .mcp.json
-MCP_SOURCE="$HOME/.ppds-mcp.json"
-MCP_TARGET=".mcp.json"
-
-if [ -f "$MCP_SOURCE" ] && [ ! -e "$MCP_TARGET" ]; then
-    create_symlink "$MCP_SOURCE" "$MCP_TARGET"
-fi
-
-# --- E2E Environment Symlink ---
-# Source: Main repo's .env.e2e.local (optional - for E2E testing)
-# Target: .env.e2e.local in worktree
+# Get main repo root (only works in worktrees)
 GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null)
-if [ -n "$GIT_COMMON_DIR" ]; then
-    # Go up from .git to get repo root
-    MAIN_REPO_ROOT=$(dirname "$GIT_COMMON_DIR")
-    ENV_SOURCE="$MAIN_REPO_ROOT/.env.e2e.local"
-    ENV_TARGET=".env.e2e.local"
+[ -z "$GIT_COMMON_DIR" ] && exit 0
 
-    # Only create symlink if:
-    # 1. Source exists in main repo
-    # 2. Target doesn't already exist
-    # 3. We're in a worktree (not the main repo itself)
-    if [ -f "$ENV_SOURCE" ] && [ ! -e "$ENV_TARGET" ]; then
-        CURRENT_DIR=$(pwd)
-        if [ "$CURRENT_DIR" != "$MAIN_REPO_ROOT" ]; then
-            create_symlink "$ENV_SOURCE" "$ENV_TARGET"
-        fi
-    fi
+MAIN_REPO_ROOT=$(dirname "$GIT_COMMON_DIR")
+CURRENT_DIR=$(pwd)
+
+# Skip if we're in the main repo (not a worktree)
+[ "$CURRENT_DIR" = "$MAIN_REPO_ROOT" ] && exit 0
+
+# --- Symlink .mcp.json ---
+MCP_SOURCE="$MAIN_REPO_ROOT/.mcp.json"
+if [ -f "$MCP_SOURCE" ] && [ ! -e ".mcp.json" ]; then
+    create_symlink "$MCP_SOURCE" ".mcp.json"
 fi
 
-# Always exit successfully - hooks should never block workflow
+# --- Symlink .claude/settings.local.json ---
+CLAUDE_SOURCE="$MAIN_REPO_ROOT/.claude/settings.local.json"
+if [ -f "$CLAUDE_SOURCE" ] && [ ! -e ".claude/settings.local.json" ]; then
+    create_symlink "$CLAUDE_SOURCE" ".claude/settings.local.json"
+fi
+
+# --- Symlink .env.e2e.local ---
+ENV_SOURCE="$MAIN_REPO_ROOT/.env.e2e.local"
+if [ -f "$ENV_SOURCE" ] && [ ! -e ".env.e2e.local" ]; then
+    create_symlink "$ENV_SOURCE" ".env.e2e.local"
+fi
+
 exit 0
