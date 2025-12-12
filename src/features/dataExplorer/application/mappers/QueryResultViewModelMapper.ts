@@ -106,9 +106,9 @@ export class QueryResultViewModelMapper {
 			// Add the original column
 			expandedColumns.push(this.mapColumn(column));
 
-			// For optionset and lookup columns, add a companion "name" column
+			// For optionset, lookup, and boolean columns, add a companion "name" column
 			// BUT only if it doesn't already exist in the original columns
-			if (column.dataType === 'optionset' || column.dataType === 'lookup') {
+			if (column.dataType === 'optionset' || column.dataType === 'lookup' || column.dataType === 'boolean') {
 				const nameColumnName = `${column.logicalName}name`;
 
 				// Skip if the user already queried this virtual column directly
@@ -172,11 +172,11 @@ export class QueryResultViewModelMapper {
 	): QueryRowViewModel {
 		const viewModelRow: Record<string, string> = {};
 
-		// Identify name columns that should be populated from lookup/optionset columns
+		// Identify name columns that should be populated from lookup/optionset/boolean columns
 		// These shouldn't be overwritten by explicit column values
 		const virtualNameColumns = new Set(
 			columns
-				.filter((c) => c.dataType === 'lookup' || c.dataType === 'optionset')
+				.filter((c) => c.dataType === 'lookup' || c.dataType === 'optionset' || c.dataType === 'boolean')
 				.map((c) => `${c.logicalName}name`)
 		);
 
@@ -199,6 +199,19 @@ export class QueryResultViewModelMapper {
 			}
 			// Handle null optionset columns for consistency
 			else if (column.dataType === 'optionset' && value === null) {
+				viewModelRow[column.logicalName] = '';
+				viewModelRow[`${column.logicalName}name`] = '';
+			}
+			// Handle boolean columns specially (like optionsets)
+			// Boolean fields return FormattedValue from Dataverse with value: true/false
+			else if (column.dataType === 'boolean' && this.isFormattedValue(value)) {
+				// Original column shows raw boolean value (true/false as API returns)
+				viewModelRow[column.logicalName] = value.value === null ? '' : String(value.value);
+				// Virtual "name" column shows formatted label (Yes/No)
+				viewModelRow[`${column.logicalName}name`] = value.formattedValue || '';
+			}
+			// Handle null boolean columns
+			else if (column.dataType === 'boolean' && value === null) {
 				viewModelRow[column.logicalName] = '';
 				viewModelRow[`${column.logicalName}name`] = '';
 			}
@@ -273,6 +286,12 @@ export class QueryResultViewModelMapper {
 			if ('id' in value && value.id !== undefined) {
 				return String(value.id);
 			}
+			// ManagedProperty complex type (e.g., ishidden, iscustomizable)
+			// Extract the Value property and display as 0/1 for SQL filter consistency
+			// Users can filter with WHERE ishidden = 0 (what they see = what they filter by)
+			if (this.isManagedProperty(value)) {
+				return value.Value ? '1' : '0';
+			}
 			return JSON.stringify(value);
 		}
 
@@ -323,6 +342,18 @@ export class QueryResultViewModelMapper {
 			typeof value === 'object' &&
 			'id' in value &&
 			'entityType' in value
+		);
+	}
+
+	/**
+	 * Type guard to check if a value is a ManagedProperty complex type.
+	 * ManagedProperty objects have Value (capital V) and ManagedPropertyLogicalName properties.
+	 * Example: { Value: false, CanBeChanged: true, ManagedPropertyLogicalName: "ishidden" }
+	 */
+	private isManagedProperty(value: object): value is { Value: boolean; CanBeChanged: boolean; ManagedPropertyLogicalName: string } {
+		return (
+			'Value' in value &&
+			'ManagedPropertyLogicalName' in value
 		);
 	}
 
