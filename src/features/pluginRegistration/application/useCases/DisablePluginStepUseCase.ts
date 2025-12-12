@@ -5,9 +5,11 @@ import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepR
  * Use case for disabling an enabled plugin step.
  *
  * Orchestration only - no business logic:
- * 1. Fetch step
- * 2. Validate via domain method (canDisable)
- * 3. Call repository to disable
+ * 1. Fetch step to verify it exists and is enabled
+ * 2. Call repository to disable
+ *
+ * Note: Some Microsoft-registered steps cannot be disabled (error 0x8004419a).
+ * We allow the attempt and let the server reject if not allowed.
  */
 export class DisablePluginStepUseCase {
 	constructor(
@@ -17,7 +19,7 @@ export class DisablePluginStepUseCase {
 
 	/**
 	 * Disable a plugin step.
-	 * @throws Error if step not found or cannot be disabled
+	 * @throws Error if step not found, already disabled, or server rejects the operation
 	 */
 	public async execute(environmentId: string, stepId: string): Promise<void> {
 		this.logger.info('DisablePluginStepUseCase started', { environmentId, stepId });
@@ -28,14 +30,22 @@ export class DisablePluginStepUseCase {
 		}
 
 		if (!step.canDisable()) {
-			const reason = step.isInManagedState()
-				? 'Cannot disable managed step'
-				: 'Step is already disabled';
-			throw new Error(reason);
+			throw new Error('Step is already disabled');
 		}
 
-		await this.stepRepository.disable(environmentId, stepId);
-
-		this.logger.info('DisablePluginStepUseCase completed', { stepId });
+		try {
+			await this.stepRepository.disable(environmentId, stepId);
+			this.logger.info('DisablePluginStepUseCase completed', { stepId });
+		} catch (error: unknown) {
+			// Provide helpful error message for Microsoft-registered steps
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			if (errorMessage.includes('0x8004419a') || errorMessage.includes('registered by Microsoft')) {
+				throw new Error(
+					'This step is registered by Microsoft and cannot be disabled. ' +
+						'Use the "Hide hidden steps" filter to reduce noise from system steps.'
+				);
+			}
+			throw error;
+		}
 	}
 }

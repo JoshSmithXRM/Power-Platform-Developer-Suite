@@ -7,18 +7,21 @@ import { StepStatus } from '../valueObjects/StepStatus';
  *
  * Business Rules:
  * - Steps execute at specific stages (PreValidation, PreOperation, PostOperation)
- * - Steps can be enabled/disabled if customizable (Microsoft-registered steps cannot be modified)
  * - Steps have execution mode (Sync vs Async)
  * - Steps have rank (execution order within same stage)
  * - Filtering attributes apply only to Update message
+ * - Hidden steps (isHidden=true) are internal system steps (workflow triggers, etc.)
  *
  * Rich behavior (NOT anemic):
  * - isEnabled(): boolean
- * - canEnable(): boolean (checks if disabled AND customizable)
- * - canDisable(): boolean (checks if enabled AND customizable)
- * - canDelete(): boolean (checks if not managed - deletion still restricted)
+ * - canEnable(): boolean (checks if disabled)
+ * - canDisable(): boolean (checks if enabled)
+ * - canDelete(): boolean (checks if not managed)
  * - getExecutionOrder(): string (formatted stage + rank)
  * - getFilteringAttributesArray(): string[]
+ *
+ * Note: Enable/disable operations may fail server-side for Microsoft-registered steps.
+ * We allow the attempt and handle errors gracefully rather than trying to predict client-side.
  */
 export class PluginStep {
 	constructor(
@@ -36,6 +39,7 @@ export class PluginStep {
 		private readonly filteringAttributes: string | null,
 		private readonly isManaged: boolean,
 		private readonly isCustomizable: boolean,
+		private readonly isHidden: boolean,
 		private readonly createdOn: Date
 	) {}
 
@@ -47,19 +51,19 @@ export class PluginStep {
 	}
 
 	/**
-	 * Business rule: Can enable if currently disabled AND step is customizable.
-	 * Microsoft-registered steps (isCustomizable=false) cannot be modified.
+	 * Business rule: Can attempt to enable if currently disabled.
+	 * Note: Operation may fail server-side for Microsoft-registered steps.
 	 */
 	public canEnable(): boolean {
-		return !this.isEnabled() && this.isCustomizable;
+		return !this.isEnabled();
 	}
 
 	/**
-	 * Business rule: Can disable if currently enabled AND step is customizable.
-	 * Microsoft-registered steps (isCustomizable=false) cannot be modified.
+	 * Business rule: Can attempt to disable if currently enabled.
+	 * Note: Operation may fail server-side for Microsoft-registered steps.
 	 */
 	public canDisable(): boolean {
-		return this.isEnabled() && this.isCustomizable;
+		return this.isEnabled();
 	}
 
 	/**
@@ -145,6 +149,10 @@ export class PluginStep {
 
 	public isInCustomizableState(): boolean {
 		return this.isCustomizable;
+	}
+
+	public isInHiddenState(): boolean {
+		return this.isHidden;
 	}
 
 	public getCreatedOn(): Date {

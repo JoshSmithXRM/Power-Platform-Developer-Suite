@@ -21,6 +21,7 @@ export class PluginStepViewModelMapper {
 			rank: step.getRank(),
 			isEnabled: step.isEnabled(),
 			isCustomizable: step.isInCustomizableState(),
+			isHidden: step.isInHiddenState(),
 			filteringAttributes: step.getFilteringAttributesArray(),
 			executionOrder: step.getExecutionOrder(),
 			createdOn: step.getCreatedOn().toISOString(),

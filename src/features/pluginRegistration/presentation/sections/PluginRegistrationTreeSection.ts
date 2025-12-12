@@ -39,9 +39,13 @@ export class PluginRegistrationTreeSection implements ISection {
 						<span class="tree-toolbar-icon">⊟</span>
 						<span>Collapse All</span>
 					</button>
-					<label class="tree-toolbar-checkbox">
-						<input type="checkbox" id="hideMicrosoftPlugins" checked />
-						<span>Hide Microsoft plugins</span>
+					<label class="tree-toolbar-checkbox" title="Hide internal system steps (workflow triggers, etc.)">
+						<input type="checkbox" id="hideHiddenSteps" checked />
+						<span>Hide hidden steps</span>
+					</label>
+					<label class="tree-toolbar-checkbox" title="Hide assemblies starting with 'Microsoft.'">
+						<input type="checkbox" id="hideMicrosoftAssemblies" />
+						<span>Hide Microsoft assemblies</span>
 					</label>
 				</div>
 
