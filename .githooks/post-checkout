@@ -23,15 +23,23 @@ create_symlink() {
         mkdir -p "$(dirname "$target")"
     fi
 
-    # Use MSYS environment variable to create native Windows symlinks
-    # This works in Git Bash hook context where cmd //c mklink fails
-    if MSYS=winsymlinks:nativestrict ln -s "$source" "$target" 2>/dev/null; then
-        echo "  ✓ Linked: $target"
-        return 0
+    if command -v cygpath >/dev/null 2>&1; then
+        # Windows (Git Bash/Cygwin)
+        # Use MSYS environment variable to create native Windows symlinks
+        if ! MSYS=winsymlinks:nativestrict ln -s "$source" "$target" 2>/dev/null; then
+            echo "  ✗ Failed: $target (enable Developer Mode in Windows Settings)" >&2
+            return 1
+        fi
     else
-        echo "  ✗ Failed: $target (enable Developer Mode in Windows Settings)" >&2
-        return 1
+        # Unix (macOS/Linux)
+        if ! ln -s "$source" "$target" 2>/dev/null; then
+            echo "  ✗ Failed: $target (check permissions)" >&2
+            return 1
+        fi
     fi
+
+    echo "  ✓ Linked: $target"
+    return 0
 }
 
 # Get main repo root (only works in worktrees)

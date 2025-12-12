@@ -49,7 +49,15 @@ Worktrees will automatically get **symlinks** to the main repo files.
 - Check hook output during `git worktree add`
 
 **Manual symlink creation (if hook fails):**
+
+Windows (Git Bash):
 ```bash
 cd /path/to/worktree
 MSYS=winsymlinks:nativestrict ln -s /path/to/main-repo/.mcp.json .mcp.json
+```
+
+macOS/Linux:
+```bash
+cd /path/to/worktree
+ln -s /path/to/main-repo/.mcp.json .mcp.json
 ```
