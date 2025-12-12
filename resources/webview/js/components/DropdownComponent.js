@@ -336,6 +336,13 @@ function handleDropdownItemClick(dropdownId, itemId) {
 		'dataExplorerImportDropdown': {
 			'fetchXml': 'importFetchXml',
 			'sql': 'importSql'
+		},
+		// Plugin Registration Register dropdown
+		'registerDropdown': {
+			'assembly': 'registerAssembly',
+			'package': 'registerPackage',
+			'step': 'registerStep',
+			'image': 'registerImage'
 		}
 	};
 

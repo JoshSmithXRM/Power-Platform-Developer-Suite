@@ -27,4 +27,20 @@ export interface IPluginPackageRepository {
 	 * @param base64Content - Base64-encoded .nupkg bytes
 	 */
 	updateContent(environmentId: string, packageId: string, base64Content: string): Promise<void>;
+
+	/**
+	 * Register a new plugin package.
+	 * @param name - Package display name
+	 * @param uniqueName - Unique name with publisher prefix (e.g., ppds_MyPackage)
+	 * @param version - Package version
+	 * @param base64Content - Base64-encoded .nupkg bytes
+	 * @returns ID of the created package
+	 */
+	register(
+		environmentId: string,
+		name: string,
+		uniqueName: string,
+		version: string,
+		base64Content: string
+	): Promise<string>;
 }

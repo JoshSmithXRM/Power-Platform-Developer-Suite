@@ -136,6 +136,48 @@ export class DataversePluginPackageRepository implements IPluginPackageRepositor
 		});
 	}
 
+	public async register(
+		environmentId: string,
+		name: string,
+		uniqueName: string,
+		version: string,
+		base64Content: string
+	): Promise<string> {
+		this.logger.info('DataversePluginPackageRepository: Registering new package', {
+			environmentId,
+			name,
+			uniqueName,
+			version,
+			contentLength: base64Content.length,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginPackageRepository.ENTITY_SET}`;
+
+		// Dataverse requires uniquename to start with publisher prefix
+		const payload = {
+			name,
+			uniquename: uniqueName,
+			version,
+			content: base64Content,
+		};
+
+		const response = await this.apiService.post<{ pluginpackageid: string }>(
+			environmentId,
+			endpoint,
+			payload
+		);
+
+		const packageId = response.pluginpackageid;
+
+		this.logger.info('DataversePluginPackageRepository: Package registered', {
+			packageId,
+			name,
+			uniqueName,
+		});
+
+		return packageId;
+	}
+
 	private mapToDomain(dto: PluginPackageDto): PluginPackage {
 		return new PluginPackage(
 			dto.pluginpackageid,
