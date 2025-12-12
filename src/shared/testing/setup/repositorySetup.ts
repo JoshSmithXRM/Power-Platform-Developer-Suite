@@ -48,7 +48,8 @@ export function createMockSolutionRepository(): jest.Mocked<ISolutionRepository>
 		findAll: jest.fn(),
 		findAllForDropdown: jest.fn(),
 		findPaginated: jest.fn(),
-		getCount: jest.fn()
+		getCount: jest.fn(),
+		findUnmanagedWithPublisherPrefix: jest.fn()
 	};
 }
 

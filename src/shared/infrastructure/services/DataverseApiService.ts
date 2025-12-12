@@ -307,7 +307,10 @@ export class DataverseApiService implements IDataverseApiService {
       'OData-MaxVersion': '4.0',
       'OData-Version': '4.0',
       // Request all OData annotations (formatted values, lookup entity types, etc.)
-      'Prefer': 'odata.include-annotations="*"',
+      // For POST: return=representation tells Dataverse to return created entity in response body
+      'Prefer': method === 'POST'
+        ? 'return=representation,odata.include-annotations="*"'
+        : 'odata.include-annotations="*"',
       // Defensive cache prevention for admin tool reliability.
       // Admin tools must show current state; stale data could cause overwrites.
       'Cache-Control': 'no-cache, no-store, must-revalidate',

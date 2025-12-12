@@ -1,0 +1,167 @@
+/**
+ * Form Modal Component
+ * Reusable modal dialog for forms with multiple fields.
+ */
+
+.form-modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 10000;
+}
+
+.form-modal-container {
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	min-width: 400px;
+	max-width: 600px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+	display: flex;
+	flex-direction: column;
+}
+
+/* Header */
+.form-modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 16px 20px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.form-modal-title {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+
+.form-modal-close {
+	background: none;
+	border: none;
+	font-size: 20px;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	padding: 0 4px;
+	line-height: 1;
+	opacity: 0.7;
+}
+
+.form-modal-close:hover {
+	opacity: 1;
+}
+
+/* Body */
+.form-modal-body {
+	padding: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+/* Field */
+.form-modal-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.form-modal-label {
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	font-weight: 500;
+}
+
+.form-modal-required {
+	color: var(--vscode-errorForeground);
+}
+
+.form-modal-input {
+	width: 100%;
+	padding: 8px 10px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 2px;
+	box-sizing: border-box;
+	font-family: var(--vscode-font-family);
+	font-size: 13px;
+}
+
+.form-modal-input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.form-modal-input--readonly {
+	background: var(--vscode-input-background);
+	opacity: 0.8;
+	cursor: default;
+}
+
+.form-modal-input--error {
+	border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.form-modal-input--error:focus {
+	outline-color: var(--vscode-inputValidation-errorBorder);
+}
+
+/* Select styling */
+select.form-modal-input {
+	appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23cccccc' d='M2 4l4 4 4-4z'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 8px center;
+	padding-right: 28px;
+}
+
+/* Textarea styling */
+textarea.form-modal-input {
+	resize: vertical;
+	min-height: 60px;
+}
+
+/* Footer */
+.form-modal-footer {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	padding: 16px 20px;
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
+.form-modal-button {
+	padding: 8px 16px;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	border: none;
+	border-radius: 2px;
+	transition: background-color 0.1s ease;
+}
+
+.form-modal-button--primary {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+.form-modal-button--primary:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+.form-modal-button--secondary {
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+}
+
+.form-modal-button--secondary:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
+}

@@ -2,7 +2,7 @@
 
 **Branch:** `feature/plugin-registration`
 **Created:** 2025-12-08
-**Status:** Implementation (Slice 2 In Progress)
+**Status:** Implementation (Slice 3 In Progress)
 
 ---
 
@@ -24,11 +24,11 @@
 ### Slice 1: Read-Only Browsing - COMPLETE ✅
 Browse plugin packages, assemblies, plugin types, steps, and images.
 
-### Slice 2: Step & Assembly Management - IN PROGRESS
+### Slice 2: Step & Assembly Management - COMPLETE ✅
 Enable/disable steps, update assemblies and packages.
 
-### Slice 3: Full CRUD Operations - PENDING
-Add/edit/delete steps, register new assemblies, image management.
+### Slice 3: Full CRUD Operations - IN PROGRESS
+Register new assemblies/packages, add/edit/delete steps, image management.
 
 ### Slice 4: Advanced Features - PENDING
 Solution filtering, detail panel, additional enhancements.
@@ -423,20 +423,108 @@ After Expand All:
 
 ---
 
-## Known Issues & Future Work
-
-### Update Plugin Package - UX IMPROVEMENTS NEEDED ⚠️
-- Update DOES work, but takes ~2 minutes with no user feedback
-- Eventually shows "Plugin package updated" success message
-- **Next session tasks:**
-  1. Add progress notification while update is running (non-cancellable spinner)
-  2. Prevent concurrent updates (disable context menu or block while update in progress)
-  3. Test what happens if user triggers multiple updates simultaneously
-
-### Slice 2 Status: COMPLETE ✅ (with UX polish needed)
+### Slice 2 Status: COMPLETE ✅
 - [x] Enable/disable steps - WORKING
-- [x] Update assembly - WORKING
-- [x] Update package - WORKING (slow, needs progress indicator)
+- [x] Update assembly - WORKING (with progress notification)
+- [x] Update package - WORKING (with progress notification)
+
+### Session 8 (2025-12-12)
+**Bug Fixes & Filter Improvements**
+
+**Issue 1: Error 0x80044184 (Custom API Implementation Steps)**
+- Custom API implementation steps cannot be disabled - special internal stage
+- Example: "CustomApi 'mspp_NotesAzureBlobUrlApi' implementation"
+- Fix: Added graceful error handling in `DisablePluginStepUseCase.ts` (like 0x8004419a)
+- User sees: "Custom API implementation steps cannot be disabled..."
+
+**Issue 2: Microsoft Assembly Filter Gap**
+- `MicrosoftPowerAppsCardsPlugins` slipped through filter (no dot after "Microsoft")
+- Fix: Changed `startsWith('Microsoft.')` to `startsWith('Microsoft')` in `plugin-registration.js`
+
+**Issue 3: Empty Plugin Packages Disappearing** - BUG FIX
+- Problem: "Hide hidden steps" filter removed user's plugin package entirely
+- Root cause: Filter removed ALL empty containers, not just those that BECAME empty due to filtering
+- User's plugin had no steps registered yet → pluginType empty → assembly empty → package removed
+- Fix: Track `_wasOriginallyEmpty` flag - only remove containers that became empty due to filtering
+- Applied same fix to `filterMicrosoftAssemblies()` for consistency
+
+**Update Operation UX - Already Fixed** ✅
+- Progress notification shows: "Uploading {AssemblyName} to {Environment}..."
+- Success message shows: "{AssemblyName} updated successfully in {Environment}"
+- No additional work needed
+
+**Files Modified:**
+- `src/features/pluginRegistration/application/useCases/DisablePluginStepUseCase.ts` - Added 0x80044184 handling
+- `resources/webview/js/features/plugin-registration.js` - Fixed filter logic + Microsoft prefix
+
+**Regression Tests Needed:**
+- [ ] `filterHiddenSteps()` - preserves originally empty containers
+- [ ] `filterHiddenSteps()` - removes containers that became empty due to hidden step filtering
+- [ ] `filterMicrosoftAssemblies()` - preserves originally empty packages
+- [ ] `filterMicrosoftAssemblies()` - removes packages that became empty due to Microsoft assembly filtering
+- [ ] Microsoft filter catches `Microsoft*` (no dot) assemblies
+
+---
+
+## Slice 3: Full CRUD Operations - IN PROGRESS
+
+### Requirements
+
+#### Register New Assembly
+- [ ] Toolbar button or command to register new assembly
+- [ ] Modal/form: File picker (.dll) + Isolation Mode dropdown (None, Sandbox)
+- [ ] API: POST pluginassemblies with base64 content + metadata
+- [ ] Refresh tree after successful registration
+
+#### Register New Package
+- [ ] Toolbar button or command to register new package
+- [ ] Modal/form: File picker (.nupkg)
+- [ ] API: POST pluginpackages with base64 content
+- [ ] Refresh tree after successful registration
+
+#### Register New Step
+- [ ] Right-click plugin type → "Register New Step..."
+- [ ] Modal/form with fields:
+  - SDK Message (dropdown/autocomplete)
+  - Primary Entity (dropdown/autocomplete, optional)
+  - Secondary Entity (optional)
+  - Execution Stage (dropdown: PreValidation, PreOperation, PostOperation)
+  - Execution Mode (dropdown: Synchronous, Asynchronous)
+  - Filtering Attributes (multi-select, optional)
+  - Step Name (auto-generated but editable)
+  - Rank/Order (number)
+  - Configuration (text, optional)
+- [ ] API: POST sdkmessageprocessingsteps
+- [ ] Refresh tree after successful registration
+
+#### Register New Image
+- [ ] Right-click step → "Register New Image..."
+- [ ] Modal/form with fields:
+  - Image Type (dropdown: PreImage, PostImage, Both)
+  - Name/Alias
+  - Entity Alias
+  - Attributes (multi-select or comma-separated)
+- [ ] API: POST sdkmessageprocessingstepimages
+- [ ] Refresh tree after successful registration
+
+#### Edit Step
+- [ ] Right-click step → "Edit Step..."
+- [ ] Same form as Register, pre-populated with current values
+- [ ] API: PATCH sdkmessageprocessingsteps
+
+#### Delete Operations
+- [ ] Right-click assembly → "Delete Assembly" (with confirmation)
+- [ ] Right-click step → "Delete Step" (with confirmation)
+- [ ] Right-click image → "Delete Image" (with confirmation)
+- [ ] Appropriate refresh after deletion
+
+### Implementation Order (Recommended)
+1. Register Assembly (simplest - file picker + dropdown)
+2. Register Package (similar to assembly)
+3. Register Step (complex form, needs SDK message/entity lookups)
+4. Register Image (moderate complexity)
+5. Edit Step (reuses Register Step form)
+6. Delete operations (confirmation dialogs)
 
 ---
 
@@ -446,4 +534,5 @@ Before merging Slices 1+2:
 - [ ] Detail panel - Show metadata when node selected
 - [ ] Solution filtering - Filter tree by solution
 - [ ] Unit tests - Domain and application layer tests
-- [ ] Update operation UX - Progress indicator + prevent concurrent updates
+- [x] Update operation UX - Progress indicator shows assembly/environment names ✅
+- [ ] Webview filter regression tests (see Session 8)

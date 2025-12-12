@@ -241,6 +241,60 @@ export class DataverseApiSolutionRepository implements ISolutionRepository {
     }
   }
 
+  /**
+   * Fetches unmanaged solutions with their publisher customization prefix.
+   * Used for plugin registration where components must use publisher prefix.
+   */
+  async findUnmanagedWithPublisherPrefix(
+    environmentId: string
+  ): Promise<Array<{ id: string; name: string; uniqueName: string; publisherPrefix: string }>> {
+    // Filter: unmanaged, visible, and NOT the Default solution (bad practice to use Default)
+    const queryString = ODataQueryBuilder.build({
+      select: ['solutionid', 'friendlyname', 'uniquename'],
+      expand: 'publisherid($select=customizationprefix)',
+      filter: "ismanaged eq false and isvisible eq true and uniquename ne 'Default'",
+      orderBy: 'friendlyname'
+    });
+
+    const endpoint = `/api/data/v9.2/solutions?${queryString}`;
+
+    this.logger.debug('Fetching unmanaged solutions with publisher prefix', { environmentId });
+
+    try {
+      interface SolutionWithPublisherDto {
+        solutionid: string;
+        friendlyname: string;
+        uniquename: string;
+        publisherid?: {
+          customizationprefix: string;
+        };
+      }
+
+      const response = await this.apiService.get<{ value: SolutionWithPublisherDto[] }>(
+        environmentId,
+        endpoint
+      );
+
+      const solutions = response.value.map(dto => ({
+        id: dto.solutionid,
+        name: dto.friendlyname,
+        uniqueName: dto.uniquename,
+        publisherPrefix: dto.publisherid?.customizationprefix ?? 'new'
+      }));
+
+      this.logger.debug('Fetched unmanaged solutions with prefix', {
+        environmentId,
+        count: solutions.length
+      });
+
+      return solutions;
+    } catch (error) {
+      const normalizedError = normalizeError(error);
+      this.logger.error('Failed to fetch unmanaged solutions with prefix', normalizedError);
+      throw normalizedError;
+    }
+  }
+
   private mapToEntity(dto: DataverseSolutionDto): Solution {
     return new Solution(
       dto.solutionid,

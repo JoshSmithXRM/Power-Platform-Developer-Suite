@@ -8,8 +8,10 @@ import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepR
  * 1. Fetch step to verify it exists and is enabled
  * 2. Call repository to disable
  *
- * Note: Some Microsoft-registered steps cannot be disabled (error 0x8004419a).
- * We allow the attempt and let the server reject if not allowed.
+ * Note: Some steps cannot be disabled:
+ * - Microsoft-registered steps (error 0x8004419a)
+ * - Custom API implementation steps (error 0x80044184) - registered at a special internal stage
+ * We allow the attempt and let the server reject if not allowed, then provide a friendly error.
  */
 export class DisablePluginStepUseCase {
 	constructor(
@@ -37,14 +39,25 @@ export class DisablePluginStepUseCase {
 			await this.stepRepository.disable(environmentId, stepId);
 			this.logger.info('DisablePluginStepUseCase completed', { stepId });
 		} catch (error: unknown) {
-			// Provide helpful error message for Microsoft-registered steps
 			const errorMessage = error instanceof Error ? error.message : String(error);
+
+			// Provide helpful error message for Microsoft-registered steps
 			if (errorMessage.includes('0x8004419a') || errorMessage.includes('registered by Microsoft')) {
 				throw new Error(
 					'This step is registered by Microsoft and cannot be disabled. ' +
 						'Use the "Hide hidden steps" filter to reduce noise from system steps.'
 				);
 			}
+
+			// Provide helpful error message for Custom API implementation steps
+			// These are registered at a special internal stage that doesn't allow modification
+			if (errorMessage.includes('0x80044184') || errorMessage.includes('Invalid plug-in registration stage')) {
+				throw new Error(
+					'Custom API implementation steps cannot be disabled. ' +
+						'These steps are registered at a special internal stage that does not allow modification.'
+				);
+			}
+
 			throw error;
 		}
 	}

@@ -60,4 +60,14 @@ export interface ISolutionRepository {
     options?: QueryOptions,
     cancellationToken?: ICancellationToken
   ): Promise<number>;
+
+  /**
+   * Retrieves unmanaged solutions with their publisher customization prefix.
+   * Used for plugin registration where components must use publisher prefix.
+   * @param environmentId - Power Platform environment GUID
+   * @returns Promise resolving to array of solutions with prefix
+   */
+  findUnmanagedWithPublisherPrefix(
+    environmentId: string
+  ): Promise<Array<{ id: string; name: string; uniqueName: string; publisherPrefix: string }>>;
 }

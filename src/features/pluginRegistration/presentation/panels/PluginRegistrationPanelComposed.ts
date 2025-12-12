@@ -30,11 +30,14 @@ import type { EnablePluginStepUseCase } from '../../application/useCases/EnableP
 import type { DisablePluginStepUseCase } from '../../application/useCases/DisablePluginStepUseCase';
 import type { UpdatePluginAssemblyUseCase } from '../../application/useCases/UpdatePluginAssemblyUseCase';
 import type { UpdatePluginPackageUseCase } from '../../application/useCases/UpdatePluginPackageUseCase';
+import type { RegisterPluginPackageUseCase } from '../../application/useCases/RegisterPluginPackageUseCase';
+import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
 import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
 import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
 import type { IPluginPackageRepository } from '../../domain/interfaces/IPluginPackageRepository';
 import { PluginRegistrationTreeMapper } from '../../application/mappers/PluginRegistrationTreeMapper';
 import { PluginRegistrationTreeSection } from '../sections/PluginRegistrationTreeSection';
+import { RegisterDropdownSection } from '../sections/RegisterDropdownSection';
 import { PluginStepViewModelMapper } from '../../application/mappers/PluginStepViewModelMapper';
 import { PluginAssemblyViewModelMapper } from '../../application/mappers/PluginAssemblyViewModelMapper';
 import { PluginPackageViewModelMapper } from '../../application/mappers/PluginPackageViewModelMapper';
@@ -52,6 +55,7 @@ export interface PluginRegistrationUseCases {
 	readonly disableStep: DisablePluginStepUseCase;
 	readonly updateAssembly: UpdatePluginAssemblyUseCase;
 	readonly updatePackage: UpdatePluginPackageUseCase;
+	readonly registerPackage: RegisterPluginPackageUseCase;
 }
 
 /**
@@ -75,7 +79,12 @@ type PluginRegistrationCommands =
 	| 'environmentChange'
 	| 'solutionChange'
 	| 'selectNode'
-	| 'filterTree';
+	| 'filterTree'
+	| 'registerAssembly'
+	| 'registerPackage'
+	| 'registerStep'
+	| 'registerImage'
+	| 'confirmRegisterPackage';
 
 /**
  * Plugin Registration panel using PanelCoordinator architecture.
@@ -98,6 +107,14 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
+	private pendingPackageContent: string | null = null;
+	private readonly filenameParser: NupkgFilenameParser;
+	private unmanagedSolutionsWithPrefix: Array<{
+		id: string;
+		name: string;
+		uniqueName: string;
+		publisherPrefix: string;
+	}> = [];
 
 	private constructor(
 		private readonly panel: SafeWebviewPanel,
@@ -119,6 +136,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		this.packageMapper = new PluginPackageViewModelMapper();
 		this.pluginTypeMapper = new PluginTypeViewModelMapper();
 		this.imageMapper = new StepImageViewModelMapper();
+		this.filenameParser = new NupkgFilenameParser();
 
 		logger.debug('PluginRegistrationPanel: Initializing');
 
@@ -290,6 +308,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		coordinator: PanelCoordinator<PluginRegistrationCommands>;
 		scaffoldingBehavior: HtmlScaffoldingBehavior;
 	} {
+		const registerDropdown = new RegisterDropdownSection();
 		const environmentSelector = new EnvironmentSelectorSection();
 		const solutionFilter = new SolutionFilterSection();
 		const treeSection = new PluginRegistrationTreeSection();
@@ -304,14 +323,14 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		);
 
 		const compositionBehavior = new SectionCompositionBehavior(
-			[actionButtons, environmentSelector, solutionFilter, treeSection],
+			[registerDropdown, actionButtons, environmentSelector, solutionFilter, treeSection],
 			PanelLayout.SingleColumn
 		);
 
 		const cssUris = resolveCssModules(
 			{
 				base: true,
-				components: ['buttons', 'inputs'],
+				components: ['buttons', 'inputs', 'dropdown', 'form-modal'],
 				sections: ['environment-selector', 'solution-filter', 'action-buttons'],
 				features: ['plugin-registration'],
 			},
@@ -330,6 +349,30 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 							'webview',
 							'js',
 							'messaging.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
+							'resources',
+							'webview',
+							'js',
+							'components',
+							'DropdownComponent.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
+							'resources',
+							'webview',
+							'js',
+							'components',
+							'FormModal.js'
 						)
 					)
 					.toString(),
@@ -398,6 +441,36 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 		this.coordinator.registerHandler('filterTree', async () => {
 			// Client-side filtering - no server action needed
+		});
+
+		// Register dropdown handlers
+		this.coordinator.registerHandler('registerAssembly', async () => {
+			await this.handleRegisterAssembly();
+		});
+
+		this.coordinator.registerHandler('registerPackage', async () => {
+			await this.handleRegisterPackage();
+		});
+
+		this.coordinator.registerHandler('registerStep', async () => {
+			// TODO: Implement step registration (requires plugin type context)
+			void vscode.window.showInformationMessage('Register Step: Coming soon');
+		});
+
+		this.coordinator.registerHandler('registerImage', async () => {
+			// TODO: Implement image registration (requires step context)
+			void vscode.window.showInformationMessage('Register Image: Coming soon');
+		});
+
+		this.coordinator.registerHandler('confirmRegisterPackage', async (data) => {
+			const { name, version, prefix } = data as {
+				name?: string;
+				version?: string;
+				prefix?: string;
+			};
+			if (name && version && prefix) {
+				await this.handleConfirmRegisterPackage(name, version, prefix);
+			}
 		});
 	}
 
@@ -505,6 +578,153 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private handleNodeSelection(nodeId: string): void {
 		this.logger.debug('Node selected', { nodeId });
 		// Future: Show detail panel for selected node
+	}
+
+	// ========================================
+	// Register Handlers (for Register dropdown)
+	// ========================================
+
+	/**
+	 * Handle Register Assembly action.
+	 * Shows file picker, then registers the assembly.
+	 */
+	private async handleRegisterAssembly(): Promise<void> {
+		this.logger.info('Register Assembly requested');
+		// TODO: Implement assembly registration
+		// 1. Show file picker for .dll
+		// 2. Show modal for isolation mode selection
+		// 3. Call RegisterPluginAssemblyUseCase
+		// 4. Refresh tree
+		void vscode.window.showInformationMessage('Register Assembly: Coming soon');
+	}
+
+	/**
+	 * Handle Register Package action.
+	 * Shows file picker, extracts metadata from filename, shows confirmation modal.
+	 */
+	private async handleRegisterPackage(): Promise<void> {
+		this.logger.info('Register Package requested');
+
+		// Show file picker
+		const fileUri = await this.pickPackageFile();
+		if (!fileUri) {
+			return; // User cancelled
+		}
+
+		try {
+			// Read file content
+			const fileContent = await vscode.workspace.fs.readFile(fileUri);
+			const base64Content = Buffer.from(fileContent).toString('base64');
+
+			// Store for later use when confirm is received
+			this.pendingPackageContent = base64Content;
+
+			// Parse filename to extract name and version
+			const filename = fileUri.fsPath;
+			const metadata = this.filenameParser.parse(filename);
+
+			this.logger.debug('Parsed package metadata from filename', {
+				filename,
+				name: metadata.name,
+				version: metadata.version,
+			});
+
+			// Load unmanaged solutions with publisher prefix (excludes Default solution)
+			this.unmanagedSolutionsWithPrefix =
+				await this.repositories.solution.findUnmanagedWithPublisherPrefix(
+					this.currentEnvironmentId
+				);
+
+			this.logger.debug('Loaded unmanaged solutions for registration', {
+				count: this.unmanagedSolutionsWithPrefix.length,
+			});
+
+			// Send message to webview to show modal
+			// No pre-selected solution - user must explicitly choose (best practice)
+			await this.panel.postMessage({
+				command: 'showRegisterPackageModal',
+				data: {
+					name: metadata.name,
+					version: metadata.version,
+					filename: this.extractFilename(filename),
+					solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
+						id: s.id,
+						name: s.name,
+						prefix: s.publisherPrefix,
+					})),
+				},
+			});
+		} catch (error) {
+			this.logger.error('Failed to read package file', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(`Failed to read package file: ${errorMessage}`);
+			this.pendingPackageContent = null;
+		}
+	}
+
+	/**
+	 * Handle confirmation from the Register Package modal.
+	 * Calls the use case to register the package.
+	 */
+	private async handleConfirmRegisterPackage(
+		name: string,
+		version: string,
+		prefix: string
+	): Promise<void> {
+		if (!this.pendingPackageContent) {
+			this.logger.error('No pending package content for registration');
+			void vscode.window.showErrorMessage('No package file selected. Please try again.');
+			return;
+		}
+
+		const base64Content = this.pendingPackageContent;
+		this.pendingPackageContent = null; // Clear pending content
+
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		// Construct name and uniquename with prefix: {prefix}_{packageId}
+		// Both must be identical per Plugin Registration Tool behavior
+		const prefixedName = `${prefix}_${name}`;
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Registering ${prefixedName} in ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.registerPackage.execute(this.currentEnvironmentId, {
+						name: prefixedName,
+						version,
+						uniqueName: prefixedName,
+						base64Content,
+					});
+
+					void vscode.window.showInformationMessage(
+						`${prefixedName} v${version} registered successfully in ${environmentName}.`
+					);
+
+					// Refresh tree to show the new package
+					await this.handleRefresh();
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to register plugin package', error);
+					void vscode.window.showErrorMessage(
+						`Failed to register ${prefixedName} in ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
+	}
+
+	/**
+	 * Extract just the filename from a full path.
+	 */
+	private extractFilename(filepath: string): string {
+		const lastSlash = Math.max(filepath.lastIndexOf('/'), filepath.lastIndexOf('\\'));
+		return lastSlash >= 0 ? filepath.substring(lastSlash + 1) : filepath;
 	}
 
 	// ========================================

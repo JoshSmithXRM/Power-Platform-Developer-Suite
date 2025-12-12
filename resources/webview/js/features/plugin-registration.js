@@ -682,7 +682,10 @@ function buildVisibleNodeIds(term) {
 /**
  * Filter out hidden steps (ishidden=true) from tree data.
  * Returns a deep copy with hidden steps removed.
- * Also removes empty parent nodes (plugin types with no steps, assemblies with no types, etc.)
+ * Also removes containers that BECAME empty due to filtering (not originally empty ones).
+ *
+ * Important: Preserves originally empty containers (e.g., plugin types with no steps registered yet).
+ * This allows users to see their registered plugins even before adding steps.
  */
 function filterHiddenSteps(items) {
 	return items
@@ -690,10 +693,16 @@ function filterHiddenSteps(items) {
 			// Deep clone the item
 			const clone = { ...item };
 
+			// Track if container was originally empty (before any filtering)
+			const wasOriginallyEmpty = !clone.children || clone.children.length === 0;
+
 			if (clone.children && clone.children.length > 0) {
 				// Recursively filter children
 				clone.children = filterHiddenSteps(clone.children);
 			}
+
+			// Store flag for filtering decision (temporary, harmless for rendering)
+			clone._wasOriginallyEmpty = wasOriginallyEmpty;
 
 			return clone;
 		})
@@ -703,9 +712,12 @@ function filterHiddenSteps(items) {
 				return item.metadata?.isHidden !== true;
 			}
 
-			// Filter out empty containers (plugin types with no steps, assemblies with no types, etc.)
+			// Filter out containers that BECAME empty due to filtering
+			// Keep containers that were originally empty (e.g., plugin type with no steps registered)
 			if (item.type === 'pluginType' || item.type === 'assembly' || item.type === 'package') {
-				return item.children && item.children.length > 0;
+				const hasChildren = item.children && item.children.length > 0;
+				// Keep if: has children OR was originally empty (didn't become empty due to filter)
+				return hasChildren || item._wasOriginallyEmpty;
 			}
 
 			return true;
@@ -713,9 +725,9 @@ function filterHiddenSteps(items) {
 }
 
 /**
- * Filter out Microsoft assemblies (name starts with 'Microsoft.') from tree data.
+ * Filter out Microsoft assemblies (name starts with 'Microsoft') from tree data.
  * Returns a deep copy with Microsoft assemblies removed.
- * Also removes empty parent nodes (packages with no assemblies).
+ * Also removes containers that BECAME empty due to filtering (not originally empty ones).
  */
 function filterMicrosoftAssemblies(items) {
 	return items
@@ -723,22 +735,30 @@ function filterMicrosoftAssemblies(items) {
 			// Deep clone the item
 			const clone = { ...item };
 
+			// Track if container was originally empty (before any filtering)
+			const wasOriginallyEmpty = !clone.children || clone.children.length === 0;
+
 			if (clone.children && clone.children.length > 0) {
 				// Recursively filter children
 				clone.children = filterMicrosoftAssemblies(clone.children);
 			}
 
+			// Store flag for filtering decision
+			clone._wasOriginallyEmpty = wasOriginallyEmpty;
+
 			return clone;
 		})
 		.filter(item => {
-			// Filter out Microsoft assemblies
+			// Filter out Microsoft assemblies (matches 'Microsoft.*' and 'MicrosoftPowerApps*' etc.)
 			if (item.type === 'assembly') {
-				return !item.name.startsWith('Microsoft.');
+				return !item.name.startsWith('Microsoft');
 			}
 
-			// Filter out empty containers (packages with no assemblies)
+			// Filter out packages that BECAME empty due to filtering
+			// Keep packages that were originally empty
 			if (item.type === 'package') {
-				return item.children && item.children.length > 0;
+				const hasChildren = item.children && item.children.length > 0;
+				return hasChildren || item._wasOriginallyEmpty;
 			}
 
 			return true;
@@ -854,6 +874,11 @@ window.createBehavior({
 		const expandAllBtn = document.getElementById('expandAllBtn');
 		const collapseAllBtn = document.getElementById('collapseAllBtn');
 
+		// Initialize dropdown components (Register dropdown)
+		if (window.initializeDropdowns) {
+			window.initializeDropdowns();
+		}
+
 		// Initial state: show loading
 		if (loadingProgress) {
 			loadingProgress.style.display = 'flex';
@@ -923,9 +948,110 @@ window.createBehavior({
 			case 'updateSubtree':
 				handleSubtreeUpdate(message.data);
 				break;
+			case 'showRegisterPackageModal':
+				handleShowRegisterPackageModal(message.data);
+				break;
 		}
 	}
 });
+
+/**
+ * Show the Register Package modal with pre-filled metadata.
+ * @param {Object} data - { name, version, filename, solutions }
+ */
+function handleShowRegisterPackageModal(data) {
+	const { name, version, filename, solutions } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build solution options for dropdown with placeholder
+	const solutionOptions = [
+		{ value: '', label: '-- Select a Solution --' },
+		...(solutions || []).map(s => ({
+			value: s.id,
+			label: s.name,
+			prefix: s.prefix
+		}))
+	];
+
+	// Store solutions for prefix lookup
+	const solutionPrefixMap = {};
+	(solutions || []).forEach(s => {
+		solutionPrefixMap[s.id] = s.prefix;
+	});
+
+	window.showFormModal({
+		title: 'Register Plugin Package',
+		fields: [
+			{
+				id: 'filename',
+				label: 'File',
+				type: 'text',
+				value: filename || '',
+				readonly: true
+			},
+			{
+				id: 'solution',
+				label: 'Solution',
+				type: 'select',
+				value: '', // No pre-selection - user must choose
+				options: solutionOptions,
+				required: true
+			},
+			{
+				id: 'prefix',
+				label: 'Prefix',
+				type: 'text',
+				value: '', // Empty until solution selected
+				required: true,
+				placeholder: 'Select a solution first'
+			},
+			{
+				id: 'name',
+				label: 'Package Name',
+				type: 'text',
+				value: name || '',
+				required: true,
+				placeholder: 'e.g., PPDSDemo.PluginPackage'
+			},
+			{
+				id: 'version',
+				label: 'Version',
+				type: 'text',
+				value: version || '1.0.0',
+				required: true,
+				placeholder: 'e.g., 1.0.0'
+			}
+		],
+		submitLabel: 'Register',
+		cancelLabel: 'Cancel',
+		onFieldChange: (fieldId, value, updateField) => {
+			// When solution changes, update the prefix field
+			if (fieldId === 'solution') {
+				const prefix = solutionPrefixMap[value] || '';
+				updateField('prefix', prefix);
+			}
+		},
+		onSubmit: (values) => {
+			// Validate solution was selected
+			if (!values.solution) {
+				return; // Form validation will handle this
+			}
+			// Send confirmation to extension
+			vscode.postMessage({
+				command: 'confirmRegisterPackage',
+				data: {
+					name: values.name,
+					version: values.version,
+					prefix: values.prefix
+				}
+			});
+		}
+	});
+}
 
 /**
  * Update a single node in the tree (e.g., after enable/disable step).
