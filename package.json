@@ -241,12 +241,12 @@
             },
             {
                 "command": "power-platform-dev-suite.updatePluginAssembly",
-                "title": "Update Assembly...",
+                "title": "Update Assembly",
                 "category": "Power Platform Developer Suite"
             },
             {
                 "command": "power-platform-dev-suite.updatePluginPackage",
-                "title": "Update Package...",
+                "title": "Update Package",
                 "category": "Power Platform Developer Suite"
             },
             {

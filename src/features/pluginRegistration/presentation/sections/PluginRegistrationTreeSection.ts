@@ -39,6 +39,10 @@ export class PluginRegistrationTreeSection implements ISection {
 						<span class="tree-toolbar-icon">⊟</span>
 						<span>Collapse All</span>
 					</button>
+					<label class="tree-toolbar-checkbox">
+						<input type="checkbox" id="hideMicrosoftPlugins" checked />
+						<span>Hide Microsoft plugins</span>
+					</label>
 				</div>
 
 				<!-- Loading Progress -->
