@@ -137,42 +137,93 @@ describe('QueryResultViewModelMapper - All Column Types', () => {
 
 	describe('BOOLEAN columns', () => {
 		/**
-		 * Boolean column design decision:
+		 * Boolean column behavior:
 		 *
-		 * Current behavior: Shows "Yes"/"No" instead of true/false
+		 * Dataverse returns booleans with FormattedValue annotation:
+		 * - Raw value: true/false (JSON boolean)
+		 * - FormattedValue: "Yes"/"No" (or custom labels)
 		 *
-		 * Why this is acceptable (unlike optionsets):
-		 * 1. Column name doesn't suggest raw value (e.g., "donotphone" not "donotphonecode")
-		 * 2. Simple, reversible transformation (Yes → true, No → false)
-		 * 3. Booleans aren't stored as QueryFormattedValue - transformation is in mapper
-		 * 4. "Yes"/"No" is universally understood
-		 *
-		 * If we need to change in the future, we could:
-		 * - Show true/false in column
-		 * - Add donotphonename column with "Yes"/"No"
+		 * Like optionsets and lookups, we split into two columns:
+		 * - donotphone: shows raw value (true/false)
+		 * - donotphonename: shows formatted label (Yes/No)
 		 */
-		it('should display boolean as Yes/No (acceptable design decision)', () => {
+		it('should show raw value in column and label in name column', () => {
+			const formattedValue: QueryFormattedValue = {
+				value: true,
+				formattedValue: 'Yes',
+			};
 			const columns = [new QueryResultColumn('donotphone', 'donotphone', 'boolean')];
-			const rows = [
-				QueryResultRow.fromRecord({ donotphone: true }),
-			];
+			const rows = [QueryResultRow.fromRecord({ donotphone: formattedValue as never })];
 			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
 
 			const viewModel = mapper.toViewModel(result);
 
-			// Boolean columns transform to Yes/No - this is intentional and documented
-			expect(viewModel.rows[0]!['donotphone']).toBe('Yes');
-			expect(viewModel.columns).toHaveLength(1);
+			// Should have 2 columns: original + name
+			expect(viewModel.columns).toHaveLength(2);
+			expect(viewModel.columns.map(c => c.name)).toContain('donotphone');
+			expect(viewModel.columns.map(c => c.name)).toContain('donotphonename');
+
+			// Raw value in original column (true/false as API returns)
+			expect(viewModel.rows[0]!['donotphone']).toBe('true');
+			// Label in name column
+			expect(viewModel.rows[0]!['donotphonename']).toBe('Yes');
 		});
 
-		it('should display false as No', () => {
+		it('should display false with No label', () => {
+			const formattedValue: QueryFormattedValue = {
+				value: false,
+				formattedValue: 'No',
+			};
 			const columns = [new QueryResultColumn('donotphone', 'donotphone', 'boolean')];
-			const rows = [QueryResultRow.fromRecord({ donotphone: false })];
+			const rows = [QueryResultRow.fromRecord({ donotphone: formattedValue as never })];
 			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
 
 			const viewModel = mapper.toViewModel(result);
 
-			expect(viewModel.rows[0]!['donotphone']).toBe('No');
+			expect(viewModel.rows[0]!['donotphone']).toBe('false');
+			expect(viewModel.rows[0]!['donotphonename']).toBe('No');
+		});
+
+		it('should handle null boolean values with empty strings in both columns', () => {
+			const columns = [new QueryResultColumn('donotphone', 'donotphone', 'boolean')];
+			const rows = [QueryResultRow.fromRecord({ donotphone: null })];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have 2 columns: original + name
+			expect(viewModel.columns).toHaveLength(2);
+
+			// Both columns should be empty strings for null values
+			expect(viewModel.rows[0]!['donotphone']).toBe('');
+			expect(viewModel.rows[0]!['donotphonename']).toBe('');
+		});
+
+		it('should not create duplicate columns when user queries both boolean and its name column', () => {
+			const formattedValue: QueryFormattedValue = {
+				value: true,
+				formattedValue: 'Yes',
+			};
+
+			// User queries BOTH donotphone AND donotphonename
+			const columns = [
+				new QueryResultColumn('donotphone', 'donotphone', 'boolean'),
+				new QueryResultColumn('donotphonename', 'donotphonename', 'unknown'),
+			];
+			const rows = [QueryResultRow.fromRecord({
+				donotphone: formattedValue as never,
+				donotphonename: null, // Dataverse may return null for virtual column queries
+			})];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should have exactly 2 columns, NOT 3
+			expect(viewModel.columns).toHaveLength(2);
+			expect(viewModel.columns.map(c => c.name)).toEqual(['donotphone', 'donotphonename']);
+
+			// Value should come from boolean, not null
+			expect(viewModel.rows[0]!['donotphonename']).toBe('Yes');
 		});
 	});
 
@@ -606,6 +657,79 @@ describe('QueryResultViewModelMapper - All Column Types', () => {
 			// Lookup columns (CURRENTLY FAILING - needs fix)
 			expect(viewModel.rows[0]!['primarycontactid']).toBe('contact-guid');
 			expect(viewModel.rows[0]!['primarycontactidname']).toBe('John Smith');
+		});
+	});
+
+	describe('MANAGEDPROPERTY columns', () => {
+		/**
+		 * ManagedProperty column behavior:
+		 *
+		 * Dataverse returns ManagedProperty as complex objects:
+		 * { Value: false, CanBeChanged: true, ManagedPropertyLogicalName: "ishidden" }
+		 *
+		 * We extract the Value property and display as 0/1 for SQL filter consistency.
+		 * This ensures what users see matches what they filter by (WHERE ishidden = 0).
+		 */
+		it('should extract Value property from ManagedProperty object as 0 (ishidden)', () => {
+			const managedProperty = {
+				Value: false,
+				CanBeChanged: true,
+				ManagedPropertyLogicalName: 'ishidden',
+			};
+			const columns = [new QueryResultColumn('ishidden', 'ishidden', 'unknown')];
+			const rows = [QueryResultRow.fromRecord({ ishidden: managedProperty as never })];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should show 0/1 for SQL filter consistency (WHERE ishidden = 0)
+			expect(viewModel.rows[0]!['ishidden']).toBe('0');
+		});
+
+		it('should extract Value property from ManagedProperty object as 1 (iscustomizable)', () => {
+			const managedProperty = {
+				Value: true,
+				CanBeChanged: true,
+				ManagedPropertyLogicalName: 'iscustomizableanddeletable',
+			};
+			const columns = [new QueryResultColumn('iscustomizable', 'iscustomizable', 'unknown')];
+			const rows = [QueryResultRow.fromRecord({ iscustomizable: managedProperty as never })];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should show 0/1 for SQL filter consistency (WHERE iscustomizable = 1)
+			expect(viewModel.rows[0]!['iscustomizable']).toBe('1');
+		});
+	});
+
+	describe('VERSIONNUMBER columns', () => {
+		/**
+		 * Versionnumber column behavior:
+		 *
+		 * Dataverse returns versionnumber as a plain integer (no FormattedValue).
+		 * We show the raw number without locale formatting (no commas).
+		 */
+		it('should display versionnumber as raw integer without locale formatting', () => {
+			const columns = [new QueryResultColumn('versionnumber', 'versionnumber', 'number')];
+			const rows = [QueryResultRow.fromRecord({ versionnumber: 8858138 })];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should show raw number without commas or other formatting
+			expect(viewModel.rows[0]!['versionnumber']).toBe('8858138');
+		});
+
+		it('should handle large versionnumber values', () => {
+			const columns = [new QueryResultColumn('versionnumber', 'versionnumber', 'number')];
+			const rows = [QueryResultRow.fromRecord({ versionnumber: 1234567890123 })];
+			const result = new QueryResult(columns, rows, 1, false, null, '', 0);
+
+			const viewModel = mapper.toViewModel(result);
+
+			// Should show raw number without commas
+			expect(viewModel.rows[0]!['versionnumber']).toBe('1234567890123');
 		});
 	});
 });
