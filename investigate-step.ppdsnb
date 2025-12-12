@@ -1,0 +1,69 @@
+{
+  "metadata": {
+    "environmentId": "env-1764781817802-t9s5zbenl",
+    "environmentName": "Demo",
+    "environmentUrl": "https://org7a4a0326.crm.dynamics.com"
+  },
+  "cells": [
+    {
+      "kind": "markdown",
+      "source": "# Investigate Microsoft-Registered SDK Message Processing Steps\n\nGoal: Find what distinguishes Microsoft-registered steps that cannot be disabled\n\nThe step that failed to disable:\n- ID: 0c4abbfa-19d7-f011-8544-000d3a59b27d\n- Name: Microsoft.Crm.RetrieveKPIValuesForGDPR\n- Error: 'A Microsoft registered SDK message processing step cannot be modified'"
+    },
+    {
+      "kind": "markdown",
+      "source": "## 1. Query the GDPR Plugin Assembly"
+    },
+    {
+      "kind": "fetchxml",
+      "source": "<fetch top='10'>\n  <entity name='pluginassembly'>\n    <all-attributes />\n    <filter>\n      <condition attribute='name' operator='like' value='%GDPR%' />\n    </filter>\n  </entity>\n</fetch>"
+    },
+    {
+      "kind": "markdown",
+      "source": "## 2. Query the GDPR Plugin Types with Assembly info"
+    },
+    {
+      "kind": "fetchxml",
+      "source": "<fetch top='10'>\n  <entity name='plugintype'>\n    <all-attributes />\n    <filter>\n      <condition attribute='name' operator='like' value='%GDPR%' />\n    </filter>\n    <link-entity name='pluginassembly' from='pluginassemblyid' to='pluginassemblyid' link-type='outer' alias='asm'>\n      <attribute name='name' />\n      <attribute name='ismanaged' />\n      <attribute name='customizationlevel' />\n      <attribute name='iscustomizable' />\n    </link-entity>\n  </entity>\n</fetch>"
+    },
+    {
+      "kind": "markdown",
+      "source": "## 3. Query OUR Plugin Assembly (PPDSDemo.Plugins) for contrast"
+    },
+    {
+      "kind": "fetchxml",
+      "source": "<fetch top='10'>\n  <entity name='pluginassembly'>\n    <all-attributes />\n    <filter>\n      <condition attribute='name' operator='like' value='%PPDSDemo%' />\n    </filter>\n  </entity>\n</fetch>"
+    },
+    {
+      "kind": "markdown",
+      "source": "## 4. Query OUR Plugin Types (PPDSDemo.Plugins) with Assembly info"
+    },
+    {
+      "kind": "fetchxml",
+      "source": "<fetch top='10'>\n  <entity name='plugintype'>\n    <all-attributes />\n    <filter>\n      <condition attribute='name' operator='like' value='%PPDSDemo%' />\n    </filter>\n    <link-entity name='pluginassembly' from='pluginassemblyid' to='pluginassemblyid' link-type='outer' alias='asm'>\n      <attribute name='name' />\n      <attribute name='ismanaged' />\n      <attribute name='customizationlevel' />\n      <attribute name='iscustomizable' />\n    </link-entity>\n  </entity>\n</fetch>"
+    },
+    {
+      "kind": "markdown",
+      "source": "## 5. Query OUR Steps (PPDSDemo) - full details"
+    },
+    {
+      "kind": "sql",
+      "source": "SELECT TOP 10\n  *\nFROM sdkmessageprocessingstep\nLEFT JOIN plugintype pt ON pt.plugintypeid = sdkmessageprocessingstep.plugintypeid\nWHERE name LIKE '%PPDSDemo%'"
+    },
+    {
+      "kind": "markdown",
+      "source": "## 6. Query the specific FAILING step with FULL assembly chain"
+    },
+    {
+      "kind": "fetchxml",
+      "source": "<fetch top='1'>\n  <entity name='sdkmessageprocessingstep'>\n    <all-attributes />\n    <filter>\n      <condition attribute='sdkmessageprocessingstepid' operator='eq' value='0c4abbfa-19d7-f011-8544-000d3a59b27d' />\n    </filter>\n    <link-entity name='plugintype' from='plugintypeid' to='plugintypeid' link-type='outer' alias='pt'>\n      <all-attributes />\n      <link-entity name='pluginassembly' from='pluginassemblyid' to='pluginassemblyid' link-type='outer' alias='asm'>\n        <all-attributes />\n      </link-entity>\n    </link-entity>\n  </entity>\n</fetch>"
+    },
+    {
+      "kind": "sql",
+      "source": "SELECT TOP 1\r\n  *\r\nFROM sdkmessageprocessingstep\r\nWHERE name LIKE '%PPDS%'"
+    },
+    {
+      "kind": "sql",
+      "source": "SELECT TOP 1\r\n asyncautodelete,\r\n  asyncautodeletename,\r\n  canbebypassed,\r\n  canbebypassedname,\r\n  canusereadonlyconnection,\r\n  canusereadonlyconnectionname,\r\n  category,\r\n  componentstate,\r\n  configuration,\r\n  createdby,\r\n  createdbyname,\r\n  createdon,\r\n  createdonbehalfby,\r\n  createdonbehalfbyname,\r\n  customizationlevel,\r\n  description,\r\n  enablepluginprofiler,\r\n  enablepluginprofilername,\r\n  eventexpander,\r\n  eventhandler,\r\n  eventhandlername,\r\n  --eventhandlertypecode,\r\n  filteringattributes,\r\n  fxexpressionid,\r\n  fxexpressionidname,\r\n  impersonatinguserid,\r\n  impersonatinguseridname,\r\n  introducedversion,\r\n  invocationsource,\r\n  invocationsourcename,\r\n  iscustomizable,\r\n  ishidden,\r\n  ismanaged,\r\n  ismanagedname,\r\n  mode,\r\n  modename,\r\n  modifiedby,\r\n  modifiedbyname,\r\n  modifiedon,\r\n  modifiedonbehalfby,\r\n  modifiedonbehalfbyname,\r\n  name,\r\n  organizationid,\r\n  overwritetime,\r\n  plugintypeid,\r\n  plugintypeidname,\r\n  powerfxruleid,\r\n  powerfxruleidname,\r\n  rank,\r\n  runtimeintegrationproperties,\r\n  sdkmessagefilterid,\r\n  sdkmessageid,\r\n  sdkmessageidname,\r\n  sdkmessageprocessingstepid,\r\n  sdkmessageprocessingstepidunique,\r\n  sdkmessageprocessingstepsecureconfigid,\r\n  solutionid,\r\n  stage,\r\n  stagename,\r\n  statecode,\r\n  statecodename,\r\n  statuscode,\r\n  statuscodename,\r\n  supporteddeployment,\r\n  supporteddeploymentname,\r\n  versionnumber\r\nFROM sdkmessageprocessingstep\r\nWHERE name LIKE '%PPDS%'"
+    }
+  ]
+}
