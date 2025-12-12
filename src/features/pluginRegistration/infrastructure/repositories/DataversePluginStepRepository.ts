@@ -9,6 +9,15 @@ import { StepStatus } from '../../domain/valueObjects/StepStatus';
 /**
  * DTO for Dataverse sdkmessageprocessingstep entity.
  */
+/**
+ * Dataverse managed property structure for iscustomizable field.
+ */
+interface ManagedPropertyDto {
+	Value: boolean;
+	CanBeChanged: boolean;
+	ManagedPropertyLogicalName: string;
+}
+
 interface PluginStepDto {
 	sdkmessageprocessingstepid: string;
 	name: string;
@@ -23,6 +32,7 @@ interface PluginStepDto {
 	statecode: number;
 	filteringattributes: string | null;
 	ismanaged: boolean;
+	iscustomizable: ManagedPropertyDto;
 	createdon: string;
 	// Expanded message entity
 	sdkmessageid?: {
@@ -56,7 +66,7 @@ interface PluginStepCollectionResponse {
 export class DataversePluginStepRepository implements IPluginStepRepository {
 	private static readonly ENTITY_SET = 'sdkmessageprocessingsteps';
 	private static readonly SELECT_FIELDS =
-		'sdkmessageprocessingstepid,name,_plugintypeid_value,_sdkmessageid_value,_sdkmessagefilterid_value,stage,mode,rank,statecode,filteringattributes,ismanaged,createdon';
+		'sdkmessageprocessingstepid,name,_plugintypeid_value,_sdkmessageid_value,_sdkmessagefilterid_value,stage,mode,rank,statecode,filteringattributes,ismanaged,iscustomizable,createdon';
 
 	constructor(
 		private readonly apiService: IDataverseApiService,
@@ -209,6 +219,9 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			dto['_sdkmessagefilterid_value@OData.Community.Display.V1.FormattedValue'] ??
 			null;
 
+		// Extract isCustomizable from managed property (defaults to true if missing)
+		const isCustomizable = dto.iscustomizable?.Value ?? true;
+
 		return new PluginStep(
 			dto.sdkmessageprocessingstepid,
 			dto.name,
@@ -223,6 +236,7 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			StepStatus.fromValue(dto.statecode),
 			dto.filteringattributes,
 			dto.ismanaged,
+			isCustomizable,
 			new Date(dto.createdon)
 		);
 	}

@@ -12,6 +12,7 @@
 let treeData = [];
 let expandedNodes = new Set();
 let currentFilter = '';
+let hideMicrosoftPlugins = true; // Default: hide Microsoft plugins
 
 // Virtual scrolling state
 const VIRTUAL_SCROLL_THRESHOLD = 500; // Enable virtual scrolling above this node count
@@ -85,7 +86,7 @@ function handleTreeUpdate(data) {
 		}
 		if (pluginTree) {
 			pluginTree.style.display = 'block';
-			renderTree(treeData);
+			renderTree();
 		}
 		if (treeToolbar) {
 			treeToolbar.style.display = 'flex';
@@ -95,20 +96,24 @@ function handleTreeUpdate(data) {
 
 /**
  * Render the tree - uses virtual scrolling for large trees.
+ * Automatically applies Microsoft plugins filter if enabled.
  */
-function renderTree(items) {
+function renderTree() {
 	const pluginTree = document.getElementById('pluginTree');
 	if (!pluginTree) return;
 
+	// Get effective data (filtered if hideMicrosoftPlugins is enabled)
+	const effectiveData = getEffectiveTreeData();
+
 	// Flatten tree to determine total visible node count
-	flattenedNodes = flattenTree(items);
+	flattenedNodes = flattenTree(effectiveData);
 	useVirtualScroll = flattenedNodes.length > VIRTUAL_SCROLL_THRESHOLD;
 
 	if (useVirtualScroll) {
 		renderVirtualTree(pluginTree);
 		setupScrollHandler(pluginTree);
 	} else {
-		renderFullTree(pluginTree, items);
+		renderFullTree(pluginTree, effectiveData);
 	}
 }
 
@@ -548,38 +553,8 @@ function applyFilterToSubtree(container) {
 	const term = currentFilter.toLowerCase().trim();
 	if (term === '') return;
 
-	// Build visible node IDs from the full tree
-	const visibleNodeIds = new Set();
-	function markMatchingBranches(item) {
-		const nodeMatches = item.displayName.toLowerCase().includes(term);
-		let hasMatchingDescendant = false;
-		if (item.children && item.children.length > 0) {
-			for (const child of item.children) {
-				if (markMatchingBranches(child)) {
-					hasMatchingDescendant = true;
-				}
-			}
-		}
-		if (nodeMatches || hasMatchingDescendant) {
-			visibleNodeIds.add(item.id);
-			if (nodeMatches && item.children) {
-				markAllDescendantsVisible(item.children);
-			}
-			return true;
-		}
-		return false;
-	}
-	function markAllDescendantsVisible(children) {
-		for (const child of children) {
-			visibleNodeIds.add(child.id);
-			if (child.children && child.children.length > 0) {
-				markAllDescendantsVisible(child.children);
-			}
-		}
-	}
-	for (const item of treeData) {
-		markMatchingBranches(item);
-	}
+	// Build visible node IDs from the effective tree data
+	const visibleNodeIds = buildVisibleNodeIds(term);
 
 	// Apply visibility to nodes in this subtree
 	container.querySelectorAll('.tree-node').forEach(node => {
@@ -663,6 +638,7 @@ function filterTree(searchTerm) {
  */
 function buildVisibleNodeIds(term) {
 	const visibleNodeIds = new Set();
+	const effectiveData = getEffectiveTreeData();
 
 	function markMatchingBranches(item) {
 		const nodeMatches = item.displayName.toLowerCase().includes(term);
@@ -695,11 +671,54 @@ function buildVisibleNodeIds(term) {
 		}
 	}
 
-	for (const item of treeData) {
+	for (const item of effectiveData) {
 		markMatchingBranches(item);
 	}
 
 	return visibleNodeIds;
+}
+
+/**
+ * Filter out Microsoft plugins (non-customizable steps) from tree data.
+ * Returns a deep copy with Microsoft plugins removed.
+ * Also removes empty parent nodes (plugin types with no steps, assemblies with no types, etc.)
+ */
+function filterMicrosoftPlugins(items) {
+	return items
+		.map(item => {
+			// Deep clone the item
+			const clone = { ...item };
+
+			if (clone.children && clone.children.length > 0) {
+				// Recursively filter children
+				clone.children = filterMicrosoftPlugins(clone.children);
+			}
+
+			return clone;
+		})
+		.filter(item => {
+			// Filter out non-customizable steps
+			if (item.type === 'step') {
+				return item.metadata?.isCustomizable !== false;
+			}
+
+			// Filter out empty containers (plugin types with no steps, assemblies with no types, etc.)
+			if (item.type === 'pluginType' || item.type === 'assembly' || item.type === 'package') {
+				return item.children && item.children.length > 0;
+			}
+
+			return true;
+		});
+}
+
+/**
+ * Get the effective tree data (filtered if hideMicrosoftPlugins is enabled)
+ */
+function getEffectiveTreeData() {
+	if (hideMicrosoftPlugins) {
+		return filterMicrosoftPlugins(treeData);
+	}
+	return treeData;
 }
 
 /**
@@ -709,6 +728,7 @@ function buildVisibleNodeIds(term) {
 function getVisibleExpandableNodeIds() {
 	const visibleIds = new Set();
 	const term = currentFilter.toLowerCase().trim();
+	const effectiveData = getEffectiveTreeData();
 
 	// Helper to check if a node matches the filter term
 	function nodeMatches(item) {
@@ -749,7 +769,7 @@ function getVisibleExpandableNodeIds() {
 		}
 	}
 
-	for (const item of treeData) {
+	for (const item of effectiveData) {
 		collectExpandableNodes(item, false);
 	}
 
@@ -764,7 +784,7 @@ function expandAll() {
 	for (const id of visibleExpandableIds) {
 		expandedNodes.add(id);
 	}
-	renderTree(treeData);
+	renderTree();
 	if (currentFilter) {
 		filterTree(currentFilter);
 	}
@@ -776,7 +796,7 @@ function expandAll() {
 function collapseAll() {
 	// Clear all expanded nodes (simple approach - works well regardless of filter)
 	expandedNodes.clear();
-	renderTree(treeData);
+	renderTree();
 	if (currentFilter) {
 		filterTree(currentFilter);
 	}
@@ -822,6 +842,18 @@ window.createBehavior({
 		if (collapseAllBtn) {
 			collapseAllBtn.addEventListener('click', collapseAll);
 		}
+
+		// Wire up hide Microsoft plugins checkbox
+		const hideMicrosoftPluginsCheckbox = document.getElementById('hideMicrosoftPlugins');
+		if (hideMicrosoftPluginsCheckbox) {
+			hideMicrosoftPluginsCheckbox.addEventListener('change', (event) => {
+				hideMicrosoftPlugins = event.target.checked;
+				renderTree();
+				if (currentFilter) {
+					filterTree(currentFilter);
+				}
+			});
+		}
 	},
 
 	handleMessage(message) {
@@ -856,7 +888,7 @@ function handleNodeUpdate(data) {
 
 	// Re-render tree to ensure correct positioning
 	// (Targeted DOM updates caused positioning bugs with virtual scrolling)
-	renderTree(treeData);
+	renderTree();
 
 	// Re-apply filter if active
 	if (currentFilter) {
@@ -878,7 +910,7 @@ function handleSubtreeUpdate(data) {
 
 	// Re-render tree to ensure correct positioning
 	// (Targeted DOM updates caused positioning bugs with virtual scrolling)
-	renderTree(treeData);
+	renderTree();
 
 	// Re-apply filter if active
 	if (currentFilter) {

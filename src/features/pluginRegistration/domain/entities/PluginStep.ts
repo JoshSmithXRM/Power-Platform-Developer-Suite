@@ -7,15 +7,15 @@ import { StepStatus } from '../valueObjects/StepStatus';
  *
  * Business Rules:
  * - Steps execute at specific stages (PreValidation, PreOperation, PostOperation)
- * - Steps can be enabled/disabled (including managed steps - developers need this for debugging)
+ * - Steps can be enabled/disabled if customizable (Microsoft-registered steps cannot be modified)
  * - Steps have execution mode (Sync vs Async)
  * - Steps have rank (execution order within same stage)
  * - Filtering attributes apply only to Update message
  *
  * Rich behavior (NOT anemic):
  * - isEnabled(): boolean
- * - canEnable(): boolean (checks if disabled)
- * - canDisable(): boolean (checks if enabled)
+ * - canEnable(): boolean (checks if disabled AND customizable)
+ * - canDisable(): boolean (checks if enabled AND customizable)
  * - canDelete(): boolean (checks if not managed - deletion still restricted)
  * - getExecutionOrder(): string (formatted stage + rank)
  * - getFilteringAttributesArray(): string[]
@@ -35,6 +35,7 @@ export class PluginStep {
 		private readonly status: StepStatus,
 		private readonly filteringAttributes: string | null,
 		private readonly isManaged: boolean,
+		private readonly isCustomizable: boolean,
 		private readonly createdOn: Date
 	) {}
 
@@ -46,19 +47,19 @@ export class PluginStep {
 	}
 
 	/**
-	 * Business rule: Can enable if currently disabled.
-	 * Note: Managed steps CAN be enabled/disabled - developers need this for debugging.
+	 * Business rule: Can enable if currently disabled AND step is customizable.
+	 * Microsoft-registered steps (isCustomizable=false) cannot be modified.
 	 */
 	public canEnable(): boolean {
-		return !this.isEnabled();
+		return !this.isEnabled() && this.isCustomizable;
 	}
 
 	/**
-	 * Business rule: Can disable if currently enabled.
-	 * Note: Managed steps CAN be enabled/disabled - developers need this for debugging.
+	 * Business rule: Can disable if currently enabled AND step is customizable.
+	 * Microsoft-registered steps (isCustomizable=false) cannot be modified.
 	 */
 	public canDisable(): boolean {
-		return this.isEnabled();
+		return this.isEnabled() && this.isCustomizable;
 	}
 
 	/**
@@ -140,6 +141,10 @@ export class PluginStep {
 
 	public isInManagedState(): boolean {
 		return this.isManaged;
+	}
+
+	public isInCustomizableState(): boolean {
+		return this.isCustomizable;
 	}
 
 	public getCreatedOn(): Date {

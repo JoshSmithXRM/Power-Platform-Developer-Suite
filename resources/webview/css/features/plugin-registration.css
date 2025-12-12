@@ -74,6 +74,25 @@
 	line-height: 1;
 }
 
+.tree-toolbar-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: auto;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	user-select: none;
+}
+
+.tree-toolbar-checkbox input[type="checkbox"] {
+	width: 14px;
+	height: 14px;
+	margin: 0;
+	cursor: pointer;
+	accent-color: var(--vscode-focusBorder);
+}
+
 /* Loading Progress */
 .loading-progress-container {
 	display: flex;
