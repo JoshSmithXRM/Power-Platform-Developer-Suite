@@ -8,6 +8,10 @@
 # - .env.e2e.local (E2E test credentials)
 #
 # Setup: git config core.hooksPath .githooks
+#
+# Windows Requirements:
+# - Developer Mode must be enabled (Settings > Privacy & Security > For developers)
+# - Without Developer Mode, symlink creation requires Administrator privileges
 
 # Cross-platform symlink creation
 create_symlink() {
@@ -19,18 +23,15 @@ create_symlink() {
         mkdir -p "$(dirname "$target")"
     fi
 
-    if command -v cygpath >/dev/null 2>&1; then
-        # Windows (Git Bash/Cygwin)
-        local WIN_TARGET WIN_SOURCE
-        WIN_TARGET=$(cygpath -w "$(pwd)/$target" 2>/dev/null) || return 0
-        WIN_SOURCE=$(cygpath -w "$source" 2>/dev/null) || return 0
-        cmd //c "mklink \"$WIN_TARGET\" \"$WIN_SOURCE\"" > /dev/null 2>&1
+    # Use MSYS environment variable to create native Windows symlinks
+    # This works in Git Bash hook context where cmd //c mklink fails
+    if MSYS=winsymlinks:nativestrict ln -s "$source" "$target" 2>/dev/null; then
+        echo "  ✓ Linked: $target"
+        return 0
     else
-        # Unix (macOS/Linux)
-        ln -s "$source" "$target" 2>/dev/null
+        echo "  ✗ Failed: $target (enable Developer Mode in Windows Settings)" >&2
+        return 1
     fi
-
-    [ $? -eq 0 ] && echo "✓ Linked: $target"
 }
 
 # Get main repo root (only works in worktrees)
@@ -50,6 +51,7 @@ FILES_TO_LINK=(
     ".env.e2e.local"
 )
 
+echo "Setting up worktree symlinks..."
 for target in "${FILES_TO_LINK[@]}"; do
     source="$MAIN_REPO_ROOT/$target"
     if [ -f "$source" ] && [ ! -e "$target" ]; then
