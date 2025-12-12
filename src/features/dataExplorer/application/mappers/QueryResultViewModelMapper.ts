@@ -79,7 +79,7 @@ export class QueryResultViewModelMapper {
 	}
 
 	/**
-	 * Expands columns to include virtual "name" columns for optionset and lookup fields.
+	 * Expands columns to include virtual "name" columns for optionset, lookup, and boolean fields.
 	 *
 	 * For optionset columns (e.g., accountcategorycode), creates a companion column
 	 * with "name" suffix (e.g., accountcategorycodename) to hold the label.
@@ -87,6 +87,9 @@ export class QueryResultViewModelMapper {
 	 * For lookup columns (e.g., primarycontactid), creates a companion column
 	 * with "name" suffix (e.g., primarycontactidname) to hold the display name.
 	 * This ensures the column name matches the content - "id" suffix columns show GUIDs.
+	 *
+	 * For boolean columns (e.g., ismanaged), creates a companion column
+	 * with "name" suffix (e.g., ismanagedname) to hold the Yes/No label.
 	 *
 	 * Avoids duplicates: If the user already queried the virtual name column directly
 	 * (e.g., createdbyname), we don't add another one.
@@ -181,8 +184,8 @@ export class QueryResultViewModelMapper {
 		);
 
 		for (const column of columns) {
-			// Skip columns that are virtual name columns for lookups/optionsets
-			// The lookup/optionset processing already populates these with the correct value
+			// Skip columns that are virtual name columns for lookups/optionsets/booleans
+			// The lookup/optionset/boolean processing already populates these with the correct value
 			// Don't check dataType - it could be 'string', 'unknown', etc. depending on the data
 			if (virtualNameColumns.has(column.logicalName)) {
 				continue;
@@ -251,9 +254,9 @@ export class QueryResultViewModelMapper {
 	 * Converts cell value to display string.
 	 * Handles null, boolean, Date, lookup, and formatted value types.
 	 *
-	 * Note: Optionset columns are handled specially in mapRow() and should not
-	 * reach this method. For other formatted values (like money), we use the
-	 * formatted display string.
+	 * Note: Optionset and boolean columns are handled specially in mapRow() and should not
+	 * reach this method with FormattedValue objects. For other formatted values (like money),
+	 * we use the formatted display string.
 	 *
 	 * @param value - Domain cell value
 	 * @param _dataType - Column data type (reserved for future use)
