@@ -12,7 +12,8 @@
 let treeData = [];
 let expandedNodes = new Set();
 let currentFilter = '';
-let hideMicrosoftPlugins = true; // Default: hide Microsoft plugins
+let hideHiddenSteps = true; // Default: hide internal system steps (ishidden=true)
+let hideMicrosoftAssemblies = false; // Default: show Microsoft assemblies
 
 // Virtual scrolling state
 const VIRTUAL_SCROLL_THRESHOLD = 500; // Enable virtual scrolling above this node count
@@ -679,11 +680,11 @@ function buildVisibleNodeIds(term) {
 }
 
 /**
- * Filter out Microsoft plugins (non-customizable steps) from tree data.
- * Returns a deep copy with Microsoft plugins removed.
+ * Filter out hidden steps (ishidden=true) from tree data.
+ * Returns a deep copy with hidden steps removed.
  * Also removes empty parent nodes (plugin types with no steps, assemblies with no types, etc.)
  */
-function filterMicrosoftPlugins(items) {
+function filterHiddenSteps(items) {
 	return items
 		.map(item => {
 			// Deep clone the item
@@ -691,15 +692,15 @@ function filterMicrosoftPlugins(items) {
 
 			if (clone.children && clone.children.length > 0) {
 				// Recursively filter children
-				clone.children = filterMicrosoftPlugins(clone.children);
+				clone.children = filterHiddenSteps(clone.children);
 			}
 
 			return clone;
 		})
 		.filter(item => {
-			// Filter out non-customizable steps
+			// Filter out hidden steps
 			if (item.type === 'step') {
-				return item.metadata?.isCustomizable !== false;
+				return item.metadata?.isHidden !== true;
 			}
 
 			// Filter out empty containers (plugin types with no steps, assemblies with no types, etc.)
@@ -712,13 +713,53 @@ function filterMicrosoftPlugins(items) {
 }
 
 /**
- * Get the effective tree data (filtered if hideMicrosoftPlugins is enabled)
+ * Filter out Microsoft assemblies (name starts with 'Microsoft.') from tree data.
+ * Returns a deep copy with Microsoft assemblies removed.
+ * Also removes empty parent nodes (packages with no assemblies).
+ */
+function filterMicrosoftAssemblies(items) {
+	return items
+		.map(item => {
+			// Deep clone the item
+			const clone = { ...item };
+
+			if (clone.children && clone.children.length > 0) {
+				// Recursively filter children
+				clone.children = filterMicrosoftAssemblies(clone.children);
+			}
+
+			return clone;
+		})
+		.filter(item => {
+			// Filter out Microsoft assemblies
+			if (item.type === 'assembly') {
+				return !item.name.startsWith('Microsoft.');
+			}
+
+			// Filter out empty containers (packages with no assemblies)
+			if (item.type === 'package') {
+				return item.children && item.children.length > 0;
+			}
+
+			return true;
+		});
+}
+
+/**
+ * Get the effective tree data (filtered based on active filters)
  */
 function getEffectiveTreeData() {
-	if (hideMicrosoftPlugins) {
-		return filterMicrosoftPlugins(treeData);
+	let data = treeData;
+
+	if (hideHiddenSteps) {
+		data = filterHiddenSteps(data);
 	}
-	return treeData;
+
+	if (hideMicrosoftAssemblies) {
+		data = filterMicrosoftAssemblies(data);
+	}
+
+	return data;
 }
 
 /**
@@ -843,11 +884,23 @@ window.createBehavior({
 			collapseAllBtn.addEventListener('click', collapseAll);
 		}
 
-		// Wire up hide Microsoft plugins checkbox
-		const hideMicrosoftPluginsCheckbox = document.getElementById('hideMicrosoftPlugins');
-		if (hideMicrosoftPluginsCheckbox) {
-			hideMicrosoftPluginsCheckbox.addEventListener('change', (event) => {
-				hideMicrosoftPlugins = event.target.checked;
+		// Wire up hide hidden steps checkbox
+		const hideHiddenStepsCheckbox = document.getElementById('hideHiddenSteps');
+		if (hideHiddenStepsCheckbox) {
+			hideHiddenStepsCheckbox.addEventListener('change', (event) => {
+				hideHiddenSteps = event.target.checked;
+				renderTree();
+				if (currentFilter) {
+					filterTree(currentFilter);
+				}
+			});
+		}
+
+		// Wire up hide Microsoft assemblies checkbox
+		const hideMicrosoftAssembliesCheckbox = document.getElementById('hideMicrosoftAssemblies');
+		if (hideMicrosoftAssembliesCheckbox) {
+			hideMicrosoftAssembliesCheckbox.addEventListener('change', (event) => {
+				hideMicrosoftAssemblies = event.target.checked;
 				renderTree();
 				if (currentFilter) {
 					filterTree(currentFilter);

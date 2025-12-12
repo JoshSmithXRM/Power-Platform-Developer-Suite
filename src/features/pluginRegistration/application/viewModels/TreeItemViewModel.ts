@@ -68,6 +68,7 @@ export interface StepMetadata {
 	readonly rank: number;
 	readonly isEnabled: boolean;
 	readonly isCustomizable: boolean;
+	readonly isHidden: boolean;
 	readonly filteringAttributes: string[];
 	readonly executionOrder: string;
 	readonly createdOn: string;

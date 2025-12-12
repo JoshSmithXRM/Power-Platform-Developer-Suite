@@ -33,6 +33,7 @@ interface PluginStepDto {
 	filteringattributes: string | null;
 	ismanaged: boolean;
 	iscustomizable: ManagedPropertyDto;
+	ishidden: ManagedPropertyDto;
 	createdon: string;
 	// Expanded message entity
 	sdkmessageid?: {
@@ -66,7 +67,7 @@ interface PluginStepCollectionResponse {
 export class DataversePluginStepRepository implements IPluginStepRepository {
 	private static readonly ENTITY_SET = 'sdkmessageprocessingsteps';
 	private static readonly SELECT_FIELDS =
-		'sdkmessageprocessingstepid,name,_plugintypeid_value,_sdkmessageid_value,_sdkmessagefilterid_value,stage,mode,rank,statecode,filteringattributes,ismanaged,iscustomizable,createdon';
+		'sdkmessageprocessingstepid,name,_plugintypeid_value,_sdkmessageid_value,_sdkmessagefilterid_value,stage,mode,rank,statecode,filteringattributes,ismanaged,iscustomizable,ishidden,createdon';
 
 	constructor(
 		private readonly apiService: IDataverseApiService,
@@ -219,8 +220,9 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			dto['_sdkmessagefilterid_value@OData.Community.Display.V1.FormattedValue'] ??
 			null;
 
-		// Extract isCustomizable from managed property (defaults to true if missing)
+		// Extract managed properties (defaults if missing)
 		const isCustomizable = dto.iscustomizable?.Value ?? true;
+		const isHidden = dto.ishidden?.Value ?? false;
 
 		return new PluginStep(
 			dto.sdkmessageprocessingstepid,
@@ -237,6 +239,7 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			dto.filteringattributes,
 			dto.ismanaged,
 			isCustomizable,
+			isHidden,
 			new Date(dto.createdon)
 		);
 	}
