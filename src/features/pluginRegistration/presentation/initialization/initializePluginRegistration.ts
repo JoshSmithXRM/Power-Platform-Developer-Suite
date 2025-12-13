@@ -100,6 +100,9 @@ export async function initializePluginRegistration(
 	const { DataverseSdkMessageRepository } = await import(
 		'../../infrastructure/repositories/DataverseSdkMessageRepository.js'
 	);
+	const { DataverseSdkMessageFilterRepository } = await import(
+		'../../infrastructure/repositories/DataverseSdkMessageFilterRepository.js'
+	);
 	const { PluginRegistrationPanelComposed } = await import(
 		'../panels/PluginRegistrationPanelComposed.js'
 	);
@@ -120,6 +123,10 @@ export async function initializePluginRegistration(
 	const stepRepository = new DataversePluginStepRepository(dataverseApiService, logger);
 	const imageRepository = new DataverseStepImageRepository(dataverseApiService, logger);
 	const sdkMessageRepository = new DataverseSdkMessageRepository(dataverseApiService, logger);
+	const sdkMessageFilterRepository = new DataverseSdkMessageFilterRepository(
+		dataverseApiService,
+		logger
+	);
 
 	// Create use cases
 	const loadTreeUseCase = new LoadPluginRegistrationTreeUseCase(
@@ -177,6 +184,7 @@ export async function initializePluginRegistration(
 		image: imageRepository,
 		solution: solutionRepository,
 		sdkMessage: sdkMessageRepository,
+		sdkMessageFilter: sdkMessageFilterRepository,
 	};
 
 	const services = {

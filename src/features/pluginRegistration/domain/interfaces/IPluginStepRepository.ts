@@ -6,12 +6,17 @@ import type { PluginStep } from '../entities/PluginStep';
 export interface RegisterStepInput {
 	readonly pluginTypeId: string;
 	readonly sdkMessageId: string;
+	readonly sdkMessageFilterId?: string | undefined; // Links message to entity (null for entity-agnostic)
 	readonly name: string;
 	readonly stage: number; // 10=PreValidation, 20=PreOperation, 40=PostOperation
 	readonly mode: number; // 0=Synchronous, 1=Asynchronous
 	readonly rank: number;
-	readonly primaryEntityLogicalName?: string | undefined; // Optional - some messages don't need entity
-	readonly filteringAttributes?: string | undefined; // Comma-separated, only for Update message
+	readonly supportedDeployment: number; // 0=Server, 1=Offline, 2=Both
+	readonly filteringAttributes?: string | undefined; // Comma-separated, only for Create/Update messages
+	readonly asyncAutoDelete: boolean; // Delete AsyncOperation if StatusCode = Successful
+	readonly unsecureConfiguration?: string | undefined;
+	readonly secureConfiguration?: string | undefined; // Stored in separate entity
+	readonly impersonatingUserId?: string | undefined; // Run in User's Context (null = Calling User)
 	readonly description?: string | undefined;
 }
 
@@ -23,7 +28,12 @@ export interface UpdateStepInput {
 	readonly stage?: number | undefined;
 	readonly mode?: number | undefined;
 	readonly rank?: number | undefined;
+	readonly supportedDeployment?: number | undefined;
 	readonly filteringAttributes?: string | undefined;
+	readonly asyncAutoDelete?: boolean | undefined;
+	readonly unsecureConfiguration?: string | undefined;
+	readonly secureConfiguration?: string | undefined;
+	readonly impersonatingUserId?: string | undefined;
 	readonly description?: string | undefined;
 }
 

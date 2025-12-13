@@ -1535,10 +1535,10 @@ function handleShowUpdateAssemblyModal(data) {
 
 /**
  * Show the Register Step modal.
- * @param {Object} data - { pluginTypeId, pluginTypeName, messages }
+ * @param {Object} data - { pluginTypeId, pluginTypeName, messages, messageFilters }
  */
 function handleShowRegisterStepModal(data) {
-	const { pluginTypeId, pluginTypeName, messages } = data;
+	const { pluginTypeId, pluginTypeName, messages, messageFilters } = data;
 
 	if (!window.showFormModal) {
 		console.error('FormModal component not loaded');
@@ -1561,14 +1561,36 @@ function handleShowRegisterStepModal(data) {
 
 	// Mode options
 	const modeOptions = [
-		{ value: '', label: '-- Select Mode --' },
 		{ value: '0', label: 'Synchronous' },
 		{ value: '1', label: 'Asynchronous' }
 	];
 
+	// Deployment options
+	const deploymentOptions = [
+		{ value: '0', label: 'Server Only' },
+		{ value: '1', label: 'Offline Only' },
+		{ value: '2', label: 'Server and Offline' }
+	];
+
+	// Build entity options from message filters (if provided)
+	// Will be dynamically populated based on selected message
+	const entityOptions = [
+		{ value: '', label: '(none)' }
+	];
+
+	// Messages that support filtering attributes (hardcoded per PRT)
+	const messagesWithFilteringAttributes = ['Create', 'CreateMultiple', 'Update', 'UpdateMultiple', 'OnExternalUpdated'];
+
 	window.showFormModal({
 		title: `Register Step for ${pluginTypeName}`,
+		width: '700px',
 		fields: [
+			// General Configuration Section
+			{
+				id: 'sectionGeneral',
+				type: 'section',
+				label: 'General Configuration'
+			},
 			{
 				id: 'sdkMessageId',
 				label: 'Message',
@@ -1578,10 +1600,45 @@ function handleShowRegisterStepModal(data) {
 				required: true
 			},
 			{
+				id: 'primaryEntity',
+				label: 'Primary Entity',
+				type: 'text',
+				value: '',
+				placeholder: 'Entity logical name (e.g., account, contact) or leave empty for entity-agnostic'
+			},
+			{
+				id: 'filteringAttributes',
+				label: 'Filtering Attributes',
+				type: 'text',
+				value: '',
+				placeholder: 'Comma-separated attribute names (for Create/Update messages)'
+			},
+			{
+				id: 'name',
+				label: 'Step Name',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'Step name'
+			},
+			{
+				id: 'description',
+				label: 'Description',
+				type: 'text',
+				value: '',
+				placeholder: 'Optional description'
+			},
+			// Execution Section
+			{
+				id: 'sectionExecution',
+				type: 'section',
+				label: 'Execution Settings'
+			},
+			{
 				id: 'stage',
 				label: 'Stage',
 				type: 'select',
-				value: '',
+				value: '40',
 				options: stageOptions,
 				required: true
 			},
@@ -1589,7 +1646,7 @@ function handleShowRegisterStepModal(data) {
 				id: 'mode',
 				label: 'Execution Mode',
 				type: 'select',
-				value: '',
+				value: '0',
 				options: modeOptions,
 				required: true
 			},
@@ -1601,23 +1658,48 @@ function handleShowRegisterStepModal(data) {
 				required: true,
 				placeholder: '1'
 			},
+			// Deployment Section
 			{
-				id: 'filteringAttributes',
-				label: 'Filtering Attributes',
-				type: 'text',
-				value: '',
-				placeholder: 'Comma-separated (for Update message only)'
+				id: 'sectionDeployment',
+				type: 'section',
+				label: 'Deployment'
 			},
 			{
-				id: 'name',
-				label: 'Name',
-				type: 'text',
+				id: 'supportedDeployment',
+				label: 'Deployment',
+				type: 'select',
+				value: '0',
+				options: deploymentOptions,
+				required: true
+			},
+			{
+				id: 'asyncAutoDelete',
+				label: 'Delete AsyncOperation if StatusCode = Successful',
+				type: 'checkbox',
+				value: false
+			},
+			// Configuration Section
+			{
+				id: 'sectionConfiguration',
+				type: 'section',
+				label: 'Configuration'
+			},
+			{
+				id: 'unsecureConfiguration',
+				label: 'Unsecure Configuration',
+				type: 'textarea',
 				value: '',
-				required: true,
-				placeholder: 'Step name'
+				placeholder: 'Unsecure configuration string'
+			},
+			{
+				id: 'secureConfiguration',
+				label: 'Secure Configuration',
+				type: 'textarea',
+				value: '',
+				placeholder: 'Secure configuration string (stored securely)'
 			}
 		],
-		submitLabel: 'Register',
+		submitLabel: 'Register New Step',
 		cancelLabel: 'Cancel',
 		onSubmit: (values) => {
 			vscode.postMessage({
@@ -1625,11 +1707,19 @@ function handleShowRegisterStepModal(data) {
 				data: {
 					pluginTypeId,
 					sdkMessageId: values.sdkMessageId,
+					// Note: sdkMessageFilterId will be looked up on backend based on message + entity
 					name: values.name,
 					stage: parseInt(values.stage, 10),
 					mode: parseInt(values.mode, 10),
 					rank: parseInt(values.rank, 10),
-					filteringAttributes: values.filteringAttributes || undefined
+					supportedDeployment: parseInt(values.supportedDeployment, 10),
+					filteringAttributes: values.filteringAttributes || undefined,
+					asyncAutoDelete: values.asyncAutoDelete === true || values.asyncAutoDelete === 'true',
+					unsecureConfiguration: values.unsecureConfiguration || undefined,
+					secureConfiguration: values.secureConfiguration || undefined,
+					description: values.description || undefined,
+					// Primary entity is sent to backend to lookup filter
+					primaryEntity: values.primaryEntity || undefined
 				}
 			});
 		}
@@ -1638,17 +1728,21 @@ function handleShowRegisterStepModal(data) {
 
 /**
  * Show the Edit Step modal.
- * @param {Object} data - { stepId, stepName, sdkMessageId, sdkMessageName, stage, mode, rank, filteringAttributes, messages }
+ * @param {Object} data - Step data with all editable properties
  */
 function handleShowEditStepModal(data) {
-	const { stepId, stepName, sdkMessageId, sdkMessageName, stage, mode, rank, filteringAttributes, messages } = data;
+	const {
+		stepId, stepName, sdkMessageId, sdkMessageName, stage, mode, rank,
+		filteringAttributes, messages, supportedDeployment, asyncAutoDelete,
+		unsecureConfiguration, secureConfiguration, description, primaryEntity
+	} = data;
 
 	if (!window.showFormModal) {
 		console.error('FormModal component not loaded');
 		return;
 	}
 
-	// Build message options for dropdown
+	// Build message options for dropdown (readonly display)
 	const messageOptions = [
 		{ value: '', label: '-- Select a Message --' },
 		...(messages || []).map(m => ({ value: m.id, label: m.name }))
@@ -1667,16 +1761,63 @@ function handleShowEditStepModal(data) {
 		{ value: '1', label: 'Asynchronous' }
 	];
 
+	// Deployment options
+	const deploymentOptions = [
+		{ value: '0', label: 'Server Only' },
+		{ value: '1', label: 'Offline Only' },
+		{ value: '2', label: 'Server and Offline' }
+	];
+
 	window.showFormModal({
-		title: `Edit Step: ${stepName}`,
+		title: `Update Existing Step`,
+		width: '700px',
 		fields: [
+			// General Configuration Section
 			{
-				id: 'sdkMessageId',
+				id: 'sectionGeneral',
+				type: 'section',
+				label: 'General Configuration'
+			},
+			{
+				id: 'messageName',
 				label: 'Message',
-				type: 'select',
-				value: sdkMessageId,
-				options: messageOptions,
-				readonly: true // Can't change message after creation
+				type: 'text',
+				value: sdkMessageName || 'Unknown',
+				readonly: true
+			},
+			{
+				id: 'primaryEntityDisplay',
+				label: 'Primary Entity',
+				type: 'text',
+				value: primaryEntity || '(none)',
+				readonly: true
+			},
+			{
+				id: 'filteringAttributes',
+				label: 'Filtering Attributes',
+				type: 'text',
+				value: filteringAttributes || '',
+				placeholder: 'Comma-separated attribute names'
+			},
+			{
+				id: 'name',
+				label: 'Step Name',
+				type: 'text',
+				value: stepName,
+				required: true
+			},
+			{
+				id: 'description',
+				label: 'Description',
+				type: 'text',
+				value: description || '',
+				placeholder: 'Optional description'
+			},
+			// Execution Section
+			{
+				id: 'sectionExecution',
+				type: 'section',
+				label: 'Execution Settings'
 			},
 			{
 				id: 'stage',
@@ -1701,22 +1842,48 @@ function handleShowEditStepModal(data) {
 				value: String(rank),
 				required: true
 			},
+			// Deployment Section
 			{
-				id: 'filteringAttributes',
-				label: 'Filtering Attributes',
-				type: 'text',
-				value: filteringAttributes || '',
-				placeholder: 'Comma-separated (for Update message only)'
+				id: 'sectionDeployment',
+				type: 'section',
+				label: 'Deployment'
 			},
 			{
-				id: 'name',
-				label: 'Name',
-				type: 'text',
-				value: stepName,
+				id: 'supportedDeployment',
+				label: 'Deployment',
+				type: 'select',
+				value: String(supportedDeployment ?? 0),
+				options: deploymentOptions,
 				required: true
+			},
+			{
+				id: 'asyncAutoDelete',
+				label: 'Delete AsyncOperation if StatusCode = Successful',
+				type: 'checkbox',
+				value: asyncAutoDelete ?? false
+			},
+			// Configuration Section
+			{
+				id: 'sectionConfiguration',
+				type: 'section',
+				label: 'Configuration'
+			},
+			{
+				id: 'unsecureConfiguration',
+				label: 'Unsecure Configuration',
+				type: 'textarea',
+				value: unsecureConfiguration || '',
+				placeholder: 'Unsecure configuration string'
+			},
+			{
+				id: 'secureConfiguration',
+				label: 'Secure Configuration',
+				type: 'textarea',
+				value: secureConfiguration || '',
+				placeholder: 'Secure configuration string (stored securely)'
 			}
 		],
-		submitLabel: 'Update',
+		submitLabel: 'Update Step',
 		cancelLabel: 'Cancel',
 		onSubmit: (values) => {
 			vscode.postMessage({
@@ -1727,7 +1894,12 @@ function handleShowEditStepModal(data) {
 					stage: parseInt(values.stage, 10),
 					mode: parseInt(values.mode, 10),
 					rank: parseInt(values.rank, 10),
-					filteringAttributes: values.filteringAttributes || undefined
+					supportedDeployment: parseInt(values.supportedDeployment, 10),
+					filteringAttributes: values.filteringAttributes || undefined,
+					asyncAutoDelete: values.asyncAutoDelete === true || values.asyncAutoDelete === 'true',
+					unsecureConfiguration: values.unsecureConfiguration || undefined,
+					secureConfiguration: values.secureConfiguration || undefined,
+					description: values.description || undefined
 				}
 			});
 		}
