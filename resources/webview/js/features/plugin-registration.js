@@ -753,8 +753,9 @@ function filterMicrosoftAssemblies(items) {
 		})
 		.filter(item => {
 			// Filter out Microsoft assemblies (matches 'Microsoft.*' and 'MicrosoftPowerApps*' etc.)
+			// Exception: Microsoft.Crm.ServiceBus is used for Azure Service Bus integration
 			if (item.type === 'assembly') {
-				return !item.name.startsWith('Microsoft');
+				return !item.name.startsWith('Microsoft') || item.name === 'Microsoft.Crm.ServiceBus';
 			}
 
 			// Filter out packages that BECAME empty due to filtering
