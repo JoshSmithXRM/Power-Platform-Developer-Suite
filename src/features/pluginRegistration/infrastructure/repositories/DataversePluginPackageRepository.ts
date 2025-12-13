@@ -153,10 +153,7 @@ export class DataversePluginPackageRepository implements IPluginPackageRepositor
 			contentLength: base64Content.length,
 		});
 
-		// Include solutionUniqueName query parameter to add package to solution
-		const endpoint =
-			`/api/data/v9.2/${DataversePluginPackageRepository.ENTITY_SET}` +
-			`?solutionUniqueName=${encodeURIComponent(solutionUniqueName)}`;
+		const endpoint = `/api/data/v9.2/${DataversePluginPackageRepository.ENTITY_SET}`;
 
 		// Dataverse requires uniquename to start with publisher prefix
 		const payload = {
@@ -166,10 +163,18 @@ export class DataversePluginPackageRepository implements IPluginPackageRepositor
 			content: base64Content,
 		};
 
+		// Use MSCRM.SolutionUniqueName header for solution association
+		// (pluginpackages doesn't support solutionUniqueName query parameter)
+		const additionalHeaders: Record<string, string> = {
+			'MSCRM.SolutionUniqueName': solutionUniqueName,
+		};
+
 		const response = await this.apiService.post<{ pluginpackageid: string }>(
 			environmentId,
 			endpoint,
-			payload
+			payload,
+			undefined, // cancellationToken
+			additionalHeaders
 		);
 
 		const packageId = response.pluginpackageid;
