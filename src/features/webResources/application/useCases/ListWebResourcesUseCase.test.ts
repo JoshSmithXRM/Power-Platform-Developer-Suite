@@ -34,7 +34,8 @@ describe('ListWebResourcesUseCase', () => {
 
 		mockSolutionComponentRepository = {
 			findComponentIdsBySolution: jest.fn(),
-			getObjectTypeCode: jest.fn()
+			getObjectTypeCode: jest.fn(),
+			findAllComponentsForSolution: jest.fn()
 		};
 
 		useCase = new ListWebResourcesUseCase(

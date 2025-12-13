@@ -45,17 +45,17 @@ export class SolutionComparisonViewModelMapper {
       isManaged: solution.isManaged,
       managedStateDisplay: solution.isManaged ? 'Managed' : 'Unmanaged',
       installedOn: solution.installedOn !== null
-        ? this.formatDate(solution.installedOn)
+        ? this.dateToString(solution.installedOn)
         : null,
-      modifiedOn: this.formatDate(solution.modifiedOn),
+      modifiedOn: this.dateToString(solution.modifiedOn),
       publisherName: solution.publisherName
     };
   }
 
   /**
-   * Formats a date for display.
+   * Converts a date to a localized string for display.
    */
-  private static formatDate(date: Date): string {
+  private static dateToString(date: Date): string {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',

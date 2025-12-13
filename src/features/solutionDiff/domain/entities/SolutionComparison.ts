@@ -45,7 +45,9 @@ export class SolutionComparison {
    * Calculates differences between source and target solutions.
    *
    * Business Logic:
-   * - Compares version, isManaged, installedOn, modifiedOn
+   * - Compares version and publisher (actionable differences)
+   * - Ignores: isManaged (expected: dev=unmanaged, downstream=managed)
+   * - Ignores: installedOn, modifiedOn (per-environment timestamps, always different)
    * - Generates human-readable difference messages
    */
   private calculateDifferences(): ComparisonResult {
@@ -66,49 +68,24 @@ export class SolutionComparison {
 
     const differences: string[] = [];
 
-    // Compare version
+    // Compare version - primary indicator for deployment
     if (source.version !== target.version) {
       differences.push(`Version: ${source.version} → ${target.version}`);
     }
 
-    // Compare managed state
-    if (source.isManaged !== target.isManaged) {
-      const sourceState = source.isManaged ? 'Managed' : 'Unmanaged';
-      const targetState = target.isManaged ? 'Managed' : 'Unmanaged';
-      differences.push(`Type: ${sourceState} → ${targetState}`);
+    // Compare publisher - should always match, mismatch = problem
+    if (source.publisherName !== target.publisherName) {
+      differences.push(`Publisher: ${source.publisherName} → ${target.publisherName}`);
     }
 
-    // Compare installation date
-    const sourceInstalled = source.installedOn?.toISOString() ?? 'Not installed';
-    const targetInstalled = target.installedOn?.toISOString() ?? 'Not installed';
-    if (sourceInstalled !== targetInstalled) {
-      differences.push(`Installed: ${this.formatDate(source.installedOn)} → ${this.formatDate(target.installedOn)}`);
-    }
-
-    // Compare modification date
-    if (source.modifiedOn.getTime() !== target.modifiedOn.getTime()) {
-      differences.push(`Modified: ${this.formatDate(source.modifiedOn)} → ${this.formatDate(target.modifiedOn)}`);
-    }
+    // NOTE: Intentionally NOT comparing:
+    // - isManaged: Expected difference (dev=unmanaged, downstream=managed)
+    // - installedOn: Per-environment timestamp
+    // - modifiedOn: Per-environment timestamp
 
     return differences.length === 0
       ? ComparisonResult.createIdentical(source.friendlyName)
       : ComparisonResult.createDifferent(source.friendlyName, differences);
-  }
-
-  /**
-   * Formats a date for display in difference messages.
-   */
-  private formatDate(date: Date | null): string {
-    if (date === null) {
-      return 'N/A';
-    }
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   }
 
   /**

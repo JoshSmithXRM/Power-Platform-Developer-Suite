@@ -12,6 +12,7 @@ import { getNonce } from '../../../../shared/infrastructure/ui/utils/cspNonce';
 import { resolveCssModules } from '../../../../shared/infrastructure/ui/utils/CssModuleResolver';
 import { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/panels/SafeWebviewPanel';
 import { LoadingStateBehavior } from '../../../../shared/infrastructure/ui/behaviors/LoadingStateBehavior';
+import type { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { ISolutionComponentRepository } from '../../../../shared/domain/interfaces/ISolutionComponentRepository';
 import { CompareSolutionMetadataUseCase } from '../../application/useCases/CompareSolutionMetadataUseCase';
@@ -20,6 +21,8 @@ import { SolutionComparisonViewModelMapper } from '../../application/mappers/Sol
 import { ComponentDiffViewModelMapper } from '../../application/mappers/ComponentDiffViewModelMapper';
 import type { SolutionComparisonViewModel, SolutionOptionViewModel } from '../../application/viewModels/SolutionComparisonViewModel';
 import type { ComponentDiffViewModel } from '../../application/viewModels/ComponentDiffViewModel';
+import { ComponentTypeRegistry } from '../../domain/services/ComponentTypeRegistry';
+import { ComponentDataFetcher } from '../../infrastructure/services/ComponentDataFetcher';
 import { DualEnvironmentSelectorSection } from '../sections/DualEnvironmentSelectorSection';
 import { SolutionComparisonSection } from '../sections/SolutionComparisonSection';
 
@@ -52,6 +55,7 @@ export class SolutionDiffPanelComposed {
   private readonly loadingBehavior: LoadingStateBehavior;
   private readonly compareUseCase: CompareSolutionMetadataUseCase;
   private readonly compareComponentsUseCase: CompareSolutionComponentsUseCase;
+  private readonly componentDiffMapper: ComponentDiffViewModelMapper;
 
   // Dual environment state
   private sourceEnvironmentId: string | undefined;
@@ -67,6 +71,7 @@ export class SolutionDiffPanelComposed {
     private readonly getEnvironments: () => Promise<EnvironmentOption[]>,
     private readonly solutionRepository: ISolutionRepository,
     private readonly componentRepository: ISolutionComponentRepository,
+    private readonly apiService: IDataverseApiService,
     private readonly logger: ILogger,
     sourceEnvironmentId?: string,
     targetEnvironmentId?: string
@@ -74,9 +79,16 @@ export class SolutionDiffPanelComposed {
     this.sourceEnvironmentId = sourceEnvironmentId;
     this.targetEnvironmentId = targetEnvironmentId;
 
-    // Create use cases
+    // Create services and use cases
+    const componentTypeRegistry = new ComponentTypeRegistry();
+    const componentDataFetcher = new ComponentDataFetcher(apiService, componentTypeRegistry, logger);
+    this.componentDiffMapper = new ComponentDiffViewModelMapper(componentTypeRegistry);
     this.compareUseCase = new CompareSolutionMetadataUseCase(solutionRepository, logger);
-    this.compareComponentsUseCase = new CompareSolutionComponentsUseCase(componentRepository, logger);
+    this.compareComponentsUseCase = new CompareSolutionComponentsUseCase(
+      componentRepository,
+      componentDataFetcher,
+      logger
+    );
 
     // Configure webview
     panel.webview.options = {
@@ -108,6 +120,7 @@ export class SolutionDiffPanelComposed {
     getEnvironments: () => Promise<EnvironmentOption[]>,
     solutionRepository: ISolutionRepository,
     componentRepository: ISolutionComponentRepository,
+    apiService: IDataverseApiService,
     logger: ILogger,
     sourceEnvironmentId?: string,
     targetEnvironmentId?: string
@@ -137,6 +150,7 @@ export class SolutionDiffPanelComposed {
       getEnvironments,
       solutionRepository,
       componentRepository,
+      apiService,
       logger,
       sourceEnvironmentId,
       targetEnvironmentId
@@ -478,7 +492,7 @@ export class SolutionDiffPanelComposed {
           targetSolution.id
         );
 
-        this.componentDiffViewModel = ComponentDiffViewModelMapper.toViewModel(componentComparison);
+        this.componentDiffViewModel = this.componentDiffMapper.toViewModel(componentComparison);
 
         this.logger.info('Component comparison completed', {
           sourceCount: this.componentDiffViewModel.sourceComponentCount,

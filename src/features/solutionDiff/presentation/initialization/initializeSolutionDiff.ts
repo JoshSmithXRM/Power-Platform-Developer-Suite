@@ -34,6 +34,7 @@ export async function initializeSolutionDiff(
     getEnvironments,
     solutionRepository,
     componentRepository,
+    dataverseApiService,
     logger,
     sourceEnvironmentId,
     targetEnvironmentId

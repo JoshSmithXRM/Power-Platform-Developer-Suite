@@ -32,7 +32,8 @@ describe('ListConnectionReferencesUseCase', () => {
 
 		mockSolutionComponentRepository = {
 			findComponentIdsBySolution: jest.fn(),
-			getObjectTypeCode: jest.fn()
+			getObjectTypeCode: jest.fn(),
+			findAllComponentsForSolution: jest.fn()
 		};
 
 		mockRelationshipBuilder = {

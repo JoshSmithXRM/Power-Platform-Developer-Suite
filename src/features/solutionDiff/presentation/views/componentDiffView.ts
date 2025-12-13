@@ -7,7 +7,8 @@ import { escapeHtml } from '../../../../shared/infrastructure/ui/views/htmlHelpe
 import type {
 	ComponentDiffViewModel,
 	ComponentTypeGroupViewModel,
-	ComponentViewModel
+	ComponentViewModel,
+	ModifiedComponentViewModel
 } from '../../application/viewModels/ComponentDiffViewModel';
 
 /**
@@ -55,6 +56,7 @@ function renderComponentTypeGroup(group: ComponentTypeGroupViewModel): string {
 				<span class="component-type-counts">
 					${group.added.length > 0 ? `<span class="count-added">+${group.added.length}</span>` : ''}
 					${group.removed.length > 0 ? `<span class="count-removed">-${group.removed.length}</span>` : ''}
+					${group.modified.length > 0 ? `<span class="count-modified">~${group.modified.length}</span>` : ''}
 					${group.same.length > 0 ? `<span class="count-same">${group.same.length} unchanged</span>` : ''}
 				</span>
 			</summary>
@@ -62,6 +64,7 @@ function renderComponentTypeGroup(group: ComponentTypeGroupViewModel): string {
 			<div class="component-lists">
 				${renderComponentList('Added (in target only)', group.added, 'added')}
 				${renderComponentList('Removed (in source only)', group.removed, 'removed')}
+				${renderModifiedComponentList('Modified (content differs)', group.modified)}
 				${renderComponentList('Unchanged', group.same, 'same')}
 			</div>
 		</details>
@@ -88,6 +91,42 @@ function renderComponentList(
 					<li>
 						<span class="component-name">${escapeHtml(c.name)}</span>
 						<span class="component-id">${escapeHtml(c.objectId)}</span>
+					</li>
+				`).join('')}
+			</ul>
+		</div>
+	`;
+}
+
+/**
+ * Renders a list of modified components with column-level diffs.
+ */
+function renderModifiedComponentList(
+	label: string,
+	components: readonly ModifiedComponentViewModel[]
+): string {
+	if (components.length === 0) {
+		return '';
+	}
+
+	return `
+		<div class="component-list component-list-modified">
+			<h5>${escapeHtml(label)} (${components.length})</h5>
+			<ul>
+				${components.map(c => `
+					<li class="modified-component">
+						<div class="modified-component-header">
+							<span class="component-name">${escapeHtml(c.name)}</span>
+							<span class="component-id">${escapeHtml(c.objectId)}</span>
+						</div>
+						<div class="column-diffs">
+							${c.columnDiffs.map(diff => `
+								<div class="column-diff">
+									<span class="column-name">${escapeHtml(diff.columnDisplayName)}</span>
+									<span class="column-summary">${escapeHtml(diff.summary)}</span>
+								</div>
+							`).join('')}
+						</div>
 					</li>
 				`).join('')}
 			</ul>

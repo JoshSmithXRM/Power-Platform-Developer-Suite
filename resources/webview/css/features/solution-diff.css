@@ -223,6 +223,56 @@
   background: rgba(255, 193, 7, 0.1);
 }
 
+/* Informational rows (expected to differ) */
+.property-label.informational {
+  color: var(--vscode-descriptionForeground);
+  font-weight: 400;
+}
+
+.info-tag {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.8;
+  font-style: italic;
+}
+
+/* Collapsible Solution Info Section */
+.solution-info-section {
+  margin-bottom: 16px;
+}
+
+.solution-info-header {
+  cursor: pointer;
+  padding: 10px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.solution-info-header:hover {
+  color: var(--vscode-textLink-foreground);
+}
+
+.solution-info-section summary::marker,
+.solution-info-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.solution-info-section summary::before {
+  content: '▶';
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.solution-info-section[open] summary::before {
+  transform: rotate(90deg);
+}
+
 /* Differences Section */
 .differences-section {
   margin-top: 16px;
@@ -456,4 +506,95 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 40%;
+}
+
+/* Modified Components (Deep Comparison) */
+.count-modified {
+  color: #ffc107;
+  font-weight: 500;
+}
+
+.component-list-modified h5 {
+  color: #ffc107;
+}
+
+.component-list-modified li {
+  background: rgba(255, 193, 7, 0.1);
+  border-left: 3px solid #ffc107;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.modified-component {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modified-component-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.column-diffs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(255, 193, 7, 0.3);
+  margin-left: 4px;
+}
+
+.column-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.column-name {
+  font-weight: 500;
+  color: var(--vscode-descriptionForeground);
+}
+
+.column-summary {
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  word-break: break-word;
+}
+
+/* Progress Bar for Deep Comparison */
+.comparison-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.progress-label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.progress-bar-container {
+  height: 4px;
+  background: var(--vscode-progressBar-background);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--vscode-progressBar-background);
+  background: var(--vscode-focusBorder);
+  transition: width 0.3s ease;
+}
+
+.progress-status {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
 }

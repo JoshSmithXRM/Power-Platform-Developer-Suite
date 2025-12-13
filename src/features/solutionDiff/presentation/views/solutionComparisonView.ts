@@ -6,6 +6,7 @@
 import { escapeHtml, classNames } from '../../../../shared/infrastructure/ui/views/htmlHelpers';
 import type { SolutionComparisonViewModel, SolutionOptionViewModel } from '../../application/viewModels/SolutionComparisonViewModel';
 import type { ComponentDiffViewModel } from '../../application/viewModels/ComponentDiffViewModel';
+
 import { renderComponentDiff } from './componentDiffView';
 
 /**
@@ -120,29 +121,55 @@ export function renderSolutionComparison(
 }
 
 /**
+ * Metadata row configuration.
+ */
+interface MetadataRow {
+  readonly label: string;
+  readonly source: string | null | undefined;
+  readonly target: string | null | undefined;
+  /** If true, difference is highlighted. If false, row is informational only. */
+  readonly isCompared: boolean;
+}
+
+/**
  * Renders side-by-side metadata comparison table.
+ *
+ * Rows are split into two categories:
+ * - Compared: Version, Publisher (differences are actionable)
+ * - Informational: Type, Modified, Installed (expected to differ between environments)
  */
 function renderMetadataTable(comparison: SolutionComparisonViewModel): string {
   const source = comparison.source;
   const target = comparison.target;
 
-  const rows = [
-    { label: 'Version', source: source?.version, target: target?.version },
-    { label: 'Type', source: source?.managedStateDisplay, target: target?.managedStateDisplay },
-    { label: 'Publisher', source: source?.publisherName, target: target?.publisherName },
-    { label: 'Modified', source: source?.modifiedOn, target: target?.modifiedOn },
-    { label: 'Installed', source: source?.installedOn, target: target?.installedOn }
+  // Compared rows - differences are actionable
+  const comparedRows: MetadataRow[] = [
+    { label: 'Version', source: source?.version, target: target?.version, isCompared: true },
+    { label: 'Publisher', source: source?.publisherName, target: target?.publisherName, isCompared: true }
   ];
 
-  const tableRows = rows.map(row => {
+  // Informational rows - expected to differ, shown for reference only
+  const informationalRows: MetadataRow[] = [
+    { label: 'Type', source: source?.managedStateDisplay, target: target?.managedStateDisplay, isCompared: false },
+    { label: 'Modified', source: source?.modifiedOn, target: target?.modifiedOn, isCompared: false },
+    { label: 'Installed', source: source?.installedOn, target: target?.installedOn, isCompared: false }
+  ];
+
+  const allRows = [...comparedRows, ...informationalRows];
+
+  const tableRows = allRows.map(row => {
     const sourceValue = row.source ?? 'N/A';
     const targetValue = row.target ?? 'N/A';
     const isDifferent = row.source !== row.target;
-    const rowClass = isDifferent ? 'diff-row' : '';
+
+    // Only highlight differences for compared rows
+    const rowClass = isDifferent && row.isCompared ? 'diff-row' : '';
+    // Informational rows get muted styling
+    const labelClass = row.isCompared ? 'property-label' : 'property-label informational';
 
     return `
       <tr class="${rowClass}">
-        <td class="property-label">${escapeHtml(row.label)}</td>
+        <td class="${labelClass}">${escapeHtml(row.label)}${row.isCompared ? '' : ' <span class="info-tag">(info)</span>'}</td>
         <td class="source-value">${escapeHtml(sourceValue)}</td>
         <td class="target-value">${escapeHtml(targetValue)}</td>
       </tr>
@@ -150,18 +177,21 @@ function renderMetadataTable(comparison: SolutionComparisonViewModel): string {
   }).join('');
 
   return `
-    <table class="comparison-table">
-      <thead>
-        <tr>
-          <th>Property</th>
-          <th>Source</th>
-          <th>Target</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${tableRows}
-      </tbody>
-    </table>
+    <details class="solution-info-section" open>
+      <summary class="solution-info-header">Solution Metadata</summary>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Source</th>
+            <th>Target</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+    </details>
   `;
 }
 
