@@ -178,6 +178,21 @@ export class DataversePluginPackageRepository implements IPluginPackageRepositor
 		return packageId;
 	}
 
+	public async delete(environmentId: string, packageId: string): Promise<void> {
+		this.logger.info('DataversePluginPackageRepository: Deleting package', {
+			environmentId,
+			packageId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginPackageRepository.ENTITY_SET}(${packageId})`;
+
+		await this.apiService.delete(environmentId, endpoint);
+
+		this.logger.info('DataversePluginPackageRepository: Package deleted', {
+			packageId,
+		});
+	}
+
 	private mapToDomain(dto: PluginPackageDto): PluginPackage {
 		return new PluginPackage(
 			dto.pluginpackageid,

@@ -255,6 +255,11 @@
                 "category": "Power Platform Developer Suite"
             },
             {
+                "command": "power-platform-dev-suite.unregisterPluginPackage",
+                "title": "Unregister Package",
+                "category": "Power Platform Developer Suite"
+            },
+            {
                 "command": "power-platform-dev-suite.metadataBrowser",
                 "title": "Metadata Browser",
                 "category": "Power Platform Developer Suite"
@@ -511,6 +516,16 @@
                 {
                     "command": "power-platform-dev-suite.unregisterPluginAssembly",
                     "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'assembly' && canUpdate",
+                    "group": "3_delete@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.unregisterPluginPackage",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'package' && canUpdate",
+                    "group": "3_delete@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.unregisterPluginPackage",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'assembly' && !isStandalone",
                     "group": "3_delete@1"
                 },
                 {

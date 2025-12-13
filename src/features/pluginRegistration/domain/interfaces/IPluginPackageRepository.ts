@@ -43,4 +43,13 @@ export interface IPluginPackageRepository {
 		version: string,
 		base64Content: string
 	): Promise<string>;
+
+	/**
+	 * Delete (unregister) a plugin package.
+	 * Package must have no assemblies (Dataverse will error if it does).
+	 *
+	 * @param environmentId - Target environment
+	 * @param packageId - ID of the package to delete
+	 */
+	delete(environmentId: string, packageId: string): Promise<void>;
 }

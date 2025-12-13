@@ -882,6 +882,79 @@ payload['workflowactivitygroupname'] =
 - `PluginRegistrationPanelComposed.ts` - Added `pendingUpdateAssemblyTypes`, modified update flow
 - `plugin-registration.js` - Made checkboxes editable, added status indicators
 
+### Session 14 (2025-12-12)
+**Unregister Plugin Package - COMPLETE**
+
+**Implemented:**
+- `IPluginPackageRepository.delete()` method
+- `DataversePluginPackageRepository.delete()` implementation
+- `UnregisterPluginPackageUseCase`
+- `unregisterPackage()` method in panel with confirmation dialog
+- Context menu command in package.json
+- Command handler in extension.ts
+- Context menu shows on both package nodes AND assembly-in-package nodes (consistency with Update Package)
+
+**Files Created:**
+- `src/features/pluginRegistration/application/useCases/UnregisterPluginPackageUseCase.ts`
+
+**Files Modified:**
+- `IPluginPackageRepository.ts` - Added `delete()` method
+- `DataversePluginPackageRepository.ts` - Implemented `delete()`
+- `PluginRegistrationPanelComposed.ts` - Added import, interface update, `unregisterPackage()` method
+- `initializePluginRegistration.ts` - Wired up UnregisterPluginPackageUseCase
+- `extension.ts` - Added command handler with packageId fallback
+- `package.json` - Added command and two context menu entries (package + assembly-in-package)
+
+---
+
+## Current Status Summary
+
+### COMPLETED ✅
+| Feature | Status |
+|---------|--------|
+| Read-only browsing (tree, filter, expand/collapse) | ✅ Slice 1 |
+| Enable/Disable steps | ✅ Slice 2 |
+| Update assembly (with type selection) | ✅ Slice 2+3 |
+| Update package | ✅ Slice 2 |
+| Register package | ✅ Slice 3 |
+| Register assembly (with Plugin Inspector) | ✅ Slice 3 |
+| Unregister assembly | ✅ Slice 3 |
+| Unregister package | ✅ Slice 3 |
+| Delta updates (instant UI for register/unregister) | ✅ Slice 3 |
+| Plugin Inspector .NET tool | ✅ Slice 3 |
+
+### REMAINING - MVP
+| Feature | Complexity | Notes |
+|---------|------------|-------|
+| Register New Step | HIGH | Complex form: SDK message, entity, stage, mode, filtering attrs |
+| Edit Step | MEDIUM | Reuses Register Step form, pre-populated |
+| Delete Step | LOW | Confirmation dialog + API call |
+| Register New Image | MEDIUM | Form: image type, name, attributes |
+| Edit Image | MEDIUM | Reuses Register Image form, pre-populated |
+| Delete Image | LOW | Confirmation dialog + API call |
+| Detail panel | MEDIUM | Show metadata when node selected |
+| Selected item indicator | LOW | Visual highlight for selected tree node |
+| Unit tests | HIGH | Domain + application layer (required before PR) |
+
+### DEFERRED - Post-MVP
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| Solution filtering | Medium | Filter tree by solution (performance optimization) |
+| Add to Solution action | Low | Right-click → add assembly/package to solution |
+| Persist filter checkboxes | Low | Remember Hide Microsoft / Hide Hidden Steps |
+
+### MVP Definition (Locked)
+**MVP = 24 features total**
+- 15 completed features (tree, filters, assembly/package CRUD, enable/disable)
+- 6 step/image CRUD features (register, edit, delete for both)
+- Detail panel with selected item indicator
+- Unit tests (last before PR)
+
+**Explicitly OUT of MVP:**
+- Solution filtering (complex, deferred pending user feedback)
+- Add to Solution action (nice-to-have)
+- Filter checkbox persistence (nice-to-have)
+
 ---
 
 ## Pre-PR Polish Checklist
