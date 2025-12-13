@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "environmentId": "env-1765563807619-5aegsdec0",
+    "environmentName": "Demo - Dev",
+    "environmentUrl": "https://orgcabef92d.crm.dynamics.com"
+  },
+  "cells": [
+    {
+      "kind": "markdown",
+      "source": "# Power Platform Developer Suite Notebook\n\nSelect an environment using the status bar picker, then write SQL or FetchXML queries in the cells below.\n\n**Tip:** Use the toggle button in the cell toolbar to convert between SQL and FetchXML."
+    },
+    {
+      "kind": "sql",
+      "source": "SELECT * FROM flowlog"
+    },
+    {
+      "kind": "sql",
+      "source": "SELECT\r\nTOP 10\r\n  solutionid,\r\n  completedon,\r\n  modifiedon,\r\n  completedon,\r\n  solutionname,\r\n  importcontext,\r\n  name,\r\n  organizationid,\r\n  organizationidname,\r\n  importjobid,\r\n  modifiedby,\r\n  modifiedbyname,\r\n  createdon,\r\n  startedon,\r\n  operationcontext,\r\n  progress,\r\n  createdby,\r\n  createdbyname\r\nFROM importjob"
+    },
+    {
+      "kind": "sql",
+      "source": "SELECT TOP 10 * FROM workflowlog"
+    },
+    {
+      "kind": "sql",
+      "source": "SELECT TOP 10 * FROM powerpageslog"
+    },
+    {
+      "kind": "sql",
+      "source": "SELECT TOP 10 * FROM plugintracelog"
+    },
+    {
+      "kind": "sql",
+      "source": "SELECT TOP 10 * FROM privilegecheckerlog"
+    },
+    {
+      "kind": "sql",
+      "source": "SELECT * FROM pluginassembly\r\nWHERE name LIKE '%PPDS%'"
+    }
+  ]
+}
