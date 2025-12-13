@@ -1194,11 +1194,25 @@ Add solution dropdown to Register Step form:
 
 #### Phase 8: Step Name Auto-Generation
 
-Match PRT naming convention (user researching exact format):
-- Likely: `{PluginTypeName}: {Message} of {Entity}`
-- Or: `{PluginTypeName}: {Stage} {Message} of {Entity}`
-- Auto-update as Message/Entity/Stage changes
-- User can still edit manually
+**Format:** `{PluginTypeName}: {MessageName} of {PrimaryEntity}[ and {SecondaryEntity}]`
+
+**Examples:**
+- `MyCompany.Plugins.AccountHandler: Create of account`
+- `MyCompany.Plugins.ContactMerge: Merge of contact and lead`
+- `Microsoft.Crm.ServiceBus.ServiceBusPlugin: Update of any Entity`
+
+**Logic (from PRT source):**
+1. Plugin type name + `: ` (if provided)
+2. Message name + ` of ` (or "Not Specified of " if missing)
+3. Primary entity name (if provided and not "none")
+4. If secondary entity exists, add ` and {secondaryEntity}`
+5. If no entity specified, use "any Entity"
+
+**Implementation:**
+- Create domain service: `src/features/pluginRegistration/domain/services/PluginStepNameGenerator.ts`
+- Track `userHasEditedName` flag in form state
+- Auto-regenerate when message/entity changes (only if user hasn't customized)
+- Use same value for both `name` and `description` fields (PRT does this)
 
 #### Phase 9: Auto-Expand After Add Step
 
@@ -1221,28 +1235,64 @@ When step is successfully added:
 9. **Step name auto-generation** - Format TBD based on PRT research
 10. **Auto-expand after add step** - Expand parent node + scroll into view
 
-### Design Decisions (Pending User Approval)
+### Design Decisions (APPROVED ✅)
 
-#### Decision 1: Filtering Attributes - Picker Dialog vs Tag Input
-**Recommendation: Picker Dialog with Checkboxes**
-- Better discoverability - users see all available attributes
-- Select multiple with clicks vs typing each name
-- Can't misspell attribute names
-- Add search filter at top for large entities (Account has 100+ attributes)
+#### Decision 1: Filtering Attributes - Picker Dialog ✅
+- Picker dialog with searchable checkbox list
+- Sorted by logical name ascending
+- Search filter at top for large entities
 
-#### Decision 2: System Users - Filter/Limit Strategy
-**Recommendation: Type-to-search with minimum 2 characters**
-- "Calling User" as default (no impersonation, most common)
-- Type 2+ chars to trigger search: `$filter=isdisabled eq false and contains(fullname, '{search}')&$top=50`
-- No pre-loading (environments can have thousands of users)
-- Loading indicator during search
+#### Decision 2: System Users - Type-to-Search ✅
+- "Calling User" as default
+- Type 2+ chars to trigger search
+- Search on BOTH `fullname` AND `domainname` (email)
+- Query: `$filter=isdisabled eq false and (contains(fullname, '{search}') or contains(domainname, '{search}'))&$top=50`
 
-#### Decision 3: Entity List - Pre-load vs Dynamic
-**Recommendation: Dynamic fetch with client-side caching**
-- On message change: `sdkmessagefilter?$filter=_sdkmessageid_value eq '{messageId}'`
-- Cache results in memory (Map of messageId → entities)
-- Re-selecting same message is instant from cache
-- Keeps modal open fast, small per-message payloads
+#### Decision 3: Entity List - Dynamic with Caching ✅
+- On message change: fetch `sdkmessagefilter?$filter=_sdkmessageid_value eq '{messageId}'`
+- Cache results (Map of messageId → entities)
+- Sorted by logical name ascending
+- Entity field is combobox-constrained (no validation needed - user can only select valid entities)
+
+#### Decision 4: Step Name Generation ✅
+- Format: `{PluginTypeName}: {MessageName} of {PrimaryEntity}[ and {SecondaryEntity}]`
+- Auto-regenerate when message/entity changes (only if user hasn't customized name)
+- Same value for `name` and `description` fields
+
+### Open Questions (Need User Input)
+
+#### Question 1: Image `messagepropertyname`
+When registering step images, we need to set the correct `messagepropertyname`:
+- Create/Update/Delete → "Target"
+- SetState/SetStateDynamicEntity → "EntityMoniker"
+- Associate/Disassociate → "Target", "RelatedEntities", "Relationship"
+
+**Options:**
+A. Auto-set based on message (most common case is "Target")
+B. Add dropdown for user to select from valid options
+C. Auto-set to "Target" as default, allow user to override
+
+#### Question 2: Stage Validation
+Some message/stage combinations are invalid (e.g., can't do PostOperation on certain messages).
+
+**Options:**
+A. Validate client-side and show warning before submit
+B. Let Dataverse return the error (simpler, but worse UX)
+C. Filter stage dropdown based on message (only show valid stages)
+
+#### Question 3: Image Attributes Picker
+The image form has an "Attributes" field for selecting which entity attributes to include in the image.
+
+**Options:**
+A. Same picker dialog as Filtering Attributes (searchable checkbox list)
+B. Simple text field (current implementation)
+
+#### Question 4: Description Field for Steps
+PRT has a description field. We're now using step name for both `name` and `description`.
+
+**Options:**
+A. Keep it simple - same value for both (current plan)
+B. Add separate description field for custom descriptions
 
 ### Technical Considerations
 
