@@ -33,6 +33,7 @@ import type { UpdatePluginPackageUseCase } from '../../application/useCases/Upda
 import type { RegisterPluginPackageUseCase } from '../../application/useCases/RegisterPluginPackageUseCase';
 import type { RegisterPluginAssemblyUseCase } from '../../application/useCases/RegisterPluginAssemblyUseCase';
 import type { UnregisterPluginAssemblyUseCase } from '../../application/useCases/UnregisterPluginAssemblyUseCase';
+import type { UnregisterPluginPackageUseCase } from '../../application/useCases/UnregisterPluginPackageUseCase';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
 import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
 import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
@@ -62,6 +63,7 @@ export interface PluginRegistrationUseCases {
 	readonly registerPackage: RegisterPluginPackageUseCase;
 	readonly registerAssembly: RegisterPluginAssemblyUseCase;
 	readonly unregisterAssembly: UnregisterPluginAssemblyUseCase;
+	readonly unregisterPackage: UnregisterPluginPackageUseCase;
 }
 
 /**
@@ -1274,6 +1276,67 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private async handleUnregisterAssembly(assemblyId: string, _assemblyName: string): Promise<void> {
 		// Delegate to the public method which handles confirmation and execution
 		await this.unregisterAssembly(assemblyId);
+	}
+
+	/**
+	 * Unregister (delete) a plugin package. Called from context menu command.
+	 * Shows confirmation dialog, then deletes the package.
+	 */
+	public async unregisterPackage(packageId: string): Promise<void> {
+		this.logger.info('Unregistering plugin package', { packageId });
+
+		// Fetch package and environment info for better messaging
+		const [pkg, environment] = await Promise.all([
+			this.repositories.package.findById(this.currentEnvironmentId, packageId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+
+		const packageName = pkg?.getName() ?? 'Unknown Package';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		// Confirm deletion with user
+		const confirmation = await vscode.window.showWarningMessage(
+			`Are you sure you want to unregister "${packageName}" from ${environmentName}? This will delete the package and cannot be undone.`,
+			{ modal: true },
+			'Unregister'
+		);
+
+		if (confirmation !== 'Unregister') {
+			return; // User cancelled
+		}
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Unregistering ${packageName} from ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.unregisterPackage.execute(
+						this.currentEnvironmentId,
+						packageId,
+						packageName
+					);
+
+					// Send delta update to webview (instant, no full refresh)
+					await this.panel.postMessage({
+						command: 'removeNode',
+						data: { nodeId: packageId },
+					});
+
+					void vscode.window.showInformationMessage(
+						`${packageName} unregistered successfully from ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to unregister plugin package', error);
+					void vscode.window.showErrorMessage(
+						`Failed to unregister ${packageName} from ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
 	}
 
 	/**

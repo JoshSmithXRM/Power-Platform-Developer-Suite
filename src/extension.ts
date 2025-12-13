@@ -604,6 +604,24 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	);
 
+	const unregisterPluginPackageCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.unregisterPluginPackage',
+		async (contextMenuContext?: { nodeId?: string; packageId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			// packageId is set when clicking on an assembly-in-package, nodeId when clicking on package directly
+			const packageId = contextMenuContext?.packageId ?? contextMenuContext?.nodeId;
+			if (!packageId) {
+				vscode.window.showWarningMessage('No package selected.');
+				return;
+			}
+			await panel.unregisterPackage(packageId);
+		}
+	);
+
 	const metadataBrowserCommand = vscode.commands.registerCommand('power-platform-dev-suite.metadataBrowser', async (environmentItem?: { envId: string }) => {
 		try {
 			void initializeMetadataBrowser(context, factories.getEnvironments, factories.dataverseApiServiceFactory, container.environmentRepository, container.logger, environmentItem?.envId);
@@ -772,6 +790,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		updatePluginAssemblyCommand,
 		updatePluginPackageCommand,
 		unregisterPluginAssemblyCommand,
+		unregisterPluginPackageCommand,
 		metadataBrowserCommand,
 		metadataBrowserPickEnvironmentCommand,
 		dataExplorerCommand,
