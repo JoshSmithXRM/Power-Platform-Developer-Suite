@@ -1017,13 +1017,9 @@ payload['workflowactivitygroupname'] =
 |---------|----------|-------|
 | Filterable Message combobox | HIGH | Type-to-filter dropdown (hundreds of messages) |
 | Primary Entity autocomplete | HIGH | Filter entities based on selected message |
+| Secondary Entity field | HIGH | For messages that support it (Associate, SetState, etc.) |
+| Run in User's Context dropdown | HIGH | User lookup for impersonation |
 | Filtering Attributes picker | HIGH | Better than comma-separated text input |
-
-### DEFERRED UX (Post-MVP)
-| Feature | Priority | Notes |
-|---------|----------|-------|
-| Run in User's Context dropdown | Low | User lookup for impersonation |
-| Secondary entity field | Low | For messages that support it (Associate, etc.) |
 
 ### DEFERRED - Post-MVP
 | Feature | Priority | Notes |
@@ -1044,7 +1040,12 @@ payload['workflowactivitygroupname'] =
 - ✅ Plugin Inspector tool for DLL analysis
 
 **Required before MVP complete:**
-- ⬜ **Step form UX polish** (filterable combobox, entity autocomplete, attribute picker)
+- ⬜ **Step form UX polish:**
+  - Filterable combobox for Message
+  - Primary Entity autocomplete (based on message)
+  - Secondary Entity field (for Associate, SetState, etc.)
+  - Run in User's Context dropdown (user lookup)
+  - Filtering Attributes picker
 - ⬜ Detail panel (show metadata when node selected)
 - ⬜ Unit tests (required before PR)
 
@@ -1052,8 +1053,6 @@ payload['workflowactivitygroupname'] =
 - Solution filtering (complex, deferred pending user feedback)
 - Add to Solution action (nice-to-have)
 - Filter checkbox persistence (nice-to-have)
-- Run in User's Context dropdown
-- Secondary entity field
 
 ---
 
@@ -1078,7 +1077,9 @@ Before merging Slices 1-3:
 
 1. **Message Field**: Standard `<select>` dropdown with hundreds of messages - impossible to find specific message quickly
 2. **Primary Entity Field**: Plain text input - user must know exact entity logical name
-3. **Filtering Attributes Field**: Plain text comma-separated - user must know exact attribute logical names
+3. **Secondary Entity Field**: Missing entirely - needed for Associate, SetState, etc.
+4. **Run in User's Context**: Missing - needed for impersonation scenarios
+5. **Filtering Attributes Field**: Plain text comma-separated - user must know exact attribute logical names
 
 ### Proposed Solutions
 
@@ -1141,12 +1142,37 @@ Click "..." → postMessage('getEntityAttributes', entityLogicalName)
 - Add help text: "Enter attribute logical names (use Metadata Browser to find names)"
 - Least effort, acceptable for power users
 
+#### Phase 4: Secondary Entity Field
+
+For messages like Associate, SetState, SetStateDynamicEntity:
+- Add Secondary Entity combobox below Primary Entity
+- Same autocomplete behavior as Primary Entity
+- Only shown/enabled for messages that support it
+- Can be determined from sdkmessagefilter (secondaryobjecttypecode field)
+
+#### Phase 5: Run in User's Context Dropdown
+
+For step impersonation:
+- Add "Run in User's Context" combobox
+- Options: "Calling User" (default), or specific system user
+- Need to fetch system users from Dataverse
+- Maps to `impersonatinguserid` field on step
+
+**Data flow:**
+```
+Modal opens → postMessage('getSystemUsers')
+           → Extension fetches systemuser records (id, fullname)
+           → Populates dropdown with user options
+```
+
 ### Implementation Order
 
 1. **FilterableComboBox component** - Unlocks all other improvements
 2. **Message field → combobox** - Immediate high-value improvement
 3. **Primary Entity → combobox** - Need to load sdkmessagefilters per message
-4. **Filtering Attributes picker** - Most complex, needs metadata integration
+4. **Secondary Entity field** - Similar to Primary Entity, conditional display
+5. **Run in User's Context dropdown** - Need to load system users
+6. **Filtering Attributes picker** - Most complex, needs metadata integration
 
 ### Technical Considerations
 
