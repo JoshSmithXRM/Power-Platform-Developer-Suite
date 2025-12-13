@@ -2,7 +2,7 @@
 
 **Branch:** `feature/plugin-registration`
 **Created:** 2025-12-08
-**Status:** Implementation (Slice 3 In Progress)
+**Status:** Implementation (Slice 3 Near Complete - Step/Image CRUD Done)
 
 ---
 
@@ -514,41 +514,48 @@ See: `#### .NET Plugin Inspector Tool` section below for design.
 3. **No prefix on name:** Unlike packages, assemblies use just the assembly name (e.g., "PPDSDemo.Plugins")
 4. **Solution optional:** Can register without adding to solution, matching PRT behavior.
 
-#### Register New Step
-- [ ] Right-click plugin type → "Register New Step..."
-- [ ] Modal/form with fields:
-  - SDK Message (dropdown/autocomplete)
-  - Primary Entity (dropdown/autocomplete, optional)
-  - Secondary Entity (optional)
+#### Register New Step - COMPLETE ✅
+- [x] Right-click plugin type → "Register New Step..."
+- [x] Modal/form with fields:
+  - SDK Message dropdown (required)
+  - Primary Entity text field (looked up to sdkMessageFilter)
+  - Filtering Attributes (comma-separated, for Create/Update messages)
+  - Step Name (auto-populated with plugin type name)
   - Execution Stage (dropdown: PreValidation, PreOperation, PostOperation)
   - Execution Mode (dropdown: Synchronous, Asynchronous)
-  - Filtering Attributes (multi-select, optional)
-  - Step Name (auto-generated but editable)
-  - Rank/Order (number)
-  - Configuration (text, optional)
-- [ ] API: POST sdkmessageprocessingsteps
-- [ ] Refresh tree after successful registration
+  - Execution Order (rank)
+  - Deployment (Server Only, Offline Only, Server and Offline)
+  - Delete AsyncOperation if Successful (checkbox)
+  - Unsecure Configuration (textarea)
+  - Secure Configuration (textarea, stored in separate entity)
+- [x] API: POST sdkmessageprocessingsteps + POST sdkmessageprocessingstepsecureconfig
+- [x] Delta update (no full tree refresh)
 
-#### Register New Image
-- [ ] Right-click step → "Register New Image..."
-- [ ] Modal/form with fields:
+#### Register New Image - COMPLETE ✅
+- [x] Right-click step → "Register New Image..."
+- [x] Modal/form with fields:
   - Image Type (dropdown: PreImage, PostImage, Both)
-  - Name/Alias
-  - Entity Alias
-  - Attributes (multi-select or comma-separated)
-- [ ] API: POST sdkmessageprocessingstepimages
-- [ ] Refresh tree after successful registration
+  - Name/Entity Alias
+  - Attributes (comma-separated)
+- [x] API: POST sdkmessageprocessingstepimages
+- [x] Delta update (no full tree refresh)
 
-#### Edit Step
-- [ ] Right-click step → "Edit Step..."
-- [ ] Same form as Register, pre-populated with current values
-- [ ] API: PATCH sdkmessageprocessingsteps
+#### Edit Step - COMPLETE ✅
+- [x] Right-click step → "Edit Step..."
+- [x] Same form as Register, pre-populated with current values
+- [x] API: PATCH sdkmessageprocessingsteps
 
-#### Delete Operations
-- [ ] Right-click assembly → "Delete Assembly" (with confirmation)
-- [ ] Right-click step → "Delete Step" (with confirmation)
-- [ ] Right-click image → "Delete Image" (with confirmation)
-- [ ] Appropriate refresh after deletion
+#### Edit Image - COMPLETE ✅
+- [x] Right-click image → "Edit Image..."
+- [x] Same form as Register, pre-populated with current values
+- [x] API: PATCH sdkmessageprocessingstepimages
+
+#### Delete Operations - COMPLETE ✅
+- [x] Right-click assembly → "Unregister Assembly" (with confirmation)
+- [x] Right-click package → "Unregister Package" (with confirmation)
+- [x] Right-click step → "Unregister Step" (with confirmation)
+- [x] Right-click image → "Unregister Image" (with confirmation)
+- [x] Delta updates (node removal, no full refresh)
 
 #### .NET Plugin Inspector Tool - TODO
 A .NET console application bundled with the extension to analyze plugin DLLs.
@@ -587,15 +594,16 @@ A .NET console application bundled with the extension to analyze plugin DLLs.
 - [ ] Populate type selection UI in registration modal
 - [ ] Register selected types as `plugintype` records
 
-### Implementation Order (Updated)
-1. ✅ Register Package - COMPLETE
-2. 🔄 Register Assembly - IN PROGRESS (blocked on Plugin Inspector Tool)
-3. **Plugin Inspector Tool** - NEXT (unblocks assembly registration)
-4. Register Plugin Types (after tool complete)
-5. Register Step (complex form, needs SDK message/entity lookups)
-6. Register Image (moderate complexity)
-7. Edit Step (reuses Register Step form)
-8. Delete operations (confirmation dialogs)
+### Implementation Order (COMPLETE ✅)
+1. ✅ Register Package
+2. ✅ Register Assembly (with Plugin Inspector Tool)
+3. ✅ Plugin Inspector Tool (.NET tool for DLL analysis)
+4. ✅ Register Plugin Types (integrated with assembly registration)
+5. ✅ Register Step (with sdkMessageFilter lookup, secure config)
+6. ✅ Register Image
+7. ✅ Edit Step
+8. ✅ Edit Image
+9. ✅ Unregister operations (assembly, package, step, image)
 
 ### Session 9 (2025-12-12)
 **Register Plugin Package - COMPLETE**
@@ -905,6 +913,71 @@ payload['workflowactivitygroupname'] =
 - `extension.ts` - Added command handler with packageId fallback
 - `package.json` - Added command and two context menu entries (package + assembly-in-package)
 
+### Session 15 (2025-12-13)
+**Step/Image CRUD Operations - COMPLETE**
+
+**Register Step - Full PRT Parity:**
+- Created `RegisterPluginStepUseCase` with full field support
+- Created `SdkMessageFilter` entity and repository for entity-specific step registration
+- Added `DataverseSdkMessageFilterRepository` with `findByMessageAndEntity()` lookup
+- `sdkmessagefilterid` links message to entity (required for entity-specific steps)
+- Secure configuration stored in separate `sdkmessageprocessingstepsecureconfig` entity
+- Created secure config automatically and linked to step on registration
+
+**Register/Edit Step Form Fields:**
+1. **General Configuration section:**
+   - Message dropdown (required)
+   - Primary Entity text field (looked up to sdkMessageFilter)
+   - Filtering Attributes (only for Create/Update/CreateMultiple/UpdateMultiple/OnExternalUpdated)
+   - Step Name (auto-populated with plugin type name)
+2. **Execution section:**
+   - Stage (Pre-validation/Pre-operation/Post-operation)
+   - Mode (Synchronous/Asynchronous)
+   - Execution Order (rank)
+   - Deployment (Server Only/Offline Only/Server and Offline)
+   - Delete AsyncOperation if Successful checkbox
+3. **Configuration section:**
+   - Unsecure Configuration textarea
+   - Secure Configuration textarea
+
+**Register/Edit Image Form Fields:**
+- Image Type (PreImage/PostImage/Both)
+- Name (entity alias)
+- Attributes (comma-separated list)
+
+**FormModal Component Enhancements:**
+- Added `type: 'section'` - renders visual section headers
+- Added `type: 'checkbox'` - single checkbox with inline label
+- Made form body scrollable (max-height: 60vh)
+- Added custom `width` parameter support
+
+**Bug Fixes:**
+- Fixed `iscustomizable` property not existing on sdkmessage entity
+- Fixed `Microsoft.Crm.ServiceBus` filter exclusion
+- Refactored `RegisterPluginAssemblyUseCase` to satisfy max-lines-per-function rule
+
+**Files Created:**
+- `src/.../domain/entities/SdkMessageFilter.ts`
+- `src/.../domain/interfaces/ISdkMessageFilterRepository.ts`
+- `src/.../infrastructure/repositories/DataverseSdkMessageFilterRepository.ts`
+- `src/.../application/useCases/RegisterPluginStepUseCase.ts`
+- `src/.../application/useCases/UpdatePluginStepUseCase.ts`
+- `src/.../application/useCases/RegisterStepImageUseCase.ts`
+- `src/.../application/useCases/UpdateStepImageUseCase.ts`
+- `src/.../application/useCases/UnregisterPluginStepUseCase.ts`
+- `src/.../application/useCases/UnregisterStepImageUseCase.ts`
+
+**Files Modified:**
+- `FormModal.js` - Section and checkbox support
+- `form-modal.css` - Section header and checkbox styles
+- `plugin-registration.js` - Step/image modal handlers
+- `IPluginStepRepository.ts` - Extended RegisterStepInput/UpdateStepInput
+- `DataversePluginStepRepository.ts` - Full step registration with secure config
+- `DataverseSdkMessageRepository.ts` - Removed non-existent iscustomizable field
+- `PluginRegistrationPanelComposed.ts` - Step/image CRUD handlers
+- `initializePluginRegistration.ts` - Wired up new use cases and repositories
+- `RegisterPluginAssemblyUseCase.ts` - Refactored into smaller methods
+
 ---
 
 ## Current Status Summary
@@ -920,23 +993,33 @@ payload['workflowactivitygroupname'] =
 | Register assembly (with Plugin Inspector) | ✅ Slice 3 |
 | Unregister assembly | ✅ Slice 3 |
 | Unregister package | ✅ Slice 3 |
-| Unregister step | ✅ Slice 3 |
-| Unregister image | ✅ Slice 3 |
 | Delta updates (instant UI for register/unregister) | ✅ Slice 3 |
 | Plugin Inspector .NET tool | ✅ Slice 3 |
+| **Register step** | ✅ Slice 3 |
+| **Edit step** | ✅ Slice 3 |
+| **Unregister step** | ✅ Slice 3 |
+| **Register image** | ✅ Slice 3 |
+| **Edit image** | ✅ Slice 3 |
+| **Unregister image** | ✅ Slice 3 |
+| **SdkMessageFilter repository** | ✅ Slice 3 |
+| **Secure config handling** | ✅ Slice 3 |
+| **FormModal enhancements (sections, checkboxes)** | ✅ Slice 3 |
 
 ### REMAINING - MVP
 | Feature | Complexity | Notes |
 |---------|------------|-------|
-| Register New Step | ✅ DONE | Complex form: SDK message, stage, mode, filtering attrs |
-| Edit Step | ✅ DONE | Reuses Register Step form, pre-populated |
-| Unregister Step | ✅ DONE | Confirmation dialog + API call |
-| Register New Image | ✅ DONE | Form: image type, name, attributes |
-| Edit Image | ✅ DONE | Reuses Register Image form, pre-populated |
-| Unregister Image | ✅ DONE | Confirmation dialog + API call |
 | Detail panel | MEDIUM | Show metadata when node selected |
 | Selected item indicator | LOW | Visual highlight for selected tree node |
 | Unit tests | HIGH | Domain + application layer (required before PR) |
+
+### NICE-TO-HAVE (Post-MVP UX Improvements)
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| Searchable message dropdown | Medium | Autocomplete like PRT message selector |
+| Primary entity autocomplete | Medium | Based on selected message's supported entities |
+| Filtering attributes picker | Medium | Dialog with entity attributes as checkboxes |
+| Run in User's Context dropdown | Low | User lookup for impersonation |
+| Secondary entity field | Low | For messages that support it (Associate, etc.) |
 
 ### DEFERRED - Post-MVP
 | Feature | Priority | Notes |
@@ -945,25 +1028,37 @@ payload['workflowactivitygroupname'] =
 | Add to Solution action | Low | Right-click → add assembly/package to solution |
 | Persist filter checkboxes | Low | Remember Hide Microsoft / Hide Hidden Steps |
 
-### MVP Definition (Locked)
-**MVP = 24 features total**
-- 15 completed features (tree, filters, assembly/package CRUD, enable/disable)
-- 6 step/image CRUD features (register, edit, delete for both)
-- Detail panel with selected item indicator
-- Unit tests (last before PR)
+### MVP Definition (Updated)
+**MVP = Core CRUD operations complete!**
+- ✅ Tree browsing with filters (packages, assemblies, types, steps, images)
+- ✅ Assembly CRUD (register, update with type selection, unregister)
+- ✅ Package CRUD (register, update, unregister)
+- ✅ Step CRUD (register, edit, unregister, enable/disable)
+- ✅ Image CRUD (register, edit, unregister)
+- ✅ Plugin Inspector tool for DLL analysis
+- ⬜ Detail panel (show metadata when node selected)
+- ⬜ Unit tests (required before PR)
 
 **Explicitly OUT of MVP:**
 - Solution filtering (complex, deferred pending user feedback)
 - Add to Solution action (nice-to-have)
 - Filter checkbox persistence (nice-to-have)
+- Advanced UX (searchable dropdowns, attribute picker) - functional but basic
 
 ---
 
 ## Pre-PR Polish Checklist
 
-Before merging Slices 1+2:
+Before merging Slices 1-3:
 - [ ] Detail panel - Show metadata when node selected
-- [ ] Solution filtering - Filter tree by solution
 - [ ] Unit tests - Domain and application layer tests
 - [x] Update operation UX - Progress indicator shows assembly/environment names ✅
+- [x] All CRUD operations - Package, Assembly, Step, Image ✅
+- [x] FormModal enhancements - Sections, single checkboxes, scrollable ✅
 - [ ] Webview filter regression tests (see Session 8)
+
+**Deferred to Post-MVP:**
+- [ ] Solution filtering - Filter tree by solution (complex, user feedback pending)
+- [ ] Searchable message dropdown (nice-to-have UX)
+- [ ] Entity autocomplete (nice-to-have UX)
+- [ ] Attribute picker dialog (nice-to-have UX)
