@@ -3,6 +3,7 @@ import { SolutionComponent } from '../../domain/entities/SolutionComponent';
 import { getComponentTypeDisplayName, ComponentType } from '../../domain/enums/ComponentType';
 import { ComponentTypeRegistry } from '../../domain/services/ComponentTypeRegistry';
 import { ColumnDiff } from '../../domain/valueObjects/ColumnDiff';
+import { ComponentData } from '../../domain/valueObjects/ComponentData';
 import {
 	ComponentDiffViewModel,
 	ComponentTypeGroupViewModel,
@@ -11,11 +12,19 @@ import {
 } from '../viewModels/ComponentDiffViewModel';
 
 /**
+ * Indicates which environment a component belongs to for display name lookup.
+ */
+type ComponentSource = 'source' | 'target';
+
+/**
  * Mapper: Transform domain ComponentComparison → ViewModel.
  *
  * Transformation only - NO business logic.
  */
 export class ComponentDiffViewModelMapper {
+	private sourceComponentData: ReadonlyMap<string, ComponentData> | undefined;
+	private targetComponentData: ReadonlyMap<string, ComponentData> | undefined;
+
 	constructor(private readonly registry: ComponentTypeRegistry) {}
 
 	/**
@@ -24,6 +33,10 @@ export class ComponentDiffViewModelMapper {
 	 * @param comparison - The domain comparison entity
 	 */
 	public toViewModel(comparison: ComponentComparison): ComponentDiffViewModel {
+		// Store ComponentData maps for display name lookup
+		this.sourceComponentData = comparison.getSourceComponentData();
+		this.targetComponentData = comparison.getTargetComponentData();
+
 		const isDeepComparison = true; // Always enabled
 		const diff = comparison.getDiff();
 		const groupedByType = comparison.getComponentsByType();
@@ -47,10 +60,13 @@ export class ComponentDiffViewModelMapper {
 			componentsByType.push({
 				type,
 				typeName: getComponentTypeDisplayName(type),
-				added: components.added.map(c => this.toComponentViewModel(c)),
-				removed: components.removed.map(c => this.toComponentViewModel(c)),
+				// Added = in target only, so look up name from target
+				added: components.added.map(c => this.toComponentViewModel(c, 'target')),
+				// Removed = in source only, so look up name from source
+				removed: components.removed.map(c => this.toComponentViewModel(c, 'source')),
 				modified,
-				same: components.same.map(c => this.toComponentViewModel(c)),
+				// Same = in both, prefer source for consistency
+				same: components.same.map(c => this.toComponentViewModel(c, 'source')),
 				totalCount: components.added.length + components.removed.length +
 					components.modified.length + components.same.length,
 				hasDifferences: components.added.length > 0 ||
@@ -108,27 +124,52 @@ export class ComponentDiffViewModelMapper {
 
 	/**
 	 * Transforms SolutionComponent entity to ComponentViewModel.
+	 *
+	 * @param component - The domain component entity
+	 * @param source - Which environment to look up display name from
 	 */
-	private toComponentViewModel(component: SolutionComponent): ComponentViewModel {
+	private toComponentViewModel(component: SolutionComponent, source: ComponentSource): ComponentViewModel {
+		const displayName = this.lookupDisplayName(component.getObjectId(), source);
+
 		return {
 			objectId: component.getObjectId(),
-			name: component.getName(),
+			name: displayName ?? component.getName(),
 			componentType: component.getComponentType()
 		};
 	}
 
 	/**
+	 * Looks up a display name from ComponentData maps.
+	 *
+	 * @param objectId - Component object ID (GUID)
+	 * @param source - Which environment to look up from
+	 * @returns Display name if found, undefined otherwise
+	 */
+	private lookupDisplayName(objectId: string, source: ComponentSource): string | undefined {
+		const dataMap = source === 'source' ? this.sourceComponentData : this.targetComponentData;
+		if (dataMap === undefined) {
+			return undefined;
+		}
+
+		const componentData = dataMap.get(objectId.toLowerCase());
+		return componentData?.getName();
+	}
+
+	/**
 	 * Transforms ModifiedComponent to ModifiedComponentViewModel.
+	 *
+	 * Modified components exist in both environments, so we use source for display name.
 	 */
 	private toModifiedComponentViewModel(
 		modified: ModifiedComponent,
 		componentType: ComponentType
 	): ModifiedComponentViewModel {
 		const config = this.registry.getConfig(componentType);
+		const displayName = this.lookupDisplayName(modified.component.getObjectId(), 'source');
 
 		return {
 			objectId: modified.component.getObjectId(),
-			name: modified.component.getName(),
+			name: displayName ?? modified.component.getName(),
 			componentType: modified.component.getComponentType(),
 			columnDiffs: modified.columnDiffs.map(diff => ({
 				columnName: diff.getColumnName(),

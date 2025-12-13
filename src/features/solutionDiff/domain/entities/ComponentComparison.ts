@@ -197,4 +197,20 @@ export class ComponentComparison {
 	public getTargetSolutionId(): string {
 		return this.targetSolutionId;
 	}
+
+	/**
+	 * Gets fetched component data from source environment.
+	 * Used by mappers to get display names for components.
+	 */
+	public getSourceComponentData(): ReadonlyMap<string, ComponentData> | undefined {
+		return this.sourceComponentData;
+	}
+
+	/**
+	 * Gets fetched component data from target environment.
+	 * Used by mappers to get display names for components.
+	 */
+	public getTargetComponentData(): ReadonlyMap<string, ComponentData> | undefined {
+		return this.targetComponentData;
+	}
 }
