@@ -235,6 +235,7 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			name: input.name,
 			sdkMessageId: input.sdkMessageId,
 			sdkMessageFilterId: input.sdkMessageFilterId,
+			solutionUniqueName: input.solutionUniqueName,
 		});
 
 		const endpoint = `/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}`;
@@ -276,6 +277,11 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			payload['impersonatinguserid@odata.bind'] = `/systemusers(${input.impersonatingUserId})`;
 		}
 
+		// Use MSCRM.SolutionUniqueName header for solution association
+		const additionalHeaders: Record<string, string> | undefined = input.solutionUniqueName
+			? { 'MSCRM.SolutionUniqueName': input.solutionUniqueName }
+			: undefined;
+
 		interface CreateResponse {
 			sdkmessageprocessingstepid: string;
 		}
@@ -283,7 +289,9 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 		const response = await this.apiService.post<CreateResponse>(
 			environmentId,
 			endpoint,
-			payload
+			payload,
+			undefined, // cancellationToken
+			additionalHeaders
 		);
 
 		const stepId = response.sdkmessageprocessingstepid;

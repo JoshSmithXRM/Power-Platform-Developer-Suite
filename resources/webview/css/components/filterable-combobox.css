@@ -141,10 +141,10 @@
 
 .filterable-combobox-highlight {
 	font-weight: 600;
-	color: var(--vscode-editor-findMatchHighlightBackground);
-	background: var(--vscode-editor-findMatchBackground);
+	/* Inherit text color from parent, only apply background highlight */
+	background: var(--vscode-editor-findMatchHighlightBackground);
 	border-radius: 2px;
-	padding: 0 1px;
+	padding: 1px 2px;
 }
 
 /* No results message */

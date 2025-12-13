@@ -85,6 +85,10 @@ window.showFormModal = function(options) {
 
 	// Track input elements for value retrieval
 	const inputElements = {};
+	// Track field containers for visibility toggling
+	const fieldContainers = {};
+	// Track initial values for dirty checking
+	const initialValues = {};
 
 	// Create fields
 	fields.forEach(field => {
@@ -99,6 +103,11 @@ window.showFormModal = function(options) {
 
 		const fieldContainer = document.createElement('div');
 		fieldContainer.className = 'form-modal-field';
+
+		// Handle initially hidden fields
+		if (field.hidden) {
+			fieldContainer.style.display = 'none';
+		}
 
 		const label = document.createElement('label');
 		label.className = 'form-modal-label';
@@ -132,6 +141,8 @@ window.showFormModal = function(options) {
 			checkboxContainer.appendChild(checkboxLabel);
 
 			inputElements[field.id] = { type: 'checkbox', element: input };
+			fieldContainers[field.id] = fieldContainer;
+			initialValues[field.id] = input.checked;
 			fieldContainer.appendChild(checkboxContainer);
 			body.appendChild(fieldContainer);
 			return; // Skip the rest
@@ -140,6 +151,7 @@ window.showFormModal = function(options) {
 			input = document.createElement('div');
 			input.className = 'form-modal-info';
 			input.textContent = field.value || '';
+			fieldContainers[field.id] = fieldContainer;
 			fieldContainer.appendChild(label);
 			fieldContainer.appendChild(input);
 			body.appendChild(fieldContainer);
@@ -192,6 +204,9 @@ window.showFormModal = function(options) {
 
 			// Store checkboxes array for later value retrieval
 			inputElements[field.id] = { type: 'checkboxGroup', checkboxes };
+			fieldContainers[field.id] = fieldContainer;
+			// Store initial checked values as array of values
+			initialValues[field.id] = checkboxes.filter(cb => cb.checked).map(cb => cb.value).join(',');
 
 			fieldContainer.appendChild(label);
 			fieldContainer.appendChild(groupContainer);
@@ -219,15 +234,28 @@ window.showFormModal = function(options) {
 				disabled: field.disabled,
 				onChange: (value) => {
 					if (onFieldChange) {
-						const updateField = (targetFieldId, newValue, targetOptions) => {
+						const updateField = (targetFieldId, newValue, targetOptions, visibility) => {
+							// Handle visibility toggling
+							if (visibility !== undefined) {
+								const container = fieldContainers[targetFieldId];
+								if (container) {
+									container.style.display = visibility ? '' : 'none';
+								}
+							}
 							const target = inputElements[targetFieldId];
 							if (target && target.type === 'combobox') {
 								if (targetOptions) {
 									target.instance.setOptions(targetOptions);
 								}
-								target.instance.setValue(newValue);
-							} else if (target) {
-								target.value = newValue;
+								if (newValue !== undefined) {
+									target.instance.setValue(newValue);
+								}
+							} else if (target && newValue !== undefined) {
+								if (target.type === 'checkbox') {
+									target.element.checked = newValue === true || newValue === 'true';
+								} else if (target.value !== undefined) {
+									target.value = newValue;
+								}
 							}
 						};
 						onFieldChange(field.id, value, updateField);
@@ -236,6 +264,8 @@ window.showFormModal = function(options) {
 			});
 
 			inputElements[field.id] = { type: 'combobox', instance: combobox };
+			fieldContainers[field.id] = fieldContainer;
+			initialValues[field.id] = field.value || '';
 
 			fieldContainer.appendChild(label);
 			fieldContainer.appendChild(combobox.element);
@@ -264,16 +294,29 @@ window.showFormModal = function(options) {
 		if (onFieldChange) {
 			const eventType = field.type === 'select' ? 'change' : 'input';
 			input.addEventListener(eventType, () => {
-				const updateField = (targetFieldId, newValue, targetOptions) => {
+				const updateField = (targetFieldId, newValue, targetOptions, visibility) => {
+					// Handle visibility toggling
+					if (visibility !== undefined) {
+						const container = fieldContainers[targetFieldId];
+						if (container) {
+							container.style.display = visibility ? '' : 'none';
+						}
+					}
 					const target = inputElements[targetFieldId];
 					if (target && target.type === 'combobox') {
 						// Handle combobox targets
 						if (targetOptions) {
 							target.instance.setOptions(targetOptions);
 						}
-						target.instance.setValue(newValue);
-					} else if (target) {
-						target.value = newValue;
+						if (newValue !== undefined) {
+							target.instance.setValue(newValue);
+						}
+					} else if (target && newValue !== undefined) {
+						if (target.type === 'checkbox') {
+							target.element.checked = newValue === true || newValue === 'true';
+						} else if (target.value !== undefined) {
+							target.value = newValue;
+						}
 					}
 				};
 				onFieldChange(field.id, input.value, updateField);
@@ -281,6 +324,8 @@ window.showFormModal = function(options) {
 		}
 
 		inputElements[field.id] = input;
+		fieldContainers[field.id] = fieldContainer;
+		initialValues[field.id] = input.value;
 
 		fieldContainer.appendChild(label);
 		fieldContainer.appendChild(input);
@@ -303,6 +348,7 @@ window.showFormModal = function(options) {
 	submitBtn.className = 'form-modal-button form-modal-button--primary';
 	submitBtn.textContent = submitLabel;
 	submitBtn.onclick = () => {
+		console.debug('[FormModal] Submit button clicked');
 		// Collect values
 		const values = {};
 		let isValid = true;
@@ -372,9 +418,13 @@ window.showFormModal = function(options) {
 			}
 		});
 
+		console.debug('[FormModal] Validation complete', { isValid, values });
 		if (isValid) {
+			console.debug('[FormModal] Calling onSubmit with values');
 			onSubmit(values);
 			removeDialog();
+		} else {
+			console.warn('[FormModal] Validation failed - form not submitted');
 		}
 	};
 
@@ -408,6 +458,29 @@ window.showFormModal = function(options) {
 		inputElements[firstInput.id].focus();
 	}
 
+	// Check if form has unsaved changes
+	const isDirty = () => {
+		for (const field of fields) {
+			// Skip section headers and info fields
+			if (field.type === 'section' || field.type === 'info') continue;
+
+			const input = inputElements[field.id];
+			const initial = initialValues[field.id];
+
+			if (field.type === 'checkbox') {
+				if (input.element.checked !== initial) return true;
+			} else if (field.type === 'checkboxGroup') {
+				const currentValues = input.checkboxes.filter(cb => cb.checked).map(cb => cb.value).join(',');
+				if (currentValues !== initial) return true;
+			} else if (field.type === 'combobox') {
+				if (input.instance.getValue() !== initial) return true;
+			} else if (input && input.value !== initial) {
+				return true;
+			}
+		}
+		return false;
+	};
+
 	// Keyboard shortcuts
 	dialog.addEventListener('keydown', (e) => {
 		if (e.key === 'Enter' && !e.shiftKey) {
@@ -415,14 +488,19 @@ window.showFormModal = function(options) {
 			submitBtn.click();
 		} else if (e.key === 'Escape') {
 			e.preventDefault();
-			cancelBtn.click();
+			// Only close if form is not dirty, or user confirms
+			if (!isDirty() || confirm('You have unsaved changes. Are you sure you want to close?')) {
+				cancelBtn.click();
+			}
 		}
 	});
 
-	// Close on overlay click (outside dialog)
+	// Close on overlay click (outside dialog) - also check dirty state
 	overlay.addEventListener('click', (e) => {
 		if (e.target === overlay) {
-			cancelBtn.click();
+			if (!isDirty() || confirm('You have unsaved changes. Are you sure you want to close?')) {
+				cancelBtn.click();
+			}
 		}
 	});
 

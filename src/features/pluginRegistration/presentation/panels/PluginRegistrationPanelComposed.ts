@@ -516,13 +516,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		});
 
 		this.coordinator.registerHandler('registerStep', async () => {
-			// TODO: Implement step registration (requires plugin type context)
-			void vscode.window.showInformationMessage('Register Step: Coming soon');
+			await this.handleRegisterStepFromDropdown();
 		});
 
 		this.coordinator.registerHandler('registerImage', async () => {
-			// TODO: Implement image registration (requires step context)
-			void vscode.window.showInformationMessage('Register Image: Coming soon');
+			await this.handleRegisterImageFromDropdown();
 		});
 
 		this.coordinator.registerHandler('getEntitiesForMessage', async (data) => {
@@ -603,36 +601,47 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				secureConfiguration?: string;
 				impersonatingUserId?: string;
 				description?: string;
+				solutionUniqueName?: string; // Solution to add step to
 			};
-			if (
-				stepData.pluginTypeId &&
-				stepData.sdkMessageId &&
-				stepData.name &&
-				stepData.stage !== undefined &&
-				stepData.mode !== undefined &&
-				stepData.rank !== undefined &&
-				stepData.supportedDeployment !== undefined &&
-				stepData.asyncAutoDelete !== undefined
-			) {
-				await this.handleConfirmRegisterStep({
-					pluginTypeId: stepData.pluginTypeId,
-					sdkMessageId: stepData.sdkMessageId,
-					sdkMessageFilterId: stepData.sdkMessageFilterId,
-					primaryEntity: stepData.primaryEntity,
-					secondaryEntity: stepData.secondaryEntity,
-					name: stepData.name,
-					stage: stepData.stage,
-					mode: stepData.mode,
-					rank: stepData.rank,
-					supportedDeployment: stepData.supportedDeployment,
-					filteringAttributes: stepData.filteringAttributes,
-					asyncAutoDelete: stepData.asyncAutoDelete,
-					unsecureConfiguration: stepData.unsecureConfiguration,
-					secureConfiguration: stepData.secureConfiguration,
-					impersonatingUserId: stepData.impersonatingUserId,
-					description: stepData.description,
-				});
+
+			// Validate required fields and provide specific feedback
+			const missingFields: string[] = [];
+			if (!stepData.pluginTypeId) missingFields.push('Plugin Type');
+			if (!stepData.sdkMessageId) missingFields.push('Message');
+			if (!stepData.name) missingFields.push('Step Name');
+			if (stepData.stage === undefined) missingFields.push('Stage');
+			if (stepData.mode === undefined) missingFields.push('Mode');
+			if (stepData.rank === undefined) missingFields.push('Execution Order');
+			if (stepData.supportedDeployment === undefined) missingFields.push('Deployment');
+			if (stepData.asyncAutoDelete === undefined) missingFields.push('Async Auto Delete');
+
+			if (missingFields.length > 0) {
+				this.logger.warn('Register step validation failed', { missingFields, stepData });
+				void vscode.window.showErrorMessage(
+					`Cannot register step: Missing required fields: ${missingFields.join(', ')}`
+				);
+				return;
 			}
+
+			await this.handleConfirmRegisterStep({
+				pluginTypeId: stepData.pluginTypeId!,
+				sdkMessageId: stepData.sdkMessageId!,
+				sdkMessageFilterId: stepData.sdkMessageFilterId,
+				primaryEntity: stepData.primaryEntity,
+				secondaryEntity: stepData.secondaryEntity,
+				name: stepData.name!,
+				stage: stepData.stage!,
+				mode: stepData.mode!,
+				rank: stepData.rank!,
+				supportedDeployment: stepData.supportedDeployment!,
+				filteringAttributes: stepData.filteringAttributes,
+				asyncAutoDelete: stepData.asyncAutoDelete!,
+				unsecureConfiguration: stepData.unsecureConfiguration,
+				secureConfiguration: stepData.secureConfiguration,
+				impersonatingUserId: stepData.impersonatingUserId,
+				description: stepData.description,
+				solutionUniqueName: stepData.solutionUniqueName,
+			});
 		});
 
 		this.coordinator.registerHandler('confirmEditStep', async (data) => {
@@ -1683,16 +1692,92 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	}
 
 	/**
+	 * Handle Register Step from dropdown menu.
+	 * Shows quick pick to select plugin type, then opens registration modal.
+	 */
+	private async handleRegisterStepFromDropdown(): Promise<void> {
+		this.logger.info('Register Step from dropdown - fetching plugin types');
+
+		// Fetch all plugin types
+		const pluginTypes = await this.repositories.pluginType.findAll(this.currentEnvironmentId);
+
+		if (pluginTypes.length === 0) {
+			void vscode.window.showWarningMessage(
+				'No plugin types found. Register an assembly first to create plugin types.'
+			);
+			return;
+		}
+
+		// Show quick pick to select plugin type
+		const items = pluginTypes.map((pt) => ({
+			label: pt.getName(),
+			description: pt.isWorkflowActivity() ? '(Workflow Activity)' : '(Plugin)',
+			pluginTypeId: pt.getId(),
+		}));
+
+		const selected = await vscode.window.showQuickPick(items, {
+			placeHolder: 'Select a plugin type to register a step for',
+			title: 'Register Step',
+		});
+
+		if (!selected) {
+			return; // User cancelled
+		}
+
+		// Proceed with step registration using the selected plugin type
+		await this.registerStep(selected.pluginTypeId);
+	}
+
+	/**
+	 * Handle Register Image from dropdown menu.
+	 * Shows quick pick to select step, then opens registration modal.
+	 */
+	private async handleRegisterImageFromDropdown(): Promise<void> {
+		this.logger.info('Register Image from dropdown - fetching steps');
+
+		// Fetch all steps
+		const steps = await this.repositories.step.findAll(this.currentEnvironmentId);
+
+		if (steps.length === 0) {
+			void vscode.window.showWarningMessage(
+				'No plugin steps found. Register a step first before adding images.'
+			);
+			return;
+		}
+
+		// Show quick pick to select step
+		const items = steps.map((step) => ({
+			label: step.getName(),
+			description: step.getMessageName(),
+			detail: step.isEnabled() ? 'Enabled' : 'Disabled',
+			stepId: step.getId(),
+		}));
+
+		const selected = await vscode.window.showQuickPick(items, {
+			placeHolder: 'Select a step to register an image for',
+			title: 'Register Image',
+		});
+
+		if (!selected) {
+			return; // User cancelled
+		}
+
+		// Proceed with image registration using the selected step
+		await this.registerImage(selected.stepId);
+	}
+
+	/**
 	 * Register a new plugin step. Called from context menu on plugin type.
 	 * Shows modal form, then creates the step.
 	 */
 	public async registerStep(pluginTypeId: string): Promise<void> {
 		this.logger.info('Registering new plugin step', { pluginTypeId });
 
-		// Fetch plugin type info and SDK messages for the form
-		const [pluginType, messages] = await Promise.all([
+		// Fetch plugin type info, SDK messages, and solutions for the form
+		const [pluginType, messages, solutions] = await Promise.all([
 			this.repositories.pluginType.findById(this.currentEnvironmentId, pluginTypeId),
 			this.repositories.sdkMessage.findAllPublic(this.currentEnvironmentId),
+			this.repositories.solution.findUnmanagedWithPublisherPrefix(this.currentEnvironmentId),
 		]);
 
 		const pluginTypeName = pluginType?.getName() ?? 'Unknown Plugin';
@@ -1704,6 +1789,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				pluginTypeId,
 				pluginTypeName,
 				messages: messages.map((m) => ({ id: m.getId(), name: m.getName() })),
+				solutions: solutions.map((s) => ({
+					id: s.id,
+					uniqueName: s.uniqueName,
+					name: s.name,
+				})),
 			},
 		});
 	}
@@ -1813,11 +1903,16 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		secureConfiguration?: string | undefined;
 		impersonatingUserId?: string | undefined;
 		description?: string | undefined;
+		solutionUniqueName?: string | undefined;
 	}): Promise<void> {
 		this.logger.debug('Handling register step confirmation', data);
 
-		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+		const [environment, pluginType] = await Promise.all([
+			this.getEnvironmentById(this.currentEnvironmentId),
+			this.repositories.pluginType.findById(this.currentEnvironmentId, data.pluginTypeId),
+		]);
 		const environmentName = environment?.name ?? 'Unknown Environment';
+		const pluginTypeName = pluginType?.getName() ?? 'Unknown Plugin';
 
 		await vscode.window.withProgress(
 			{
@@ -1855,6 +1950,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 							secureConfiguration: data.secureConfiguration,
 							impersonatingUserId: data.impersonatingUserId,
 							description: data.description,
+							solutionUniqueName: data.solutionUniqueName,
 						}
 					);
 
@@ -1882,7 +1978,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					}
 
 					void vscode.window.showInformationMessage(
-						`Step "${data.name}" registered successfully in ${environmentName}.`
+						`Step "${data.name}" registered for ${pluginTypeName} in ${environmentName}.`
 					);
 				} catch (error: unknown) {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -2010,13 +2106,17 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	}): Promise<void> {
 		this.logger.debug('Handling register image confirmation', data);
 
-		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+		const [environment, step] = await Promise.all([
+			this.getEnvironmentById(this.currentEnvironmentId),
+			this.repositories.step.findById(this.currentEnvironmentId, data.stepId),
+		]);
 		const environmentName = environment?.name ?? 'Unknown Environment';
+		const stepName = step?.getName() ?? 'Unknown Step';
 
 		await vscode.window.withProgress(
 			{
 				location: vscode.ProgressLocation.Notification,
-				title: `Registering image in ${environmentName}...`,
+				title: `Registering image for ${stepName}...`,
 				cancellable: false,
 			},
 			async () => {
@@ -2056,7 +2156,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					}
 
 					void vscode.window.showInformationMessage(
-						`Image "${data.name}" registered successfully in ${environmentName}.`
+						`Image "${data.name}" registered for ${stepName} in ${environmentName}.`
 					);
 				} catch (error: unknown) {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';

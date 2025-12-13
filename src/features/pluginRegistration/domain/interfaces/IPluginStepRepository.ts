@@ -18,6 +18,7 @@ export interface RegisterStepInput {
 	readonly secureConfiguration?: string | undefined; // Stored in separate entity
 	readonly impersonatingUserId?: string | undefined; // Run in User's Context (null = Calling User)
 	readonly description?: string | undefined;
+	readonly solutionUniqueName?: string | undefined; // Solution to add the step to
 }
 
 /**
