@@ -86,20 +86,8 @@ export class RegisterPluginAssemblyUseCase {
 			pluginTypeCount: input.pluginTypes.length,
 		});
 
-		// Basic validation
-		if (!input.name || input.name.trim().length === 0) {
-			throw new Error('Assembly name is required');
-		}
+		this.validateInput(input);
 
-		if (!input.base64Content || input.base64Content.length === 0) {
-			throw new Error('Assembly content is required');
-		}
-
-		if (input.pluginTypes.length === 0) {
-			throw new Error('At least one plugin type must be selected for registration');
-		}
-
-		// Step 1: Register the assembly
 		const assemblyId = await this.assemblyRepository.register(
 			environmentId,
 			input.name.trim(),
@@ -112,40 +100,7 @@ export class RegisterPluginAssemblyUseCase {
 			typeCount: input.pluginTypes.length,
 		});
 
-		// Step 2: Register each plugin type
-		const pluginTypeIds: string[] = [];
-
-		for (const pluginType of input.pluginTypes) {
-			try {
-				const isWorkflowActivity = pluginType.typeKind === 'WorkflowActivity';
-				const pluginTypeId = await this.pluginTypeRepository.register(environmentId, {
-					typeName: pluginType.typeName,
-					friendlyName: pluginType.displayName,
-					assemblyId,
-					isWorkflowActivity,
-					// For workflow activities, use the namespace as group name
-					...(isWorkflowActivity && {
-						workflowActivityGroupName: this.extractNamespace(pluginType.typeName),
-					}),
-				});
-
-				pluginTypeIds.push(pluginTypeId);
-
-				this.logger.debug('Plugin type registered', {
-					pluginTypeId,
-					typeName: pluginType.typeName,
-				});
-			} catch (error) {
-				// Log but continue with other types - partial success is better than total failure
-				this.logger.error('Failed to register plugin type', {
-					typeName: pluginType.typeName,
-					error,
-				});
-				throw new Error(
-					`Failed to register plugin type ${pluginType.displayName}: ${error instanceof Error ? error.message : 'Unknown error'}`
-				);
-			}
-		}
+		const pluginTypeIds = await this.registerPluginTypes(environmentId, assemblyId, input.pluginTypes);
 
 		this.logger.info('RegisterPluginAssemblyUseCase completed', {
 			assemblyId,
@@ -153,10 +108,75 @@ export class RegisterPluginAssemblyUseCase {
 			registeredTypeCount: pluginTypeIds.length,
 		});
 
-		return {
-			assemblyId,
-			pluginTypeIds,
-		};
+		return { assemblyId, pluginTypeIds };
+	}
+
+	/** Validates registration input. */
+	private validateInput(input: RegisterPluginAssemblyInput): void {
+		if (!input.name || input.name.trim().length === 0) {
+			throw new Error('Assembly name is required');
+		}
+		if (!input.base64Content || input.base64Content.length === 0) {
+			throw new Error('Assembly content is required');
+		}
+		if (input.pluginTypes.length === 0) {
+			throw new Error('At least one plugin type must be selected for registration');
+		}
+	}
+
+	/** Registers plugin types for an assembly. */
+	private async registerPluginTypes(
+		environmentId: string,
+		assemblyId: string,
+		pluginTypes: readonly PluginTypeToRegister[]
+	): Promise<string[]> {
+		const pluginTypeIds: string[] = [];
+
+		for (const pluginType of pluginTypes) {
+			const pluginTypeId = await this.registerSinglePluginType(
+				environmentId,
+				assemblyId,
+				pluginType
+			);
+			pluginTypeIds.push(pluginTypeId);
+		}
+
+		return pluginTypeIds;
+	}
+
+	/** Registers a single plugin type. */
+	private async registerSinglePluginType(
+		environmentId: string,
+		assemblyId: string,
+		pluginType: PluginTypeToRegister
+	): Promise<string> {
+		try {
+			const isWorkflowActivity = pluginType.typeKind === 'WorkflowActivity';
+			const pluginTypeId = await this.pluginTypeRepository.register(environmentId, {
+				typeName: pluginType.typeName,
+				friendlyName: pluginType.displayName,
+				assemblyId,
+				isWorkflowActivity,
+				...(isWorkflowActivity && {
+					workflowActivityGroupName: this.extractNamespace(pluginType.typeName),
+				}),
+			});
+
+			this.logger.debug('Plugin type registered', {
+				pluginTypeId,
+				typeName: pluginType.typeName,
+			});
+
+			return pluginTypeId;
+		} catch (error) {
+			this.logger.error('Failed to register plugin type', {
+				typeName: pluginType.typeName,
+				error,
+			});
+			throw new Error(
+				`Failed to register plugin type ${pluginType.displayName}: ${error instanceof Error ? error.message : 'Unknown error'}`
+			);
+		}
 	}
 
 	/**

@@ -1535,10 +1535,10 @@ function handleShowUpdateAssemblyModal(data) {
 
 /**
  * Show the Register Step modal.
- * @param {Object} data - { pluginTypeId, pluginTypeName, messages, messageFilters }
+ * @param {Object} data - { pluginTypeId, pluginTypeName, messages }
  */
 function handleShowRegisterStepModal(data) {
-	const { pluginTypeId, pluginTypeName, messages, messageFilters } = data;
+	const { pluginTypeId, pluginTypeName, messages } = data;
 
 	if (!window.showFormModal) {
 		console.error('FormModal component not loaded');
@@ -1553,7 +1553,6 @@ function handleShowRegisterStepModal(data) {
 
 	// Stage options (matching Dataverse values)
 	const stageOptions = [
-		{ value: '', label: '-- Select Stage --' },
 		{ value: '10', label: 'Pre-validation' },
 		{ value: '20', label: 'Pre-operation' },
 		{ value: '40', label: 'Post-operation' }
@@ -1572,20 +1571,10 @@ function handleShowRegisterStepModal(data) {
 		{ value: '2', label: 'Server and Offline' }
 	];
 
-	// Build entity options from message filters (if provided)
-	// Will be dynamically populated based on selected message
-	const entityOptions = [
-		{ value: '', label: '(none)' }
-	];
-
-	// Messages that support filtering attributes (hardcoded per PRT)
-	const messagesWithFilteringAttributes = ['Create', 'CreateMultiple', 'Update', 'UpdateMultiple', 'OnExternalUpdated'];
-
 	window.showFormModal({
-		title: `Register Step for ${pluginTypeName}`,
-		width: '700px',
+		title: `Register New Step`,
+		width: '550px',
 		fields: [
-			// General Configuration Section
 			{
 				id: 'sectionGeneral',
 				type: 'section',
@@ -1604,35 +1593,27 @@ function handleShowRegisterStepModal(data) {
 				label: 'Primary Entity',
 				type: 'text',
 				value: '',
-				placeholder: 'Entity logical name (e.g., account, contact) or leave empty for entity-agnostic'
+				placeholder: 'e.g., account, contact (leave empty for entity-agnostic)'
 			},
 			{
 				id: 'filteringAttributes',
 				label: 'Filtering Attributes',
 				type: 'text',
 				value: '',
-				placeholder: 'Comma-separated attribute names (for Create/Update messages)'
+				placeholder: 'Comma-separated (only for Create/Update messages)'
 			},
 			{
 				id: 'name',
 				label: 'Step Name',
 				type: 'text',
-				value: '',
+				value: `${pluginTypeName}: `,
 				required: true,
 				placeholder: 'Step name'
 			},
 			{
-				id: 'description',
-				label: 'Description',
-				type: 'text',
-				value: '',
-				placeholder: 'Optional description'
-			},
-			// Execution Section
-			{
 				id: 'sectionExecution',
 				type: 'section',
-				label: 'Execution Settings'
+				label: 'Execution'
 			},
 			{
 				id: 'stage',
@@ -1644,7 +1625,7 @@ function handleShowRegisterStepModal(data) {
 			},
 			{
 				id: 'mode',
-				label: 'Execution Mode',
+				label: 'Mode',
 				type: 'select',
 				value: '0',
 				options: modeOptions,
@@ -1655,14 +1636,7 @@ function handleShowRegisterStepModal(data) {
 				label: 'Execution Order',
 				type: 'number',
 				value: '1',
-				required: true,
-				placeholder: '1'
-			},
-			// Deployment Section
-			{
-				id: 'sectionDeployment',
-				type: 'section',
-				label: 'Deployment'
+				required: true
 			},
 			{
 				id: 'supportedDeployment',
@@ -1674,32 +1648,31 @@ function handleShowRegisterStepModal(data) {
 			},
 			{
 				id: 'asyncAutoDelete',
-				label: 'Delete AsyncOperation if StatusCode = Successful',
+				label: 'Delete AsyncOperation if Successful',
 				type: 'checkbox',
 				value: false
 			},
-			// Configuration Section
 			{
 				id: 'sectionConfiguration',
 				type: 'section',
-				label: 'Configuration'
+				label: 'Configuration (Optional)'
 			},
 			{
 				id: 'unsecureConfiguration',
 				label: 'Unsecure Configuration',
 				type: 'textarea',
 				value: '',
-				placeholder: 'Unsecure configuration string'
+				placeholder: 'Configuration string accessible to plugin'
 			},
 			{
 				id: 'secureConfiguration',
 				label: 'Secure Configuration',
 				type: 'textarea',
 				value: '',
-				placeholder: 'Secure configuration string (stored securely)'
+				placeholder: 'Encrypted configuration (only accessible to plugin)'
 			}
 		],
-		submitLabel: 'Register New Step',
+		submitLabel: 'Register Step',
 		cancelLabel: 'Cancel',
 		onSubmit: (values) => {
 			vscode.postMessage({
@@ -1707,7 +1680,6 @@ function handleShowRegisterStepModal(data) {
 				data: {
 					pluginTypeId,
 					sdkMessageId: values.sdkMessageId,
-					// Note: sdkMessageFilterId will be looked up on backend based on message + entity
 					name: values.name,
 					stage: parseInt(values.stage, 10),
 					mode: parseInt(values.mode, 10),
@@ -1717,8 +1689,6 @@ function handleShowRegisterStepModal(data) {
 					asyncAutoDelete: values.asyncAutoDelete === true || values.asyncAutoDelete === 'true',
 					unsecureConfiguration: values.unsecureConfiguration || undefined,
 					secureConfiguration: values.secureConfiguration || undefined,
-					description: values.description || undefined,
-					// Primary entity is sent to backend to lookup filter
 					primaryEntity: values.primaryEntity || undefined
 				}
 			});
@@ -1732,21 +1702,15 @@ function handleShowRegisterStepModal(data) {
  */
 function handleShowEditStepModal(data) {
 	const {
-		stepId, stepName, sdkMessageId, sdkMessageName, stage, mode, rank,
-		filteringAttributes, messages, supportedDeployment, asyncAutoDelete,
-		unsecureConfiguration, secureConfiguration, description, primaryEntity
+		stepId, stepName, sdkMessageName, stage, mode, rank,
+		filteringAttributes, supportedDeployment, asyncAutoDelete,
+		unsecureConfiguration, secureConfiguration, primaryEntity
 	} = data;
 
 	if (!window.showFormModal) {
 		console.error('FormModal component not loaded');
 		return;
 	}
-
-	// Build message options for dropdown (readonly display)
-	const messageOptions = [
-		{ value: '', label: '-- Select a Message --' },
-		...(messages || []).map(m => ({ value: m.id, label: m.name }))
-	];
 
 	// Stage options
 	const stageOptions = [
@@ -1769,10 +1733,9 @@ function handleShowEditStepModal(data) {
 	];
 
 	window.showFormModal({
-		title: `Update Existing Step`,
-		width: '700px',
+		title: `Update Step`,
+		width: '550px',
 		fields: [
-			// General Configuration Section
 			{
 				id: 'sectionGeneral',
 				type: 'section',
@@ -1807,17 +1770,9 @@ function handleShowEditStepModal(data) {
 				required: true
 			},
 			{
-				id: 'description',
-				label: 'Description',
-				type: 'text',
-				value: description || '',
-				placeholder: 'Optional description'
-			},
-			// Execution Section
-			{
 				id: 'sectionExecution',
 				type: 'section',
-				label: 'Execution Settings'
+				label: 'Execution'
 			},
 			{
 				id: 'stage',
@@ -1829,7 +1784,7 @@ function handleShowEditStepModal(data) {
 			},
 			{
 				id: 'mode',
-				label: 'Execution Mode',
+				label: 'Mode',
 				type: 'select',
 				value: String(mode),
 				options: modeOptions,
@@ -1842,12 +1797,6 @@ function handleShowEditStepModal(data) {
 				value: String(rank),
 				required: true
 			},
-			// Deployment Section
-			{
-				id: 'sectionDeployment',
-				type: 'section',
-				label: 'Deployment'
-			},
 			{
 				id: 'supportedDeployment',
 				label: 'Deployment',
@@ -1858,29 +1807,28 @@ function handleShowEditStepModal(data) {
 			},
 			{
 				id: 'asyncAutoDelete',
-				label: 'Delete AsyncOperation if StatusCode = Successful',
+				label: 'Delete AsyncOperation if Successful',
 				type: 'checkbox',
 				value: asyncAutoDelete ?? false
 			},
-			// Configuration Section
 			{
 				id: 'sectionConfiguration',
 				type: 'section',
-				label: 'Configuration'
+				label: 'Configuration (Optional)'
 			},
 			{
 				id: 'unsecureConfiguration',
 				label: 'Unsecure Configuration',
 				type: 'textarea',
 				value: unsecureConfiguration || '',
-				placeholder: 'Unsecure configuration string'
+				placeholder: 'Configuration string accessible to plugin'
 			},
 			{
 				id: 'secureConfiguration',
 				label: 'Secure Configuration',
 				type: 'textarea',
 				value: secureConfiguration || '',
-				placeholder: 'Secure configuration string (stored securely)'
+				placeholder: 'Encrypted configuration (only accessible to plugin)'
 			}
 		],
 		submitLabel: 'Update Step',
@@ -1898,8 +1846,7 @@ function handleShowEditStepModal(data) {
 					filteringAttributes: values.filteringAttributes || undefined,
 					asyncAutoDelete: values.asyncAutoDelete === true || values.asyncAutoDelete === 'true',
 					unsecureConfiguration: values.unsecureConfiguration || undefined,
-					secureConfiguration: values.secureConfiguration || undefined,
-					description: values.description || undefined
+					secureConfiguration: values.secureConfiguration || undefined
 				}
 			});
 		}
