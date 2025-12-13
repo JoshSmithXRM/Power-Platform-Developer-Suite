@@ -8,6 +8,7 @@ export interface RegisterImageInput {
 	readonly name: string;
 	readonly imageType: number; // 0=PreImage, 1=PostImage, 2=Both
 	readonly entityAlias: string;
+	readonly messagePropertyName: string; // Required - e.g., "Target", "id", "EntityMoniker"
 	readonly attributes?: string | undefined; // Comma-separated
 }
 
@@ -18,6 +19,7 @@ export interface UpdateImageInput {
 	readonly name?: string | undefined;
 	readonly imageType?: number | undefined;
 	readonly entityAlias?: string | undefined;
+	readonly messagePropertyName?: string | undefined;
 	readonly attributes?: string | undefined;
 }
 

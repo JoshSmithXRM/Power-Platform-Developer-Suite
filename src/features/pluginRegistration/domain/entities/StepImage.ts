@@ -21,6 +21,7 @@ export class StepImage {
 		private readonly imageType: ImageType,
 		private readonly entityAlias: string,
 		private readonly attributes: string,
+		private readonly messagePropertyName: string,
 		private readonly createdOn: Date
 	) {}
 
@@ -57,6 +58,10 @@ export class StepImage {
 
 	public getAttributes(): string {
 		return this.attributes;
+	}
+
+	public getMessagePropertyName(): string {
+		return this.messagePropertyName;
 	}
 
 	public getCreatedOn(): Date {

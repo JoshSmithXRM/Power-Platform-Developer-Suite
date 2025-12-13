@@ -17,6 +17,7 @@ interface StepImageDto {
 	_sdkmessageprocessingstepid_value: string;
 	imagetype: number;
 	entityalias: string;
+	messagepropertyname: string;
 	attributes: string | null;
 	createdon: string;
 }
@@ -37,7 +38,7 @@ interface StepImageCollectionResponse {
 export class DataverseStepImageRepository implements IStepImageRepository {
 	private static readonly ENTITY_SET = 'sdkmessageprocessingstepimages';
 	private static readonly SELECT_FIELDS =
-		'sdkmessageprocessingstepimageid,name,_sdkmessageprocessingstepid_value,imagetype,entityalias,attributes,createdon';
+		'sdkmessageprocessingstepimageid,name,_sdkmessageprocessingstepid_value,imagetype,entityalias,messagepropertyname,attributes,createdon';
 
 	constructor(
 		private readonly apiService: IDataverseApiService,
@@ -158,6 +159,7 @@ export class DataverseStepImageRepository implements IStepImageRepository {
 			'sdkmessageprocessingstepid@odata.bind': `/sdkmessageprocessingsteps(${input.stepId})`,
 			imagetype: input.imageType,
 			entityalias: input.entityAlias,
+			messagepropertyname: input.messagePropertyName,
 		};
 
 		if (input.attributes) {
@@ -208,6 +210,10 @@ export class DataverseStepImageRepository implements IStepImageRepository {
 			payload['entityalias'] = input.entityAlias;
 		}
 
+		if (input.messagePropertyName !== undefined) {
+			payload['messagepropertyname'] = input.messagePropertyName;
+		}
+
 		if (input.attributes !== undefined) {
 			payload['attributes'] = input.attributes || null;
 		}
@@ -225,6 +231,7 @@ export class DataverseStepImageRepository implements IStepImageRepository {
 			ImageType.fromValue(dto.imagetype),
 			dto.entityalias,
 			dto.attributes ?? '',
+			dto.messagepropertyname,
 			new Date(dto.createdon)
 		);
 	}
