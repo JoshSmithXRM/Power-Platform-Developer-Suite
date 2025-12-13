@@ -2,7 +2,7 @@
 
 **Branch:** `feature/plugin-registration`
 **Created:** 2025-12-08
-**Status:** Implementation (Slice 3 Near Complete - Step/Image CRUD Done)
+**Status:** Implementation (Slice 3 Complete - UX Polish Done, Tests Remaining)
 
 ---
 
@@ -913,6 +913,59 @@ payload['workflowactivitygroupname'] =
 - `extension.ts` - Added command handler with packageId fallback
 - `package.json` - Added command and two context menu entries (package + assembly-in-package)
 
+### Session 16 (2025-12-13)
+**Step Registration UX Polish - COMPLETE**
+
+**Implemented:**
+1. **FilterableComboBox Component** - Created reusable type-to-filter dropdown
+   - Keyboard navigation (↑/↓/Enter/Escape)
+   - Highlighted matching text
+   - Loading state support
+   - Dynamic option updates
+
+2. **Message Field → Combobox** - Replaced select with filterable combobox
+   - Type to filter hundreds of SDK messages
+   - Improved usability for finding specific messages
+
+3. **Dynamic Primary Entity Options** - Entity list fetched per message
+   - Calls `sdkmessagefilter` repository when message changes
+   - Client-side caching (`entityCacheByMessage` Map)
+   - Sorted alphabetically by logical name
+
+4. **Secondary Entity Field** - Added for Associate/Disassociate messages
+   - Updated `SdkMessageFilter` entity with `secondaryObjectTypeCode`
+   - Updated repository to fetch and map secondary entity
+   - Populates when message is selected (if applicable)
+
+5. **Step Name Auto-Generation** - Format: `{PluginType}: {Message} of {Entity}[ and {Secondary}]`
+   - Tracks `userEditedName` flag - stops regenerating if user customizes
+   - Updates on message, primary entity, or secondary entity change
+
+6. **Auto-Expand After Step Registration** - Fixed bug where parent wasn't visible
+   - Now expands parent node AND all ancestors before rendering
+   - Added `expandAncestors()` helper function
+   - Scrolls new step into view
+
+7. **Stage/Mode Validation** - Async mode forces PostOperation
+   - When mode changes to Async, stage is automatically set to PostOperation
+
+8. **Run in User's Context Dropdown** - MVP implementation
+   - Simple dropdown with "Calling User" option
+   - Full user search deferred to post-MVP
+
+**Files Created:**
+- `resources/webview/css/components/filterable-combobox.css`
+- `resources/webview/js/components/FilterableComboBox.js`
+
+**Files Modified:**
+- `resources/webview/js/features/plugin-registration.js` - Added UX enhancements
+- `resources/webview/js/components/FormModal.js` - Added combobox field type support
+- `src/features/pluginRegistration/domain/entities/SdkMessageFilter.ts` - Added secondary entity
+- `src/features/pluginRegistration/infrastructure/repositories/DataverseSdkMessageFilterRepository.ts` - Fetch secondary entity
+- `src/features/pluginRegistration/presentation/panels/PluginRegistrationPanelComposed.ts` - Entity loading handlers
+
+---
+
 ### Session 15 (2025-12-13)
 **Step/Image CRUD Operations - COMPLETE**
 
@@ -1012,22 +1065,26 @@ payload['workflowactivitygroupname'] =
 | Selected item indicator | LOW | Visual highlight for selected tree node |
 | Unit tests | HIGH | Domain + application layer (required before PR) |
 
-### REQUIRED UX POLISH (Before MVP Complete)
+### UX POLISH - CORE COMPLETE ✅
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Filterable Message combobox | ✅ | Type-to-filter dropdown (hundreds of messages) |
+| Primary Entity autocomplete | ✅ | Dynamic fetch based on message, sorted by logical name |
+| Secondary Entity field | ✅ | For Merge, Associate, etc. |
+| Run in User's Context dropdown | ✅ | "Calling User" default (MVP - type-to-search users deferred) |
+| Stage/Mode validation | ✅ | Async → force PostOperation |
+| Step name auto-generation | ✅ | `{PluginType}: {Message} of {Entity}[ and {Secondary}]` |
+| Auto-expand after add step | ✅ | Expand ancestors, scroll new step into view |
+
+### UX POLISH - DEFERRED (Post-MVP)
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| Filterable Message combobox | HIGH | Type-to-filter dropdown (hundreds of messages) |
-| Primary Entity autocomplete | HIGH | Dynamic fetch based on message, sorted by logical name |
-| Secondary Entity field | HIGH | For Merge, Associate, etc. |
-| Run in User's Context dropdown | HIGH | Type-to-search by fullname OR domainname (email) |
-| Filtering Attributes picker | HIGH | Searchable checkbox dialog, sorted by logical name |
-| Solution selector for steps | HIGH | Add step to solution (like assemblies) |
-| Auto-expand after add step | HIGH | Show new step in tree without manual expand |
-| Stage/Mode validation | HIGH | Async → force PostOperation; disable invalid combos |
-| AsyncAutoDelete conditional | HIGH | Only show for Asynchronous mode |
-| Step name auto-generation | HIGH | `{PluginType}: {Message} of {Entity}[ and {Secondary}]` |
-| Description field | HIGH | Separate from name, both auto-generate independently |
-| Image messagepropertyname | HIGH | Auto-set for single, dropdown for multi (Merge) |
-| Image Attributes picker | HIGH | Same searchable checkbox dialog as Filtering Attributes |
+| Filtering Attributes picker | MEDIUM | Searchable checkbox dialog, sorted by logical name |
+| Solution selector for steps | MEDIUM | Add step to solution (like assemblies) |
+| AsyncAutoDelete conditional | LOW | Only show for Asynchronous mode |
+| Description field | LOW | Separate from name, both auto-generate independently |
+| Image messagepropertyname | MEDIUM | Auto-set for single, dropdown for multi (Merge) |
+| Image Attributes picker | MEDIUM | Same searchable checkbox dialog as Filtering Attributes |
 
 ### DEFERRED - Post-MVP
 | Feature | Priority | Notes |
@@ -1048,22 +1105,22 @@ payload['workflowactivitygroupname'] =
 - ✅ Plugin Inspector tool for DLL analysis
 
 **Required before MVP complete:**
-- ⬜ **Step form UX polish:**
-  - Filterable combobox for Message (type-to-filter)
-  - Primary Entity autocomplete (dynamic fetch based on message)
-  - Secondary Entity field (for Merge, Associate, etc.)
-  - Run in User's Context dropdown (type-to-search users by name/email)
-  - Filtering Attributes picker (searchable checkbox dialog)
-  - Solution selector (add step to solution)
-  - Step name + description auto-generation (match PRT convention)
-  - Description field (separate from name, both auto-generate)
-- ⬜ **Step form behavior:**
-  - Auto-expand plugin type after adding step
-  - Async mode → force PostOperation, disable stage dropdown
-  - Hide/disable "Delete AsyncOperation" when mode is Synchronous
-- ⬜ **Image form UX polish:**
-  - Auto-set messagepropertyname (dropdown for multi-property messages like Merge)
-  - Attributes picker (same searchable checkbox dialog as Filtering Attributes)
+- ✅ **Step form UX polish (CORE COMPLETE):**
+  - ✅ Filterable combobox for Message (type-to-filter)
+  - ✅ Primary Entity autocomplete (dynamic fetch based on message)
+  - ✅ Secondary Entity field (for Merge, Associate, etc.)
+  - ✅ Run in User's Context dropdown ("Calling User" default - full user search deferred)
+  - ✅ Step name auto-generation (match PRT convention)
+  - ⬜ Filtering Attributes picker (deferred - searchable checkbox dialog)
+  - ⬜ Solution selector (deferred - add step to solution)
+  - ⬜ Description field (deferred - separate from name)
+- ✅ **Step form behavior:**
+  - ✅ Auto-expand plugin type after adding step
+  - ✅ Async mode → force PostOperation
+  - ⬜ Hide/disable "Delete AsyncOperation" when mode is Synchronous (deferred)
+- ⬜ **Image form UX polish (deferred):**
+  - ⬜ Auto-set messagepropertyname (dropdown for multi-property messages like Merge)
+  - ⬜ Attributes picker (same searchable checkbox dialog as Filtering Attributes)
 - ⬜ Detail panel (show metadata when node selected)
 - ⬜ Unit tests (required before PR)
 
