@@ -1431,6 +1431,22 @@ Dataverse requires the actual unique name string, not the ID.
 - `src/.../domain/interfaces/IPluginPackageRepository.ts`
 - `src/.../infrastructure/repositories/DataversePluginPackageRepository.ts`
 
+**F5 Testing Status (2025-12-13):**
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Register Package | ✅ WORKING | Adds to solution correctly |
+| Unregister Package | ✅ WORKING | |
+| Register Assembly | ✅ WORKING | With plugin type selection |
+| Unregister Assembly | ✅ WORKING | |
+| Update Package | ✅ WORKING | Needs more testing |
+| Update Assembly | ✅ WORKING | Needs more testing |
+| Register Step | ⏳ NEEDS TESTING | |
+| Edit Step | ⏳ NEEDS TESTING | |
+| Unregister Step | ⏳ NEEDS TESTING | |
+| Register Image | ⏳ NEEDS TESTING | |
+| Edit Image | ⏳ NEEDS TESTING | |
+| Unregister Image | ⏳ NEEDS TESTING | |
+
 ### Technical Considerations
 
 **FormModal changes needed:**
