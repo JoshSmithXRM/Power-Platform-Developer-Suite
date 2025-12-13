@@ -123,7 +123,8 @@ type PluginRegistrationCommands =
 	| 'confirmRegisterStep'
 	| 'confirmEditStep'
 	| 'confirmRegisterImage'
-	| 'confirmEditImage';
+	| 'confirmEditImage'
+	| 'getEntitiesForMessage';
 
 /**
  * Plugin Registration panel using PanelCoordinator architecture.
@@ -380,7 +381,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		const cssUris = resolveCssModules(
 			{
 				base: true,
-				components: ['buttons', 'inputs', 'dropdown', 'form-modal'],
+				components: ['buttons', 'inputs', 'dropdown', 'form-modal', 'filterable-combobox'],
 				sections: ['environment-selector', 'solution-filter', 'action-buttons'],
 				features: ['plugin-registration'],
 			},
@@ -423,6 +424,18 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 							'js',
 							'components',
 							'FormModal.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
+							'resources',
+							'webview',
+							'js',
+							'components',
+							'FilterableComboBox.js'
 						)
 					)
 					.toString(),
@@ -510,6 +523,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		this.coordinator.registerHandler('registerImage', async () => {
 			// TODO: Implement image registration (requires step context)
 			void vscode.window.showInformationMessage('Register Image: Coming soon');
+		});
+
+		this.coordinator.registerHandler('getEntitiesForMessage', async (data) => {
+			const { messageId } = data as { messageId?: string };
+			if (messageId) {
+				await this.handleGetEntitiesForMessage(messageId);
+			}
 		});
 
 		this.coordinator.registerHandler('confirmRegisterPackage', async (data) => {
@@ -1046,6 +1066,36 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			void vscode.window.showErrorMessage(`Failed to read package file: ${errorMessage}`);
 			this.pendingPackageContent = null;
+		}
+	}
+
+	/**
+	 * Handle request for entities available for a specific message.
+	 * Fetches sdkmessagefilter records and returns entity logical names.
+	 */
+	private async handleGetEntitiesForMessage(messageId: string): Promise<void> {
+		try {
+			const filters = await this.repositories.sdkMessageFilter.findByMessageId(
+				this.currentEnvironmentId,
+				messageId
+			);
+
+			// Extract entity logical names, sorted by logical name
+			const entities = filters
+				.map((f) => f.getPrimaryEntityLogicalName())
+				.filter((e) => e !== 'none') // Filter out 'none' entities
+				.sort((a, b) => a.localeCompare(b));
+
+			await this.panel.postMessage({
+				command: 'entitiesForMessage',
+				data: { messageId, entities },
+			});
+		} catch (error) {
+			this.logger.error('Failed to fetch entities for message', { messageId, error });
+			await this.panel.postMessage({
+				command: 'entitiesForMessage',
+				data: { messageId, entities: [], error: 'Failed to fetch entities' },
+			});
 		}
 	}
 

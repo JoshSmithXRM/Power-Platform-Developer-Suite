@@ -15,6 +15,14 @@ let currentFilter = '';
 let hideHiddenSteps = true; // Default: hide internal system steps (ishidden=true)
 let hideMicrosoftAssemblies = true; // Default: hide Microsoft assemblies
 
+// Cache for entities per message (messageId -> entity logical names array)
+const entityCacheByMessage = new Map();
+// Active step modal state (for async entity loading)
+let activeStepModal = {
+	updateField: null, // Function to update fields in the active modal
+	pendingMessageId: null // Message ID we're waiting for entities
+};
+
 // Virtual scrolling state
 const VIRTUAL_SCROLL_THRESHOLD = 500; // Enable virtual scrolling above this node count
 const NODE_HEIGHT = 30; // Fixed height for virtual scroll calculations
@@ -985,6 +993,9 @@ window.createBehavior({
 			case 'addNode':
 				handleAddNode(message.data);
 				break;
+			case 'entitiesForMessage':
+				handleEntitiesForMessage(message.data);
+				break;
 		}
 	}
 });
@@ -1545,11 +1556,8 @@ function handleShowRegisterStepModal(data) {
 		return;
 	}
 
-	// Build message options for dropdown
-	const messageOptions = [
-		{ value: '', label: '-- Select a Message --' },
-		...(messages || []).map(m => ({ value: m.id, label: m.name }))
-	];
+	// Build message options for combobox (no placeholder needed - user types to filter)
+	const messageOptions = (messages || []).map(m => ({ value: m.id, label: m.name }));
 
 	// Stage options (matching Dataverse values)
 	const stageOptions = [
@@ -1583,17 +1591,19 @@ function handleShowRegisterStepModal(data) {
 			{
 				id: 'sdkMessageId',
 				label: 'Message',
-				type: 'select',
+				type: 'combobox',
 				value: '',
 				options: messageOptions,
-				required: true
+				required: true,
+				placeholder: 'Type to search messages...'
 			},
 			{
 				id: 'primaryEntity',
 				label: 'Primary Entity',
-				type: 'text',
+				type: 'combobox',
 				value: '',
-				placeholder: 'e.g., account, contact (leave empty for entity-agnostic)'
+				options: [], // Will be populated when message is selected
+				placeholder: 'Select message first...'
 			},
 			{
 				id: 'filteringAttributes',
@@ -1674,6 +1684,27 @@ function handleShowRegisterStepModal(data) {
 		],
 		submitLabel: 'Register Step',
 		cancelLabel: 'Cancel',
+		onFieldChange: (fieldId, value, updateField) => {
+			// Store updateField reference for async entity loading
+			activeStepModal.updateField = updateField;
+
+			if (fieldId === 'sdkMessageId' && value) {
+				// When message changes, fetch or use cached entities
+				const cachedEntities = entityCacheByMessage.get(value);
+				if (cachedEntities) {
+					// Use cached entities
+					const options = cachedEntities.map(e => ({ value: e, label: e }));
+					updateField('primaryEntity', '', options);
+				} else {
+					// Fetch entities from extension
+					activeStepModal.pendingMessageId = value;
+					vscode.postMessage({
+						command: 'getEntitiesForMessage',
+						data: { messageId: value }
+					});
+				}
+			}
+		},
 		onSubmit: (values) => {
 			vscode.postMessage({
 				command: 'confirmRegisterStep',
@@ -2030,4 +2061,25 @@ function handleAddNode(data) {
 	// Expand parent and scroll to new node
 	expandedNodes.add(parentId);
 	scrollNodeIntoView(node.id);
+}
+
+/**
+ * Handle entities response from extension for a message.
+ * Updates the active primary entity combobox with available entities.
+ * @param {Object} data - { messageId, entities, error? }
+ */
+function handleEntitiesForMessage(data) {
+	const { messageId, entities, error } = data;
+
+	// Cache the results
+	if (!error) {
+		entityCacheByMessage.set(messageId, entities);
+	}
+
+	// Update the active modal's primary entity field if we're waiting for this message
+	if (activeStepModal.updateField && activeStepModal.pendingMessageId === messageId) {
+		const options = (entities || []).map(e => ({ value: e, label: e }));
+		activeStepModal.updateField('primaryEntity', '', options);
+		activeStepModal.pendingMessageId = null;
+	}
 }

@@ -1,0 +1,188 @@
+/**
+ * FilterableComboBox Component
+ * Type-to-filter dropdown for selecting from a list of options.
+ */
+
+/* Container */
+.filterable-combobox {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+}
+
+/* Input wrapper (input + dropdown button) */
+.filterable-combobox-input-wrapper {
+	display: flex;
+	align-items: stretch;
+}
+
+/* Text input */
+.filterable-combobox-input {
+	flex: 1;
+	padding: 8px 10px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	border-right: none;
+	border-radius: 2px 0 0 2px;
+	font-family: var(--vscode-font-family);
+	font-size: 13px;
+	box-sizing: border-box;
+}
+
+.filterable-combobox-input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.filterable-combobox-input::placeholder {
+	color: var(--vscode-input-placeholderForeground);
+}
+
+.filterable-combobox-input--error {
+	border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.filterable-combobox-input--readonly {
+	background: var(--vscode-input-background);
+	opacity: 0.8;
+	cursor: default;
+}
+
+/* Dropdown toggle button */
+.filterable-combobox-toggle {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border);
+	border-left: none;
+	border-radius: 0 2px 2px 0;
+	cursor: pointer;
+	color: var(--vscode-foreground);
+	padding: 0;
+}
+
+.filterable-combobox-toggle:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.filterable-combobox-toggle:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.filterable-combobox-toggle-icon {
+	transition: transform 0.15s ease;
+}
+
+.filterable-combobox--open .filterable-combobox-toggle-icon {
+	transform: rotate(180deg);
+}
+
+/* Dropdown menu */
+.filterable-combobox-dropdown {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	margin-top: 2px;
+	background: var(--vscode-dropdown-background);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 2px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+	z-index: 10001;
+	max-height: 250px;
+	overflow-y: auto;
+	display: none;
+}
+
+.filterable-combobox--open .filterable-combobox-dropdown {
+	display: block;
+}
+
+/* Dropdown items */
+.filterable-combobox-option {
+	display: flex;
+	align-items: center;
+	padding: 6px 10px;
+	color: var(--vscode-dropdown-foreground);
+	cursor: pointer;
+	user-select: none;
+	font-size: 13px;
+}
+
+.filterable-combobox-option:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.filterable-combobox-option--focused {
+	background: var(--vscode-list-focusBackground);
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.filterable-combobox-option--selected {
+	background: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.filterable-combobox-option--selected::before {
+	content: '✓';
+	color: var(--vscode-testing-iconPassed);
+	margin-right: 8px;
+	font-size: 12px;
+}
+
+/* Option label (for highlighting matches) */
+.filterable-combobox-option-text {
+	flex: 1;
+}
+
+.filterable-combobox-highlight {
+	font-weight: 600;
+	color: var(--vscode-editor-findMatchHighlightBackground);
+	background: var(--vscode-editor-findMatchBackground);
+	border-radius: 2px;
+	padding: 0 1px;
+}
+
+/* No results message */
+.filterable-combobox-no-results {
+	padding: 8px 10px;
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+	font-size: 12px;
+}
+
+/* Option description (secondary text) */
+.filterable-combobox-option-description {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	margin-left: 8px;
+}
+
+/* Loading state */
+.filterable-combobox-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.filterable-combobox-spinner {
+	width: 16px;
+	height: 16px;
+	border: 2px solid var(--vscode-progressBar-background);
+	border-top-color: transparent;
+	border-radius: 50%;
+	animation: filterable-combobox-spin 0.8s linear infinite;
+	margin-right: 8px;
+}
+
+@keyframes filterable-combobox-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}

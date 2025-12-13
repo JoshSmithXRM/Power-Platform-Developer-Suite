@@ -208,6 +208,39 @@ window.showFormModal = function(options) {
 				option.textContent = opt.label;
 				input.appendChild(option);
 			});
+		} else if (field.type === 'combobox') {
+			// Filterable combobox
+			const combobox = window.createFilterableComboBox({
+				id: field.id,
+				options: field.options || [],
+				value: field.value || '',
+				placeholder: field.placeholder || 'Type to filter...',
+				readonly: field.readonly,
+				disabled: field.disabled,
+				onChange: (value) => {
+					if (onFieldChange) {
+						const updateField = (targetFieldId, newValue, targetOptions) => {
+							const target = inputElements[targetFieldId];
+							if (target && target.type === 'combobox') {
+								if (targetOptions) {
+									target.instance.setOptions(targetOptions);
+								}
+								target.instance.setValue(newValue);
+							} else if (target) {
+								target.value = newValue;
+							}
+						};
+						onFieldChange(field.id, value, updateField);
+					}
+				}
+			});
+
+			inputElements[field.id] = { type: 'combobox', instance: combobox };
+
+			fieldContainer.appendChild(label);
+			fieldContainer.appendChild(combobox.element);
+			body.appendChild(fieldContainer);
+			return; // Skip the rest of input setup
 		} else {
 			input = document.createElement('input');
 			input.type = field.type || 'text';
@@ -231,10 +264,16 @@ window.showFormModal = function(options) {
 		if (onFieldChange) {
 			const eventType = field.type === 'select' ? 'change' : 'input';
 			input.addEventListener(eventType, () => {
-				const updateField = (targetFieldId, newValue) => {
-					const targetInput = inputElements[targetFieldId];
-					if (targetInput) {
-						targetInput.value = newValue;
+				const updateField = (targetFieldId, newValue, targetOptions) => {
+					const target = inputElements[targetFieldId];
+					if (target && target.type === 'combobox') {
+						// Handle combobox targets
+						if (targetOptions) {
+							target.instance.setOptions(targetOptions);
+						}
+						target.instance.setValue(newValue);
+					} else if (target) {
+						target.value = newValue;
 					}
 				};
 				onFieldChange(field.id, input.value, updateField);
@@ -302,6 +341,21 @@ window.showFormModal = function(options) {
 					if (groupContainer) {
 						groupContainer.classList.remove('form-modal-checkbox-group--error');
 					}
+				}
+				return;
+			}
+
+			// Handle combobox fields
+			if (field.type === 'combobox') {
+				const value = input.instance.getValue();
+				values[field.id] = value;
+
+				// Validation: if required, must have a value
+				if (field.required && !value) {
+					input.instance.setError(true);
+					isValid = false;
+				} else {
+					input.instance.setError(false);
 				}
 				return;
 			}
