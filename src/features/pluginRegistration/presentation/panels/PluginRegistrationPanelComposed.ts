@@ -533,13 +533,14 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		});
 
 		this.coordinator.registerHandler('confirmRegisterPackage', async (data) => {
-			const { name, version, prefix } = data as {
+			const { name, version, prefix, solutionUniqueName } = data as {
 				name?: string;
 				version?: string;
 				prefix?: string;
+				solutionUniqueName?: string;
 			};
-			if (name && version && prefix) {
-				await this.handleConfirmRegisterPackage(name, version, prefix);
+			if (name && version && prefix && solutionUniqueName) {
+				await this.handleConfirmRegisterPackage(name, version, prefix, solutionUniqueName);
 			}
 		});
 
@@ -1115,7 +1116,8 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private async handleConfirmRegisterPackage(
 		name: string,
 		version: string,
-		prefix: string
+		prefix: string,
+		solutionUniqueName: string
 	): Promise<void> {
 		if (!this.pendingPackageContent) {
 			this.logger.error('No pending package content for registration');
@@ -1146,6 +1148,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 						version,
 						uniqueName: prefixedName,
 						base64Content,
+						solutionUniqueName,
 					});
 
 					void vscode.window.showInformationMessage(

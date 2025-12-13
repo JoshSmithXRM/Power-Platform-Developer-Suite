@@ -34,6 +34,7 @@ export interface IPluginPackageRepository {
 	 * @param uniqueName - Unique name with publisher prefix (e.g., ppds_MyPackage)
 	 * @param version - Package version
 	 * @param base64Content - Base64-encoded .nupkg bytes
+	 * @param solutionUniqueName - Solution to add the package to
 	 * @returns ID of the created package
 	 */
 	register(
@@ -41,7 +42,8 @@ export interface IPluginPackageRepository {
 		name: string,
 		uniqueName: string,
 		version: string,
-		base64Content: string
+		base64Content: string,
+		solutionUniqueName: string
 	): Promise<string>;
 
 	/**
