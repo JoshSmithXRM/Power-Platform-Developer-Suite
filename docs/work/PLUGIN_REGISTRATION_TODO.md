@@ -1016,14 +1016,18 @@ payload['workflowactivitygroupname'] =
 | Feature | Priority | Notes |
 |---------|----------|-------|
 | Filterable Message combobox | HIGH | Type-to-filter dropdown (hundreds of messages) |
-| Primary Entity autocomplete | HIGH | Filter entities based on selected message |
-| Secondary Entity field | HIGH | For messages that support it (Associate, SetState, etc.) |
-| Run in User's Context dropdown | HIGH | Type-to-search user lookup for impersonation |
-| Filtering Attributes picker | HIGH | Picker dialog with entity attribute checkboxes |
+| Primary Entity autocomplete | HIGH | Dynamic fetch based on message, sorted by logical name |
+| Secondary Entity field | HIGH | For Merge, Associate, etc. |
+| Run in User's Context dropdown | HIGH | Type-to-search by fullname OR domainname (email) |
+| Filtering Attributes picker | HIGH | Searchable checkbox dialog, sorted by logical name |
 | Solution selector for steps | HIGH | Add step to solution (like assemblies) |
 | Auto-expand after add step | HIGH | Show new step in tree without manual expand |
-| AsyncAutoDelete conditional | HIGH | Only enable for Asynchronous mode |
-| Step name auto-generation | HIGH | Match PRT naming convention (user researching)
+| Stage/Mode validation | HIGH | Async → force PostOperation; disable invalid combos |
+| AsyncAutoDelete conditional | HIGH | Only show for Asynchronous mode |
+| Step name auto-generation | HIGH | `{PluginType}: {Message} of {Entity}[ and {Secondary}]` |
+| Description field | HIGH | Separate from name, both auto-generate independently |
+| Image messagepropertyname | HIGH | Auto-set for single, dropdown for multi (Merge) |
+| Image Attributes picker | HIGH | Same searchable checkbox dialog as Filtering Attributes |
 
 ### DEFERRED - Post-MVP
 | Feature | Priority | Notes |
@@ -1047,14 +1051,19 @@ payload['workflowactivitygroupname'] =
 - ⬜ **Step form UX polish:**
   - Filterable combobox for Message (type-to-filter)
   - Primary Entity autocomplete (dynamic fetch based on message)
-  - Secondary Entity field (for Associate, SetState, etc.)
-  - Run in User's Context dropdown (type-to-search users)
-  - Filtering Attributes picker (dialog with checkboxes)
+  - Secondary Entity field (for Merge, Associate, etc.)
+  - Run in User's Context dropdown (type-to-search users by name/email)
+  - Filtering Attributes picker (searchable checkbox dialog)
   - Solution selector (add step to solution)
-  - Step name auto-generation (match PRT convention)
+  - Step name + description auto-generation (match PRT convention)
+  - Description field (separate from name, both auto-generate)
 - ⬜ **Step form behavior:**
   - Auto-expand plugin type after adding step
-  - Disable "Delete AsyncOperation" when mode is Synchronous
+  - Async mode → force PostOperation, disable stage dropdown
+  - Hide/disable "Delete AsyncOperation" when mode is Synchronous
+- ⬜ **Image form UX polish:**
+  - Auto-set messagepropertyname (dropdown for multi-property messages like Merge)
+  - Attributes picker (same searchable checkbox dialog as Filtering Attributes)
 - ⬜ Detail panel (show metadata when node selected)
 - ⬜ Unit tests (required before PR)
 
@@ -1256,43 +1265,69 @@ When step is successfully added:
 
 #### Decision 4: Step Name Generation ✅
 - Format: `{PluginTypeName}: {MessageName} of {PrimaryEntity}[ and {SecondaryEntity}]`
-- Auto-regenerate when message/entity changes (only if user hasn't customized name)
-- Same value for `name` and `description` fields
+- Auto-regenerate when message/entity changes (only if user hasn't customized)
+- Both Name and Description auto-generate with same logic, but can be edited independently
 
-### Open Questions (Need User Input)
+#### Decision 5: Image `messagepropertyname` ✅
+Auto-set for single property, show dropdown for messages with multiple options.
 
-#### Question 1: Image `messagepropertyname`
-When registering step images, we need to set the correct `messagepropertyname`:
-- Create/Update/Delete → "Target"
-- SetState/SetStateDynamicEntity → "EntityMoniker"
-- Associate/Disassociate → "Target", "RelatedEntities", "Relationship"
+**Hardcoded property names by message:**
+| Message        | PropertyName(s)                    |
+|----------------|------------------------------------|
+| Create         | id                                 |
+| CreateMultiple | Ids                                |
+| Update         | Target                             |
+| UpdateMultiple | Targets                            |
+| Delete         | Target                             |
+| Assign         | Target                             |
+| SetState       | EntityMoniker                      |
+| Merge          | Target, SubordinateId (user picks) |
 
-**Options:**
-A. Auto-set based on message (most common case is "Target")
-B. Add dropdown for user to select from valid options
-C. Auto-set to "Target" as default, allow user to override
+**Logic:**
+```javascript
+if (message.imagePropertyNames.length === 1) {
+    return message.imagePropertyNames[0]; // Auto-set
+}
+if (message.imagePropertyNames.length > 1) {
+    // Show dropdown for user to pick
+}
+```
 
-#### Question 2: Stage Validation
-Some message/stage combinations are invalid (e.g., can't do PostOperation on certain messages).
+#### Decision 6: Stage/Mode Validation ✅
+Dynamically filter/disable based on context (matches PRT behavior).
 
-**Options:**
-A. Validate client-side and show warning before submit
-B. Let Dataverse return the error (simpler, but worse UX)
-C. Filter stage dropdown based on message (only show valid stages)
+**Rules:**
+- Async mode → Force PostOperation, disable stage dropdown
+- Service endpoints → Force Async + PostOperation, disable both dropdowns
+- CustomAPI → Special handling (TBD)
+- Otherwise → All stages enabled
 
-#### Question 3: Image Attributes Picker
-The image form has an "Attributes" field for selecting which entity attributes to include in the image.
+**Logic:**
+```javascript
+if (mode === 'Async') {
+    stage = 'PostOperation';
+    stageDropdownEnabled = false;
+}
+if (isServiceEndpoint) {
+    mode = 'Async';
+    stage = 'PostOperation';
+    modeEnabled = false;
+    stageEnabled = false;
+}
+```
 
-**Options:**
-A. Same picker dialog as Filtering Attributes (searchable checkbox list)
-B. Simple text field (current implementation)
+#### Decision 7: Image Attributes Picker ✅
+Use same searchable checkbox picker as Filtering Attributes for consistency.
 
-#### Question 4: Description Field for Steps
-PRT has a description field. We're now using step name for both `name` and `description`.
+#### Decision 8: Description Field ✅
+Add separate description field (matches PRT).
 
-**Options:**
-A. Keep it simple - same value for both (current plan)
-B. Add separate description field for custom descriptions
+**Behavior:**
+- Both Name and Description auto-generate using same `PluginStepNameGenerator` logic
+- Both track independent `userHasEdited*` flags
+- User can customize either independently
+- Name: Short identifier shown in tree
+- Description: Can be more verbose, shown in details/tooltips
 
 ### Technical Considerations
 
