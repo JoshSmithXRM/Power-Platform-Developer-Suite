@@ -10,6 +10,7 @@ interface SdkMessageFilterDto {
 	sdkmessagefilterid: string;
 	_sdkmessageid_value: string;
 	primaryobjecttypecode: string;
+	secondaryobjecttypecode: string;
 	iscustomprocessingstepallowed: boolean;
 }
 
@@ -27,7 +28,7 @@ interface SdkMessageFilterCollectionResponse {
 export class DataverseSdkMessageFilterRepository implements ISdkMessageFilterRepository {
 	private static readonly ENTITY_SET = 'sdkmessagefilters';
 	private static readonly SELECT_FIELDS =
-		'sdkmessagefilterid,_sdkmessageid_value,primaryobjecttypecode,iscustomprocessingstepallowed';
+		'sdkmessagefilterid,_sdkmessageid_value,primaryobjecttypecode,secondaryobjecttypecode,iscustomprocessingstepallowed';
 
 	constructor(
 		private readonly apiService: IDataverseApiService,
@@ -123,6 +124,7 @@ export class DataverseSdkMessageFilterRepository implements ISdkMessageFilterRep
 			dto.sdkmessagefilterid,
 			dto._sdkmessageid_value,
 			dto.primaryobjecttypecode,
+			dto.secondaryobjecttypecode ?? 'none',
 			dto.iscustomprocessingstepallowed
 		);
 	}
