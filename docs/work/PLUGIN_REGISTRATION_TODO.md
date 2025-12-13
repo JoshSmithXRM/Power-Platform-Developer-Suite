@@ -1407,7 +1407,9 @@ Add separate description field (matches PRT).
 
 **API pattern (matching PRT behavior):**
 ```
-POST /api/data/v9.2/pluginpackages?solutionUniqueName=MySolution
+POST /api/data/v9.2/pluginpackages
+MSCRM.SolutionUniqueName: MySolution
+
 {
   "name": "prefix_PackageName",
   "uniquename": "prefix_PackageName",
@@ -1415,6 +1417,9 @@ POST /api/data/v9.2/pluginpackages?solutionUniqueName=MySolution
   "content": "<base64>"
 }
 ```
+
+**Note:** Query parameter `?solutionUniqueName=` does NOT work for pluginpackages - returns 400 error.
+Must use `MSCRM.SolutionUniqueName` header (same as pluginassemblies).
 
 **Files Modified:**
 - `resources/webview/js/features/plugin-registration.js`
