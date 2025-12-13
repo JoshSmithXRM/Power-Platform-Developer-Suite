@@ -105,6 +105,59 @@ window.showFormModal = function(options) {
 			fieldContainer.appendChild(input);
 			body.appendChild(fieldContainer);
 			return; // Skip the rest of input setup
+		} else if (field.type === 'checkboxGroup') {
+			// Checkbox group: multiple checkboxes for multi-select
+			const groupContainer = document.createElement('div');
+			groupContainer.className = 'form-modal-checkbox-group' + (field.disabled ? ' form-modal-checkbox-group--disabled' : '');
+			groupContainer.id = `form-modal-${field.id}`;
+
+			const checkboxes = [];
+			const isGroupDisabled = field.disabled === true;
+			(field.options || []).forEach((opt, index) => {
+				const checkboxWrapper = document.createElement('div');
+				checkboxWrapper.className = 'form-modal-checkbox-item';
+
+				const checkbox = document.createElement('input');
+				checkbox.type = 'checkbox';
+				checkbox.id = `form-modal-${field.id}-${index}`;
+				checkbox.value = opt.value;
+				checkbox.checked = opt.checked !== false; // Default to checked unless explicitly false
+				checkbox.className = 'form-modal-checkbox';
+				if (isGroupDisabled) {
+					checkbox.disabled = true;
+				}
+
+				const checkboxLabel = document.createElement('label');
+				checkboxLabel.setAttribute('for', checkbox.id);
+				checkboxLabel.className = 'form-modal-checkbox-label';
+
+				// Create label content
+				const labelText = document.createElement('span');
+				labelText.className = 'form-modal-checkbox-label-text';
+				labelText.textContent = opt.label;
+				checkboxLabel.appendChild(labelText);
+
+				// Add description if provided (e.g., "(Plugin)" or "(Workflow Activity)")
+				if (opt.description) {
+					const descText = document.createElement('span');
+					descText.className = 'form-modal-checkbox-description';
+					descText.textContent = ' ' + opt.description;
+					checkboxLabel.appendChild(descText);
+				}
+
+				checkboxWrapper.appendChild(checkbox);
+				checkboxWrapper.appendChild(checkboxLabel);
+				groupContainer.appendChild(checkboxWrapper);
+				checkboxes.push(checkbox);
+			});
+
+			// Store checkboxes array for later value retrieval
+			inputElements[field.id] = { type: 'checkboxGroup', checkboxes };
+
+			fieldContainer.appendChild(label);
+			fieldContainer.appendChild(groupContainer);
+			body.appendChild(fieldContainer);
+			return; // Skip the rest of input setup
 		} else if (field.type === 'textarea') {
 			input = document.createElement('textarea');
 			input.rows = field.rows || 3;
@@ -183,6 +236,31 @@ window.showFormModal = function(options) {
 			}
 
 			const input = inputElements[field.id];
+
+			// Handle checkboxGroup fields specially
+			if (field.type === 'checkboxGroup') {
+				const checkedValues = input.checkboxes
+					.filter(cb => cb.checked)
+					.map(cb => cb.value);
+				values[field.id] = checkedValues;
+
+				// Validation: if required, at least one must be checked
+				if (field.required && checkedValues.length === 0) {
+					// Add error styling to the group container
+					const groupContainer = document.getElementById(`form-modal-${field.id}`);
+					if (groupContainer) {
+						groupContainer.classList.add('form-modal-checkbox-group--error');
+					}
+					isValid = false;
+				} else {
+					const groupContainer = document.getElementById(`form-modal-${field.id}`);
+					if (groupContainer) {
+						groupContainer.classList.remove('form-modal-checkbox-group--error');
+					}
+				}
+				return;
+			}
+
 			const value = input.value.trim();
 			values[field.id] = value;
 

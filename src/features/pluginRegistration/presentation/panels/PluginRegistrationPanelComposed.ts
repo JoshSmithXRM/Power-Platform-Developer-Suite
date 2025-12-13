@@ -32,6 +32,7 @@ import type { UpdatePluginAssemblyUseCase } from '../../application/useCases/Upd
 import type { UpdatePluginPackageUseCase } from '../../application/useCases/UpdatePluginPackageUseCase';
 import type { RegisterPluginPackageUseCase } from '../../application/useCases/RegisterPluginPackageUseCase';
 import type { RegisterPluginAssemblyUseCase } from '../../application/useCases/RegisterPluginAssemblyUseCase';
+import type { UnregisterPluginAssemblyUseCase } from '../../application/useCases/UnregisterPluginAssemblyUseCase';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
 import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
 import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
@@ -46,6 +47,8 @@ import { PluginTypeViewModelMapper } from '../../application/mappers/PluginTypeV
 import type { IPluginTypeRepository } from '../../domain/interfaces/IPluginTypeRepository';
 import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRepository';
 import { StepImageViewModelMapper } from '../../application/mappers/StepImageViewModelMapper';
+import type { PluginInspectorService } from '../../infrastructure/services/PluginInspectorService';
+import type { PluginTypeToRegister } from '../../application/useCases/RegisterPluginAssemblyUseCase';
 
 /**
  * Bundle of use cases for plugin registration operations.
@@ -58,6 +61,7 @@ export interface PluginRegistrationUseCases {
 	readonly updatePackage: UpdatePluginPackageUseCase;
 	readonly registerPackage: RegisterPluginPackageUseCase;
 	readonly registerAssembly: RegisterPluginAssemblyUseCase;
+	readonly unregisterAssembly: UnregisterPluginAssemblyUseCase;
 }
 
 /**
@@ -70,6 +74,13 @@ export interface PluginRegistrationRepositories {
 	readonly pluginType: IPluginTypeRepository;
 	readonly image: IStepImageRepository;
 	readonly solution: ISolutionRepository;
+}
+
+/**
+ * Bundle of services for plugin registration.
+ */
+export interface PluginRegistrationServices {
+	readonly pluginInspector: PluginInspectorService;
 }
 
 /**
@@ -87,7 +98,10 @@ type PluginRegistrationCommands =
 	| 'registerStep'
 	| 'registerImage'
 	| 'confirmRegisterPackage'
-	| 'confirmRegisterAssembly';
+	| 'confirmRegisterAssembly'
+	| 'confirmUpdatePackage'
+	| 'confirmUpdateAssembly'
+	| 'unregisterAssembly';
 
 /**
  * Plugin Registration panel using PanelCoordinator architecture.
@@ -112,6 +126,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	private pendingPackageContent: string | null = null;
 	private pendingAssemblyContent: string | null = null;
+	private pendingAssemblyTypes: PluginTypeToRegister[] = [];
+	// Pending state for update operations
+	private pendingUpdatePackageId: string | null = null;
+	private pendingUpdatePackageContent: string | null = null;
+	private pendingUpdateAssemblyId: string | null = null;
+	private pendingUpdateAssemblyContent: string | null = null;
+	private pendingUpdateAssemblyTypes: PluginTypeToRegister[] = [];
 	private readonly filenameParser: NupkgFilenameParser;
 	private unmanagedSolutionsWithPrefix: Array<{
 		id: string;
@@ -128,6 +149,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		private readonly getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		private readonly useCases: PluginRegistrationUseCases,
 		private readonly repositories: PluginRegistrationRepositories,
+		private readonly services: PluginRegistrationServices,
 		private readonly urlBuilder: IMakerUrlBuilder,
 		private readonly logger: ILogger,
 		environmentId: string
@@ -181,6 +203,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		getEnvironmentById: (envId: string) => Promise<EnvironmentInfo | null>,
 		useCases: PluginRegistrationUseCases,
 		repositories: PluginRegistrationRepositories,
+		services: PluginRegistrationServices,
 		urlBuilder: IMakerUrlBuilder,
 		logger: ILogger,
 		initialEnvironmentId?: string
@@ -202,6 +225,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 						getEnvironmentById,
 						useCases,
 						repositories,
+						services,
 						urlBuilder,
 						logger,
 						envId
@@ -478,12 +502,43 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		});
 
 		this.coordinator.registerHandler('confirmRegisterAssembly', async (data) => {
-			const { name, solutionUniqueName } = data as {
+			const { name, solutionUniqueName, selectedTypes } = data as {
 				name?: string;
 				solutionUniqueName?: string;
+				selectedTypes?: string[]; // Array of type names to register
 			};
-			if (name) {
-				await this.handleConfirmRegisterAssembly(name, solutionUniqueName);
+			if (name && selectedTypes && selectedTypes.length > 0) {
+				await this.handleConfirmRegisterAssembly(name, solutionUniqueName, selectedTypes);
+			}
+		});
+
+		this.coordinator.registerHandler('unregisterAssembly', async (data) => {
+			const { assemblyId, assemblyName } = data as {
+				assemblyId?: string;
+				assemblyName?: string;
+			};
+			if (assemblyId && assemblyName) {
+				await this.handleUnregisterAssembly(assemblyId, assemblyName);
+			}
+		});
+
+		this.coordinator.registerHandler('confirmUpdatePackage', async (data) => {
+			const { packageId, version } = data as {
+				packageId?: string;
+				version?: string;
+			};
+			if (packageId) {
+				await this.handleConfirmUpdatePackage(packageId, version);
+			}
+		});
+
+		this.coordinator.registerHandler('confirmUpdateAssembly', async (data) => {
+			const { assemblyId, selectedTypes } = data as {
+				assemblyId?: string;
+				selectedTypes?: string[]; // Array of type names to keep/register
+			};
+			if (assemblyId) {
+				await this.handleConfirmUpdateAssembly(assemblyId, selectedTypes ?? []);
 			}
 		});
 	}
@@ -600,7 +655,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 	/**
 	 * Handle Register Assembly action.
-	 * Shows file picker for .dll, then modal with assembly name and optional solution.
+	 * Shows file picker for .dll, inspects for plugin types, then shows modal with types.
 	 */
 	private async handleRegisterAssembly(): Promise<void> {
 		this.logger.info('Register Assembly requested');
@@ -612,23 +667,62 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		}
 
 		try {
-			// Read file content
+			// Check if inspector is available
+			const inspectorAvailable = await this.services.pluginInspector.isAvailable();
+			if (!inspectorAvailable) {
+				void vscode.window.showErrorMessage(
+					'Plugin Inspector tool not found. Please rebuild the extension with "npm run build:tools".'
+				);
+				return;
+			}
+
+			// Show progress while inspecting
+			const inspectionResult = await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: 'Inspecting assembly for plugin types...',
+					cancellable: false,
+				},
+				async () => this.services.pluginInspector.inspect(fileUri.fsPath)
+			);
+
+			if (!inspectionResult.success) {
+				void vscode.window.showErrorMessage(
+					`Failed to inspect assembly: ${inspectionResult.error}`
+				);
+				return;
+			}
+
+			if (inspectionResult.types.length === 0) {
+				void vscode.window.showWarningMessage(
+					'No plugin types (IPlugin or CodeActivity implementations) found in this assembly.'
+				);
+				return;
+			}
+
+			this.logger.info('Assembly inspection completed', {
+				assemblyName: inspectionResult.assemblyName,
+				typeCount: inspectionResult.types.length,
+			});
+
+			// Read file content for registration
 			const fileContent = await vscode.workspace.fs.readFile(fileUri);
 			const base64Content = Buffer.from(fileContent).toString('base64');
 
 			// Store for later use when confirm is received
 			this.pendingAssemblyContent = base64Content;
+			this.pendingAssemblyTypes = inspectionResult.types.map((t) => ({
+				typeName: t.typeName,
+				displayName: t.displayName,
+				typeKind: t.typeKind,
+			}));
 
-			// Extract assembly name from filename (e.g., "PPDSDemo.Plugins.dll" → "PPDSDemo.Plugins")
+			// Extract assembly name from inspector result or filename
+			const assemblyName =
+				inspectionResult.assemblyName ?? this.extractFilename(fileUri.fsPath).replace(/\.dll$/i, '');
 			const fullFilename = this.extractFilename(fileUri.fsPath);
-			const assemblyName = fullFilename.replace(/\.dll$/i, '');
 
-			this.logger.debug('Parsed assembly name from filename', {
-				fullFilename,
-				assemblyName,
-			});
-
-			// Load unmanaged solutions (optional for assemblies, unlike packages which require prefix)
+			// Load unmanaged solutions (optional for assemblies)
 			this.unmanagedSolutionsWithPrefix =
 				await this.repositories.solution.findUnmanagedWithPublisherPrefix(
 					this.currentEnvironmentId
@@ -638,34 +732,43 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				count: this.unmanagedSolutionsWithPrefix.length,
 			});
 
-			// Send message to webview to show modal
+			// Send message to webview to show modal with discovered types
 			await this.panel.postMessage({
 				command: 'showRegisterAssemblyModal',
 				data: {
 					name: assemblyName,
 					filename: fullFilename,
+					version: inspectionResult.assemblyVersion ?? '1.0.0.0',
 					solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
 						id: s.id,
 						name: s.name,
 						uniqueName: s.uniqueName,
 					})),
+					// Send discovered plugin types for checkbox selection
+					discoveredTypes: inspectionResult.types.map((t) => ({
+						typeName: t.typeName,
+						displayName: t.displayName,
+						typeKind: t.typeKind,
+					})),
 				},
 			});
 		} catch (error) {
-			this.logger.error('Failed to read assembly file', error);
+			this.logger.error('Failed to process assembly file', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-			void vscode.window.showErrorMessage(`Failed to read assembly file: ${errorMessage}`);
+			void vscode.window.showErrorMessage(`Failed to process assembly file: ${errorMessage}`);
 			this.pendingAssemblyContent = null;
+			this.pendingAssemblyTypes = [];
 		}
 	}
 
 	/**
 	 * Handle confirmation from the Register Assembly modal.
-	 * Calls the use case to register the assembly.
+	 * Calls the use case to register the assembly and its plugin types.
 	 */
 	private async handleConfirmRegisterAssembly(
 		name: string,
-		solutionUniqueName?: string
+		solutionUniqueName: string | undefined,
+		selectedTypeNames: string[]
 	): Promise<void> {
 		if (!this.pendingAssemblyContent) {
 			this.logger.error('No pending assembly content for registration');
@@ -673,8 +776,19 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			return;
 		}
 
+		// Filter pending types to only those selected by user
+		const typesToRegister = this.pendingAssemblyTypes.filter((t) =>
+			selectedTypeNames.includes(t.typeName)
+		);
+
+		if (typesToRegister.length === 0) {
+			void vscode.window.showErrorMessage('No plugin types selected. Please select at least one type.');
+			return;
+		}
+
 		const base64Content = this.pendingAssemblyContent;
 		this.pendingAssemblyContent = null; // Clear pending content
+		this.pendingAssemblyTypes = []; // Clear pending types
 
 		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 		const environmentName = environment?.name ?? 'Unknown Environment';
@@ -682,26 +796,27 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		await vscode.window.withProgress(
 			{
 				location: vscode.ProgressLocation.Notification,
-				title: `Registering ${name} in ${environmentName}...`,
+				title: `Registering ${name} with ${typesToRegister.length} plugin type(s) in ${environmentName}...`,
 				cancellable: false,
 			},
 			async () => {
 				try {
-					await this.useCases.registerAssembly.execute(this.currentEnvironmentId, {
+					const result = await this.useCases.registerAssembly.execute(this.currentEnvironmentId, {
 						name,
 						base64Content,
 						solutionUniqueName,
+						pluginTypes: typesToRegister,
 					});
 
 					const solutionInfo = solutionUniqueName
 						? ` and added to solution ${solutionUniqueName}`
 						: '';
 					void vscode.window.showInformationMessage(
-						`${name} registered successfully in ${environmentName}${solutionInfo}.`
+						`${name} registered successfully with ${result.pluginTypeIds.length} plugin type(s) in ${environmentName}${solutionInfo}.`
 					);
 
-					// Refresh tree to show the new assembly
-					await this.handleRefresh();
+					// Fetch the new assembly with types and send delta update
+					await this.sendAssemblyDeltaUpdate(result.assemblyId);
 				} catch (error: unknown) {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 					this.logger.error('Failed to register plugin assembly', error);
@@ -924,9 +1039,180 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 	/**
 	 * Update a standalone plugin assembly. Called from context menu command.
+	 * Shows file picker, runs inspector, then shows modal for confirmation.
+	 * User can select which types to register/unregister (like PRT).
 	 */
 	public async updateAssembly(assemblyId: string): Promise<void> {
 		this.logger.info('Updating plugin assembly', { assemblyId });
+
+		// Fetch assembly info for display
+		const assembly = await this.repositories.assembly.findById(
+			this.currentEnvironmentId,
+			assemblyId
+		);
+		const assemblyName = assembly?.getName() ?? 'Unknown Assembly';
+
+		// Show file picker
+		const fileUri = await this.pickAssemblyFile();
+		if (!fileUri) {
+			return; // User cancelled
+		}
+
+		try {
+			// Check if inspector is available
+			const inspectorAvailable = await this.services.pluginInspector.isAvailable();
+			if (!inspectorAvailable) {
+				void vscode.window.showErrorMessage(
+					'Plugin Inspector tool not found. Please rebuild the extension with "npm run build:tools".'
+				);
+				return;
+			}
+
+			// Inspect the new assembly
+			const inspectionResult = await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: 'Inspecting assembly...',
+					cancellable: false,
+				},
+				async () => this.services.pluginInspector.inspect(fileUri.fsPath)
+			);
+
+			if (!inspectionResult.success) {
+				void vscode.window.showErrorMessage(
+					`Failed to inspect assembly: ${inspectionResult.error}`
+				);
+				return;
+			}
+
+			// Fetch existing registered types for this assembly
+			const existingTypes = await this.repositories.pluginType.findByAssemblyId(
+				this.currentEnvironmentId,
+				assemblyId
+			);
+			const existingTypeNames = new Set(existingTypes.map((t) => t.getName()));
+
+			this.logger.debug('Fetched existing types for assembly update', {
+				assemblyId,
+				existingCount: existingTypes.length,
+				newCount: inspectionResult.types.length,
+			});
+
+			// Read file content and store for confirmation
+			const fileContent = await vscode.workspace.fs.readFile(fileUri);
+			const base64Content = Buffer.from(fileContent).toString('base64');
+
+			this.pendingUpdateAssemblyId = assemblyId;
+			this.pendingUpdateAssemblyContent = base64Content;
+			this.pendingUpdateAssemblyTypes = inspectionResult.types.map((t) => ({
+				typeName: t.typeName,
+				displayName: t.displayName,
+				typeKind: t.typeKind,
+			}));
+
+			// Build merged type list for modal:
+			// - Types in new DLL get their info from inspection
+			// - Types already registered are pre-checked
+			// - Types only in existing (removed from DLL) are shown as "existing only"
+			const discoveredTypeNames = new Set(inspectionResult.types.map((t) => t.typeName));
+
+			// Types in new assembly (may or may not be registered)
+			const mergedTypes = inspectionResult.types.map((t) => ({
+				typeName: t.typeName,
+				displayName: t.displayName,
+				typeKind: t.typeKind,
+				isRegistered: existingTypeNames.has(t.typeName),
+				existsInNewDll: true,
+			}));
+
+			// Types that are registered but NOT in new DLL (were removed from code)
+			for (const existingType of existingTypes) {
+				if (!discoveredTypeNames.has(existingType.getName())) {
+					mergedTypes.push({
+						typeName: existingType.getName(),
+						displayName: existingType.getFriendlyName(),
+						typeKind: existingType.isWorkflowActivity() ? 'WorkflowActivity' : 'Plugin',
+						isRegistered: true,
+						existsInNewDll: false,
+					});
+				}
+			}
+
+			// Show modal with assembly info and merged types
+			await this.panel.postMessage({
+				command: 'showUpdateAssemblyModal',
+				data: {
+					assemblyId,
+					name: assemblyName,
+					filename: this.extractFilename(fileUri.fsPath),
+					version: inspectionResult.assemblyVersion ?? '1.0.0.0',
+					discoveredTypes: mergedTypes,
+				},
+			});
+		} catch (error) {
+			this.logger.error('Failed to process assembly file for update', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(`Failed to process assembly: ${errorMessage}`);
+			this.pendingUpdateAssemblyId = null;
+			this.pendingUpdateAssemblyContent = null;
+			this.pendingUpdateAssemblyTypes = [];
+		}
+	}
+
+	/**
+	 * Update a plugin package. Called from context menu command.
+	 * Shows file picker, then modal for confirmation.
+	 */
+	public async updatePackage(packageId: string): Promise<void> {
+		this.logger.info('Updating plugin package', { packageId });
+
+		// Fetch package info for display
+		const pkg = await this.repositories.package.findById(this.currentEnvironmentId, packageId);
+		const packageName = pkg?.getName() ?? 'Unknown Package';
+		const packageVersion = pkg?.getVersion() ?? '1.0.0';
+
+		// Show file picker
+		const fileUri = await this.pickPackageFile();
+		if (!fileUri) {
+			return; // User cancelled
+		}
+
+		try {
+			// Read file content and store for confirmation
+			const fileContent = await vscode.workspace.fs.readFile(fileUri);
+			const base64Content = Buffer.from(fileContent).toString('base64');
+
+			// Parse new version from filename
+			const filename = this.extractFilename(fileUri.fsPath);
+			const metadata = this.filenameParser.parse(fileUri.fsPath);
+
+			this.pendingUpdatePackageId = packageId;
+			this.pendingUpdatePackageContent = base64Content;
+
+			// Show modal with package info
+			await this.panel.postMessage({
+				command: 'showUpdatePackageModal',
+				data: {
+					packageId,
+					name: packageName,
+					version: metadata.version || packageVersion,
+					filename,
+				},
+			});
+		} catch (error) {
+			this.logger.error('Failed to read package file for update', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(`Failed to read package file: ${errorMessage}`);
+			this.pendingUpdatePackageId = null;
+			this.pendingUpdatePackageContent = null;
+		}
+	}
+
+	/**
+	 * Unregister (delete) a standalone plugin assembly. Called from context menu command.
+	 */
+	public async unregisterAssembly(assemblyId: string): Promise<void> {
+		this.logger.info('Unregistering plugin assembly', { assemblyId });
 
 		// Fetch assembly and environment info for better messaging
 		const [assembly, environment] = await Promise.all([
@@ -937,41 +1223,45 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		const assemblyName = assembly?.getName() ?? 'Unknown Assembly';
 		const environmentName = environment?.name ?? 'Unknown Environment';
 
-		// Show file picker
-		const fileUri = await this.pickAssemblyFile();
-		if (!fileUri) {
+		// Confirm deletion with user
+		const confirmation = await vscode.window.showWarningMessage(
+			`Are you sure you want to unregister "${assemblyName}" from ${environmentName}? This will delete the assembly and cannot be undone.`,
+			{ modal: true },
+			'Unregister'
+		);
+
+		if (confirmation !== 'Unregister') {
 			return; // User cancelled
 		}
 
 		await vscode.window.withProgress(
 			{
 				location: vscode.ProgressLocation.Notification,
-				title: `Uploading ${assemblyName} to ${environmentName}...`,
+				title: `Unregistering ${assemblyName} from ${environmentName}...`,
 				cancellable: false,
 			},
 			async () => {
 				try {
-					// Read file and convert to base64
-					const fileContent = await vscode.workspace.fs.readFile(fileUri);
-					const base64Content = Buffer.from(fileContent).toString('base64');
-
-					await this.useCases.updateAssembly.execute(
+					await this.useCases.unregisterAssembly.execute(
 						this.currentEnvironmentId,
 						assemblyId,
-						base64Content
+						assemblyName
 					);
 
-					// Refresh the subtree (assembly + all children)
-					await this.refreshAssemblySubtree(assemblyId);
+					// Send delta update to webview (instant, no full refresh)
+					await this.panel.postMessage({
+						command: 'removeNode',
+						data: { nodeId: assemblyId },
+					});
 
 					void vscode.window.showInformationMessage(
-						`${assemblyName} updated successfully in ${environmentName}.`
+						`${assemblyName} unregistered successfully from ${environmentName}.`
 					);
 				} catch (error: unknown) {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-					this.logger.error('Failed to update plugin assembly', error);
+					this.logger.error('Failed to unregister plugin assembly', error);
 					void vscode.window.showErrorMessage(
-						`Failed to update ${assemblyName} in ${environmentName}: ${errorMessage}`
+						`Failed to unregister ${assemblyName} from ${environmentName}: ${errorMessage}`
 					);
 				}
 			}
@@ -979,38 +1269,45 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	}
 
 	/**
-	 * Update a plugin package. Called from context menu command.
+	 * Handle unregister assembly from webview message.
 	 */
-	public async updatePackage(packageId: string): Promise<void> {
-		this.logger.info('Updating plugin package', { packageId });
+	private async handleUnregisterAssembly(assemblyId: string, _assemblyName: string): Promise<void> {
+		// Delegate to the public method which handles confirmation and execution
+		await this.unregisterAssembly(assemblyId);
+	}
 
-		// Fetch package and environment info for better messaging
+	/**
+	 * Handle confirmation from the Update Package modal.
+	 */
+	private async handleConfirmUpdatePackage(
+		packageId: string,
+		_version: string | undefined
+	): Promise<void> {
+		if (!this.pendingUpdatePackageContent || this.pendingUpdatePackageId !== packageId) {
+			this.logger.error('No pending package content for update');
+			void vscode.window.showErrorMessage('No package file selected. Please try again.');
+			return;
+		}
+
+		const base64Content = this.pendingUpdatePackageContent;
+		this.pendingUpdatePackageId = null;
+		this.pendingUpdatePackageContent = null;
+
 		const [pkg, environment] = await Promise.all([
 			this.repositories.package.findById(this.currentEnvironmentId, packageId),
 			this.getEnvironmentById(this.currentEnvironmentId),
 		]);
-
 		const packageName = pkg?.getName() ?? 'Unknown Package';
 		const environmentName = environment?.name ?? 'Unknown Environment';
-
-		// Show file picker
-		const fileUri = await this.pickPackageFile();
-		if (!fileUri) {
-			return; // User cancelled
-		}
 
 		await vscode.window.withProgress(
 			{
 				location: vscode.ProgressLocation.Notification,
-				title: `Uploading ${packageName} to ${environmentName}...`,
+				title: `Updating ${packageName} in ${environmentName}...`,
 				cancellable: false,
 			},
 			async () => {
 				try {
-					// Read file and convert to base64
-					const fileContent = await vscode.workspace.fs.readFile(fileUri);
-					const base64Content = Buffer.from(fileContent).toString('base64');
-
 					await this.useCases.updatePackage.execute(
 						this.currentEnvironmentId,
 						packageId,
@@ -1032,6 +1329,179 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				}
 			}
 		);
+	}
+
+	/**
+	 * Handle confirmation from the Update Assembly modal.
+	 * Handles type registration/unregistration based on user selection (like PRT).
+	 */
+	private async handleConfirmUpdateAssembly(
+		assemblyId: string,
+		selectedTypeNames: string[]
+	): Promise<void> {
+		if (!this.pendingUpdateAssemblyContent || this.pendingUpdateAssemblyId !== assemblyId) {
+			this.logger.error('No pending assembly content for update');
+			void vscode.window.showErrorMessage('No assembly file selected. Please try again.');
+			return;
+		}
+
+		const base64Content = this.pendingUpdateAssemblyContent;
+		const pendingTypes = this.pendingUpdateAssemblyTypes;
+		this.pendingUpdateAssemblyId = null;
+		this.pendingUpdateAssemblyContent = null;
+		this.pendingUpdateAssemblyTypes = [];
+
+		const [assembly, environment] = await Promise.all([
+			this.repositories.assembly.findById(this.currentEnvironmentId, assemblyId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+		const assemblyName = assembly?.getName() ?? 'Unknown Assembly';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Updating ${assemblyName} in ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					// 1. Update assembly content (existing)
+					await this.useCases.updateAssembly.execute(
+						this.currentEnvironmentId,
+						assemblyId,
+						base64Content
+					);
+
+					// 2. Fetch current existing types to compare with selection
+					const existingTypes = await this.repositories.pluginType.findByAssemblyId(
+						this.currentEnvironmentId,
+						assemblyId
+					);
+					const existingTypeNames = new Set(existingTypes.map((t) => t.getName()));
+					const selectedTypeNameSet = new Set(selectedTypeNames);
+
+					// 3. Register new types (selected but not existing)
+					// Only consider types that exist in the new DLL
+					const typesToRegister = pendingTypes.filter(
+						(t) => selectedTypeNameSet.has(t.typeName) && !existingTypeNames.has(t.typeName)
+					);
+
+					let registeredCount = 0;
+					for (const typeInfo of typesToRegister) {
+						await this.repositories.pluginType.register(this.currentEnvironmentId, {
+							typeName: typeInfo.typeName,
+							friendlyName: typeInfo.displayName,
+							assemblyId,
+							isWorkflowActivity: typeInfo.typeKind === 'WorkflowActivity',
+						});
+						registeredCount++;
+					}
+
+					// 4. Unregister removed types (existing but not selected)
+					const typesToUnregister = existingTypes.filter(
+						(t) => !selectedTypeNameSet.has(t.getName())
+					);
+
+					let unregisteredCount = 0;
+					for (const pluginType of typesToUnregister) {
+						try {
+							await this.repositories.pluginType.delete(
+								this.currentEnvironmentId,
+								pluginType.getId()
+							);
+							unregisteredCount++;
+						} catch (error) {
+							// Type may have steps - log and continue
+							this.logger.warn('Failed to unregister plugin type (may have steps)', {
+								pluginTypeId: pluginType.getId(),
+								typeName: pluginType.getName(),
+								error: error instanceof Error ? error.message : 'Unknown error',
+							});
+						}
+					}
+
+					// Refresh the subtree (assembly + all children)
+					await this.refreshAssemblySubtree(assemblyId);
+
+					// Build summary message
+					const parts: string[] = [`${assemblyName} updated`];
+					if (registeredCount > 0) {
+						parts.push(`${registeredCount} type(s) added`);
+					}
+					if (unregisteredCount > 0) {
+						parts.push(`${unregisteredCount} type(s) removed`);
+					}
+
+					void vscode.window.showInformationMessage(
+						`${parts.join(', ')} in ${environmentName}.`
+					);
+
+					this.logger.info('Assembly update completed', {
+						assemblyId,
+						registeredCount,
+						unregisteredCount,
+					});
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to update plugin assembly', error);
+					void vscode.window.showErrorMessage(
+						`Failed to update ${assemblyName} in ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
+	}
+
+	// ========================================
+	// Delta Update Helpers
+	// ========================================
+
+	/**
+	 * Fetch a newly registered assembly with its types and send delta update to webview.
+	 * This avoids a full tree refresh after registration.
+	 */
+	private async sendAssemblyDeltaUpdate(assemblyId: string): Promise<void> {
+		this.logger.debug('Sending assembly delta update', { assemblyId });
+
+		// Fetch the assembly with its plugin types (1 API call)
+		const result = await this.repositories.assembly.findByIdWithTypes(
+			this.currentEnvironmentId,
+			assemblyId
+		);
+
+		if (result === null) {
+			// Fallback to full refresh if assembly not found (shouldn't happen)
+			this.logger.warn('Assembly not found for delta update, falling back to refresh', {
+				assemblyId,
+			});
+			await this.handleRefresh();
+			return;
+		}
+
+		// Build plugin type tree items (no steps yet for new assembly)
+		const pluginTypeItems = result.pluginTypes.map((pluginType) =>
+			this.pluginTypeMapper.toTreeItem(pluginType, assemblyId, [])
+		);
+
+		// Build assembly tree item (0 active steps for new assembly)
+		const assemblyNode = this.assemblyMapper.toTreeItem(
+			result.assembly,
+			pluginTypeItems,
+			0, // activeStepCount = 0 for new assembly
+			null // parentPackageId = null for standalone
+		);
+
+		// Send delta update to webview
+		await this.panel.postMessage({
+			command: 'addStandaloneAssembly',
+			data: { assemblyNode },
+		});
+
+		this.logger.debug('Assembly delta update sent', {
+			assemblyId,
+			pluginTypeCount: pluginTypeItems.length,
+		});
 	}
 
 	// ========================================

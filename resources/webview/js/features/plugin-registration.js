@@ -13,7 +13,7 @@ let treeData = [];
 let expandedNodes = new Set();
 let currentFilter = '';
 let hideHiddenSteps = true; // Default: hide internal system steps (ishidden=true)
-let hideMicrosoftAssemblies = false; // Default: show Microsoft assemblies
+let hideMicrosoftAssemblies = true; // Default: hide Microsoft assemblies
 
 // Virtual scrolling state
 const VIRTUAL_SCROLL_THRESHOLD = 500; // Enable virtual scrolling above this node count
@@ -954,6 +954,18 @@ window.createBehavior({
 			case 'showRegisterAssemblyModal':
 				handleShowRegisterAssemblyModal(message.data);
 				break;
+			case 'removeNode':
+				handleRemoveNode(message.data);
+				break;
+			case 'addStandaloneAssembly':
+				handleAddStandaloneAssembly(message.data);
+				break;
+			case 'showUpdatePackageModal':
+				handleShowUpdatePackageModal(message.data);
+				break;
+			case 'showUpdateAssemblyModal':
+				handleShowUpdateAssemblyModal(message.data);
+				break;
 		}
 	}
 });
@@ -1057,11 +1069,11 @@ function handleShowRegisterPackageModal(data) {
 }
 
 /**
- * Show the Register Assembly modal with pre-filled metadata.
- * @param {Object} data - { name, filename, solutions }
+ * Show the Register Assembly modal with pre-filled metadata and plugin type selection.
+ * @param {Object} data - { name, filename, version, solutions, discoveredTypes }
  */
 function handleShowRegisterAssemblyModal(data) {
-	const { name, filename, solutions } = data;
+	const { name, filename, version, solutions, discoveredTypes } = data;
 
 	if (!window.showFormModal) {
 		console.error('FormModal component not loaded');
@@ -1084,39 +1096,66 @@ function handleShowRegisterAssemblyModal(data) {
 		solutionUniqueNameMap[s.id] = s.uniqueName;
 	});
 
+	// Build fields array - always include basic fields
+	const fields = [
+		{
+			id: 'filename',
+			label: 'File',
+			type: 'text',
+			value: filename || '',
+			readonly: true
+		},
+		{
+			id: 'name',
+			label: 'Assembly Name',
+			type: 'text',
+			value: name || '',
+			required: true,
+			placeholder: 'e.g., PPDSDemo.Plugins'
+		},
+		{
+			id: 'version',
+			label: 'Version',
+			type: 'text',
+			value: version || '1.0.0.0',
+			readonly: true
+		},
+		{
+			id: 'solution',
+			label: 'Add to Solution (Optional)',
+			type: 'select',
+			value: '', // None by default
+			options: solutionOptions,
+			required: false
+		}
+	];
+
+	// Add plugin types section if we have discovered types
+	if (discoveredTypes && discoveredTypes.length > 0) {
+		fields.push({
+			id: 'pluginTypesHeader',
+			label: '',
+			type: 'info',
+			value: `Found ${discoveredTypes.length} plugin type(s). Select which to register:`
+		});
+
+		fields.push({
+			id: 'pluginTypes',
+			label: 'Plugin Types',
+			type: 'checkboxGroup',
+			options: discoveredTypes.map(t => ({
+				value: t.typeName,
+				label: t.displayName,
+				description: t.typeKind === 'WorkflowActivity' ? '(Workflow Activity)' : '(Plugin)',
+				checked: true // All selected by default
+			})),
+			required: true
+		});
+	}
+
 	window.showFormModal({
 		title: 'Register Plugin Assembly',
-		fields: [
-			{
-				id: 'filename',
-				label: 'File',
-				type: 'text',
-				value: filename || '',
-				readonly: true
-			},
-			{
-				id: 'name',
-				label: 'Assembly Name',
-				type: 'text',
-				value: name || '',
-				required: true,
-				placeholder: 'e.g., PPDSDemo.Plugins'
-			},
-			{
-				id: 'solution',
-				label: 'Add to Solution (Optional)',
-				type: 'select',
-				value: '', // None by default
-				options: solutionOptions,
-				required: false
-			},
-			{
-				id: 'info',
-				label: '',
-				type: 'info',
-				value: 'Plugin types will be discovered automatically after registration.'
-			}
-		],
+		fields: fields,
 		submitLabel: 'Register',
 		cancelLabel: 'Cancel',
 		onSubmit: (values) => {
@@ -1125,12 +1164,16 @@ function handleShowRegisterAssemblyModal(data) {
 				? solutionUniqueNameMap[values.solution]
 				: undefined;
 
+			// Get selected plugin types
+			const selectedTypes = values.pluginTypes || [];
+
 			// Send confirmation to extension
 			vscode.postMessage({
 				command: 'confirmRegisterAssembly',
 				data: {
 					name: values.name,
-					solutionUniqueName
+					solutionUniqueName,
+					selectedTypes
 				}
 			});
 		}
@@ -1198,4 +1241,275 @@ function updateNodeInTree(items, nodeId, newNode) {
 		}
 	}
 	return false;
+}
+
+/**
+ * Remove a node from the tree by ID.
+ * Used for unregister operations to provide instant UI feedback.
+ * @param {Object} data - { nodeId }
+ */
+function handleRemoveNode(data) {
+	const { nodeId } = data;
+	if (!nodeId) return;
+
+	// Remove from data model
+	const removed = removeNodeFromTree(treeData, nodeId);
+
+	if (removed) {
+		// Check if tree is now empty
+		const treeEmpty = document.getElementById('treeEmpty');
+		const pluginTree = document.getElementById('pluginTree');
+		const treeToolbar = document.getElementById('treeToolbar');
+
+		if (treeData.length === 0) {
+			if (pluginTree) pluginTree.style.display = 'none';
+			if (treeEmpty) treeEmpty.style.display = 'flex';
+			if (treeToolbar) treeToolbar.style.display = 'none';
+		} else {
+			// Re-render tree
+			renderTree();
+
+			// Re-apply filter if active
+			if (currentFilter) {
+				filterTree(currentFilter);
+			}
+		}
+	}
+}
+
+/**
+ * Recursively find and remove a node from the tree.
+ * @returns {boolean} True if node was found and removed
+ */
+function removeNodeFromTree(items, nodeId) {
+	for (let i = 0; i < items.length; i++) {
+		if (items[i].id === nodeId) {
+			items.splice(i, 1);
+			return true;
+		}
+		if (items[i].children && items[i].children.length > 0) {
+			if (removeNodeFromTree(items[i].children, nodeId)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
+ * Add a standalone assembly to the tree.
+ * Used for register operations to provide near-instant UI feedback.
+ * @param {Object} data - { assemblyNode } - The TreeItemViewModel for the new assembly
+ */
+function handleAddStandaloneAssembly(data) {
+	const { assemblyNode } = data;
+	if (!assemblyNode) return;
+
+	// Add to tree data (standalone assemblies go at root level after packages)
+	// Find the first standalone assembly (type === 'assembly' at root) and insert before it
+	// Or if no standalone assemblies exist, append at end
+	let insertIndex = treeData.length;
+	for (let i = 0; i < treeData.length; i++) {
+		if (treeData[i].type === 'assembly') {
+			insertIndex = i;
+			break;
+		}
+	}
+	treeData.splice(insertIndex, 0, assemblyNode);
+
+	// Ensure tree container is visible (in case it was empty before)
+	const treeEmpty = document.getElementById('treeEmpty');
+	const pluginTree = document.getElementById('pluginTree');
+	const treeToolbar = document.getElementById('treeToolbar');
+
+	if (treeEmpty) treeEmpty.style.display = 'none';
+	if (pluginTree) pluginTree.style.display = 'block';
+	if (treeToolbar) treeToolbar.style.display = 'flex';
+
+	// Re-render tree
+	renderTree();
+
+	// Re-apply filter if active
+	if (currentFilter) {
+		filterTree(currentFilter);
+	}
+
+	// Scroll the new node into view
+	scrollNodeIntoView(assemblyNode.id);
+}
+
+/**
+ * Scroll a tree node into view.
+ * @param {string} nodeId - ID of the node to scroll to
+ */
+function scrollNodeIntoView(nodeId) {
+	// Use requestAnimationFrame to ensure DOM has updated
+	requestAnimationFrame(() => {
+		const nodeElement = document.querySelector(`[data-id="${nodeId}"]`);
+		if (nodeElement) {
+			nodeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		}
+	});
+}
+
+/**
+ * Show the Update Package modal with pre-filled metadata.
+ * Simpler than register - no solution picker needed.
+ * @param {Object} data - { packageId, name, version, filename }
+ */
+function handleShowUpdatePackageModal(data) {
+	const { packageId, name, version, filename } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	window.showFormModal({
+		title: `Update Package: ${name}`,
+		fields: [
+			{
+				id: 'filename',
+				label: 'New File',
+				type: 'text',
+				value: filename || '',
+				readonly: true
+			},
+			{
+				id: 'name',
+				label: 'Package Name',
+				type: 'text',
+				value: name || '',
+				readonly: true // Name cannot change on update
+			},
+			{
+				id: 'version',
+				label: 'Version',
+				type: 'text',
+				value: version || '1.0.0',
+				required: true,
+				placeholder: 'e.g., 1.0.0'
+			}
+		],
+		submitLabel: 'Update',
+		cancelLabel: 'Cancel',
+		onSubmit: (values) => {
+			vscode.postMessage({
+				command: 'confirmUpdatePackage',
+				data: {
+					packageId,
+					version: values.version
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Update Assembly modal with discovered types.
+ * Types are EDITABLE - user can select which types to register/unregister (like PRT).
+ * @param {Object} data - { assemblyId, name, filename, version, discoveredTypes }
+ * discoveredTypes: Array of { typeName, displayName, typeKind, isRegistered, existsInNewDll }
+ */
+function handleShowUpdateAssemblyModal(data) {
+	const { assemblyId, name, filename, version, discoveredTypes } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build fields array
+	const fields = [
+		{
+			id: 'filename',
+			label: 'New File',
+			type: 'text',
+			value: filename || '',
+			readonly: true
+		},
+		{
+			id: 'name',
+			label: 'Assembly Name',
+			type: 'text',
+			value: name || '',
+			readonly: true // Name cannot change on update
+		},
+		{
+			id: 'version',
+			label: 'Version',
+			type: 'text',
+			value: version || '1.0.0.0',
+			readonly: true
+		}
+	];
+
+	// Add plugin types section if we have discovered types
+	// Show as EDITABLE checkboxes - user can select which types to register/unregister
+	if (discoveredTypes && discoveredTypes.length > 0) {
+		// Count types by category
+		const newTypes = discoveredTypes.filter(t => t.existsInNewDll && !t.isRegistered);
+		const existingTypes = discoveredTypes.filter(t => t.existsInNewDll && t.isRegistered);
+		const removedTypes = discoveredTypes.filter(t => !t.existsInNewDll && t.isRegistered);
+
+		// Build info message
+		let infoMessage = `Found ${discoveredTypes.length} plugin type(s). Select which to register:`;
+		if (newTypes.length > 0) {
+			infoMessage += `\n• ${newTypes.length} new type(s) to add`;
+		}
+		if (removedTypes.length > 0) {
+			infoMessage += `\n• ${removedTypes.length} type(s) removed from DLL`;
+		}
+
+		fields.push({
+			id: 'pluginTypesHeader',
+			label: '',
+			type: 'info',
+			value: infoMessage
+		});
+
+		fields.push({
+			id: 'pluginTypes',
+			label: 'Plugin Types',
+			type: 'checkboxGroup',
+			// EDITABLE - user can select/deselect types
+			options: discoveredTypes.map(t => {
+				// Build description showing type status
+				let description = t.typeKind === 'WorkflowActivity' ? '(Workflow Activity)' : '(Plugin)';
+				if (!t.existsInNewDll) {
+					description += ' [REMOVED FROM DLL]';
+				} else if (!t.isRegistered) {
+					description += ' [NEW]';
+				}
+
+				return {
+					value: t.typeName,
+					label: t.displayName,
+					description: description,
+					// Pre-check types that exist in the new DLL (both new and existing)
+					// Types removed from DLL are unchecked by default (will be unregistered)
+					checked: t.existsInNewDll
+				};
+			})
+		});
+	}
+
+	window.showFormModal({
+		title: `Update Assembly: ${name}`,
+		fields: fields,
+		submitLabel: 'Update',
+		cancelLabel: 'Cancel',
+		onSubmit: (values) => {
+			// Get selected plugin types (returns array of checked type names)
+			const selectedTypes = values.pluginTypes || [];
+
+			vscode.postMessage({
+				command: 'confirmUpdateAssembly',
+				data: {
+					assemblyId,
+					selectedTypes
+				}
+			});
+		}
+	});
 }

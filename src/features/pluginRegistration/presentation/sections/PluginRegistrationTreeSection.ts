@@ -44,7 +44,7 @@ export class PluginRegistrationTreeSection implements ISection {
 						<span>Hide hidden steps</span>
 					</label>
 					<label class="tree-toolbar-checkbox" title="Hide assemblies starting with 'Microsoft.'">
-						<input type="checkbox" id="hideMicrosoftAssemblies" />
+						<input type="checkbox" id="hideMicrosoftAssemblies" checked />
 						<span>Hide Microsoft assemblies</span>
 					</label>
 				</div>

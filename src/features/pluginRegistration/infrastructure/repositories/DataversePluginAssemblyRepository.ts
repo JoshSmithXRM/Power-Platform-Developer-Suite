@@ -1,7 +1,11 @@
 import type { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
-import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
+import type {
+	AssemblyWithTypes,
+	IPluginAssemblyRepository,
+} from '../../domain/interfaces/IPluginAssemblyRepository';
 import { PluginAssembly } from '../../domain/entities/PluginAssembly';
+import { PluginType } from '../../domain/entities/PluginType';
 import { IsolationMode } from '../../domain/valueObjects/IsolationMode';
 import { SourceType } from '../../domain/valueObjects/SourceType';
 
@@ -26,6 +30,23 @@ interface PluginAssemblyDto {
 interface PluginAssemblyCollectionResponse {
 	value: PluginAssemblyDto[];
 	'@odata.count'?: number;
+}
+
+/**
+ * DTO for plugin type in expanded response.
+ */
+interface ExpandedPluginTypeDto {
+	plugintypeid: string;
+	typename: string;
+	friendlyname: string | null;
+	workflowactivitygroupname: string | null;
+}
+
+/**
+ * DTO for assembly with expanded plugin types.
+ */
+interface PluginAssemblyWithTypesDto extends PluginAssemblyDto {
+	pluginassembly_plugintype?: ExpandedPluginTypeDto[];
 }
 
 /**
@@ -213,11 +234,7 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 			solutionUniqueName,
 		});
 
-		// Build endpoint - optionally include solution for immediate association
-		let endpoint = `/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}`;
-		if (solutionUniqueName) {
-			endpoint += `?solutionUniqueName=${encodeURIComponent(solutionUniqueName)}`;
-		}
+		const endpoint = `/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}`;
 
 		// Cloud-only fixed values per Microsoft documentation:
 		// - sourcetype: 0 = Database (on-prem can use 1=Disk or 2=GAC)
@@ -229,10 +246,18 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 			isolationmode: 2,
 		};
 
+		// Use MSCRM.SolutionUniqueName header for solution association
+		// (pluginassemblies doesn't support solutionUniqueName query parameter)
+		const additionalHeaders: Record<string, string> | undefined = solutionUniqueName
+			? { 'MSCRM.SolutionUniqueName': solutionUniqueName }
+			: undefined;
+
 		const response = await this.apiService.post<{ pluginassemblyid: string }>(
 			environmentId,
 			endpoint,
-			payload
+			payload,
+			undefined, // no cancellation token
+			additionalHeaders
 		);
 
 		const assemblyId = response.pluginassemblyid;
@@ -243,6 +268,66 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 		});
 
 		return assemblyId;
+	}
+
+	public async delete(environmentId: string, assemblyId: string): Promise<void> {
+		this.logger.info('DataversePluginAssemblyRepository: Deleting assembly', {
+			environmentId,
+			assemblyId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}(${assemblyId})`;
+
+		await this.apiService.delete(environmentId, endpoint);
+
+		this.logger.info('DataversePluginAssemblyRepository: Assembly deleted', {
+			assemblyId,
+		});
+	}
+
+	public async findByIdWithTypes(
+		environmentId: string,
+		assemblyId: string
+	): Promise<AssemblyWithTypes | null> {
+		this.logger.debug('DataversePluginAssemblyRepository: Fetching assembly with types', {
+			environmentId,
+			assemblyId,
+		});
+
+		// Use $expand to fetch assembly and plugin types in a single query
+		const pluginTypeSelect = 'plugintypeid,typename,friendlyname,workflowactivitygroupname';
+		const endpoint =
+			`/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}(${assemblyId})` +
+			`?$select=${DataversePluginAssemblyRepository.SELECT_FIELDS}` +
+			`&$expand=pluginassembly_plugintype($select=${pluginTypeSelect})`;
+
+		try {
+			const dto = await this.apiService.get<PluginAssemblyWithTypesDto>(environmentId, endpoint);
+
+			const assembly = this.mapToDomain(dto);
+			const pluginTypes = (dto.pluginassembly_plugintype ?? []).map(
+				(pt) =>
+					new PluginType(
+						pt.plugintypeid,
+						pt.typename,
+						pt.friendlyname ?? pt.typename,
+						assemblyId,
+						pt.workflowactivitygroupname
+					)
+			);
+
+			this.logger.debug('DataversePluginAssemblyRepository: Fetched assembly with types', {
+				assemblyId,
+				pluginTypeCount: pluginTypes.length,
+			});
+
+			return { assembly, pluginTypes };
+		} catch (error) {
+			if (error instanceof Error && error.message.includes('404')) {
+				return null;
+			}
+			throw error;
+		}
 	}
 
 	private mapToDomain(dto: PluginAssemblyDto): PluginAssembly {

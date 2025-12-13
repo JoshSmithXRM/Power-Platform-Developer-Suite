@@ -173,3 +173,62 @@ textarea.form-modal-input {
 .form-modal-button--secondary:hover {
 	background: var(--vscode-button-secondaryHoverBackground);
 }
+
+/* Checkbox Group */
+.form-modal-checkbox-group {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	max-height: 200px;
+	overflow-y: auto;
+	padding: 8px;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 2px;
+}
+
+.form-modal-checkbox-group--error {
+	border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.form-modal-checkbox-group--disabled {
+	opacity: 0.7;
+	background: var(--vscode-input-background);
+}
+
+.form-modal-checkbox-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+}
+
+.form-modal-checkbox {
+	margin: 2px 0 0 0;
+	cursor: pointer;
+	accent-color: var(--vscode-button-background);
+}
+
+.form-modal-checkbox:disabled {
+	cursor: not-allowed;
+}
+
+.form-modal-checkbox-group--disabled .form-modal-checkbox-label {
+	cursor: default;
+}
+
+.form-modal-checkbox-label {
+	flex: 1;
+	cursor: pointer;
+	font-size: 13px;
+	color: var(--vscode-foreground);
+	line-height: 1.4;
+}
+
+.form-modal-checkbox-label-text {
+	font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.form-modal-checkbox-description {
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+}

@@ -1,4 +1,13 @@
 import type { PluginAssembly } from '../entities/PluginAssembly';
+import type { PluginType } from '../entities/PluginType';
+
+/**
+ * Result of fetching an assembly with its plugin types.
+ */
+export interface AssemblyWithTypes {
+	readonly assembly: PluginAssembly;
+	readonly pluginTypes: readonly PluginType[];
+}
 
 /**
  * Repository interface for plugin assemblies.
@@ -57,4 +66,25 @@ export interface IPluginAssemblyRepository {
 		base64Content: string,
 		solutionUniqueName?: string
 	): Promise<string>;
+
+	/**
+	 * Delete/unregister a plugin assembly.
+	 * Note: This will fail if the assembly has registered steps.
+	 *
+	 * @param environmentId - Target environment
+	 * @param assemblyId - ID of the assembly to delete
+	 */
+	delete(environmentId: string, assemblyId: string): Promise<void>;
+
+	/**
+	 * Find assembly by ID with its plugin types in a single query.
+	 * Uses $expand to fetch both assembly and types efficiently.
+	 *
+	 * Used for delta UI updates after registration.
+	 *
+	 * @param environmentId - Target environment
+	 * @param assemblyId - ID of the assembly
+	 * @returns Assembly with its plugin types, or null if not found
+	 */
+	findByIdWithTypes(environmentId: string, assemblyId: string): Promise<AssemblyWithTypes | null>;
 }

@@ -250,6 +250,11 @@
                 "category": "Power Platform Developer Suite"
             },
             {
+                "command": "power-platform-dev-suite.unregisterPluginAssembly",
+                "title": "Unregister Assembly",
+                "category": "Power Platform Developer Suite"
+            },
+            {
                 "command": "power-platform-dev-suite.metadataBrowser",
                 "title": "Metadata Browser",
                 "category": "Power Platform Developer Suite"
@@ -504,6 +509,11 @@
                     "group": "2_actions@1"
                 },
                 {
+                    "command": "power-platform-dev-suite.unregisterPluginAssembly",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'assembly' && canUpdate",
+                    "group": "3_delete@1"
+                },
+                {
                     "command": "power-platform-dev-suite.metadataBrowserPickEnvironment",
                     "when": "webviewId == 'powerPlatformDevSuite.metadataBrowser'",
                     "group": "1_environment@1"
@@ -613,16 +623,17 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run package",
-        "compile": "npm run lint:all && npm test && npm run build:extension && npm run build:webview",
-        "compile:no-lint": "npm test && npm run build:extension && npm run build:webview",
-        "compile:no-test": "npm run lint:all && npm run build:extension && npm run build:webview",
-        "compile:fast": "npm run build:extension && npm run build:webview",
+        "compile": "npm run build:tools && npm run lint:all && npm test && npm run build:extension && npm run build:webview",
+        "compile:no-lint": "npm run build:tools && npm test && npm run build:extension && npm run build:webview",
+        "compile:no-test": "npm run build:tools && npm run lint:all && npm run build:extension && npm run build:webview",
+        "compile:fast": "npm run build:tools && npm run build:extension && npm run build:webview",
+        "build:tools": "dotnet publish tools/PluginInspector -c Release -o resources/tools --nologo -v q",
         "build:extension": "webpack --config webpack.config.js",
         "build:webview": "webpack --mode development --config webpack.webview.config.js",
         "watch": "npm run watch:extension & npm run watch:webview",
         "watch:extension": "webpack --config webpack.config.js --watch",
         "watch:webview": "webpack --mode development --config webpack.webview.config.js --watch",
-        "package": "npm run lint:all && webpack --config webpack.config.js --mode production --devtool hidden-source-map && webpack --config webpack.webview.config.js --mode production --devtool hidden-source-map",
+        "package": "npm run build:tools && npm run lint:all && webpack --config webpack.config.js --mode production --devtool hidden-source-map && webpack --config webpack.webview.config.js --mode production --devtool hidden-source-map",
         "package:no-lint": "webpack --config webpack.config.js --mode production --devtool hidden-source-map && webpack --config webpack.webview.config.js --mode production --devtool hidden-source-map",
         "lint": "eslint src",
         "lint:fix": "eslint src --fix",
