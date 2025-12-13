@@ -470,17 +470,40 @@ After Expand All:
 
 ### Requirements
 
-#### Register New Assembly
-- [ ] Toolbar button or command to register new assembly
-- [ ] Modal/form: File picker (.dll) + Isolation Mode dropdown (None, Sandbox)
-- [ ] API: POST pluginassemblies with base64 content + metadata
+#### Register New Package - COMPLETE ✅
+- [x] Register dropdown in toolbar with Package/Assembly/Step/Image options
+- [x] File picker for .nupkg files
+- [x] Modal with solution selector (for publisher prefix) + name/version auto-populated
+- [x] API: POST pluginpackages with prefixed name/uniquename
+- [x] Refresh tree after successful registration
+
+**Key Learnings from Package Registration:**
+- Both `name` and `uniquename` must be `{prefix}_{packageId}` (identical values)
+- PackageId inside nupkg does NOT need prefix - added at registration time
+- Dataverse POST returns 204 No Content by default - need `Prefer: return=representation` header
+- Analyzed Plugin Registration Tool source code (`PackageRegistrationForm.cs`) for correct field values
+
+#### Register New Assembly - NEXT UP
+- [ ] Register dropdown → "New Assembly..." already wired up
+- [ ] File picker for .dll files
+- [ ] Modal with:
+  - Assembly name (extracted from filename, e.g., "PPDSDemo.Plugins")
+  - Solution selector (optional - can register without adding to solution)
+  - Info text about automatic plugin type discovery
+- [ ] API: POST pluginassemblies with:
+  - `name`: Assembly name (NO prefix, unlike packages)
+  - `content`: Base64 DLL bytes
+  - `sourcetype`: 0 (Database) - only valid for cloud Dataverse
+  - `isolationmode`: 2 (Sandbox) - only valid for cloud Dataverse
+- [ ] Dataverse auto-discovers plugin types and creates plugintype records
 - [ ] Refresh tree after successful registration
 
-#### Register New Package
-- [ ] Toolbar button or command to register new package
-- [ ] Modal/form: File picker (.nupkg)
-- [ ] API: POST pluginpackages with base64 content
-- [ ] Refresh tree after successful registration
+**Design Decisions for Assembly Registration:**
+1. **No plugin type selection (v1):** PRT uses .NET reflection to analyze DLL - not possible in TypeScript. Dataverse auto-discovers all IPlugin/CodeActivity classes after upload.
+2. **No isolation mode selector:** Only Sandbox (2) is valid for cloud Dataverse. (Microsoft docs: "Dataverse is not available for on-premises deployments, so you will always accept the default options of SandBox and Database")
+3. **No storage location selector:** Only Database (0) is valid for cloud Dataverse. Disk/GAC are on-prem only.
+4. **No prefix on name:** Unlike packages, assemblies use just the assembly name (e.g., "PPDSDemo.Plugins")
+5. **Solution optional:** Can register without adding to solution, matching PRT behavior.
 
 #### Register New Step
 - [ ] Right-click plugin type → "Register New Step..."
@@ -518,13 +541,64 @@ After Expand All:
 - [ ] Right-click image → "Delete Image" (with confirmation)
 - [ ] Appropriate refresh after deletion
 
-### Implementation Order (Recommended)
-1. Register Assembly (simplest - file picker + dropdown)
-2. Register Package (similar to assembly)
+### Implementation Order (Updated)
+1. ✅ Register Package - COMPLETE
+2. **Register Assembly** - NEXT (simpler than package - no prefix, fixed isolation/source)
 3. Register Step (complex form, needs SDK message/entity lookups)
 4. Register Image (moderate complexity)
 5. Edit Step (reuses Register Step form)
 6. Delete operations (confirmation dialogs)
+
+### Session 9 (2025-12-12)
+**Register Plugin Package - COMPLETE**
+
+**Implemented:**
+- Register dropdown component in toolbar (Package/Assembly/Step/Image options)
+- FormModal component for registration dialogs
+- NupkgFilenameParser utility to extract name/version from filename
+- RegisterPluginPackageUseCase
+- Solution selector with publisher prefix (loads unmanaged solutions only)
+- Fixed DataverseApiService to return created entity on POST (`Prefer: return=representation`)
+
+**Investigation & Debugging:**
+- Initial error: "nuget file name does not contain a solution prefix named: 0"
+- Investigated by comparing Empire.Plugins (working) vs PPDSDemo.PluginPackage (failing)
+- Found Pipeline renames nupkg: `Empire.Plugins.1.0.0.nupkg` → `et_Empire.Plugins.nupkg`
+- Queried actual Dataverse data to see registered package format
+- Analyzed Plugin Registration Tool source code (`PackageRegistrationForm.cs`)
+- Key finding: Both `name` and `uniquename` must have prefix (were only adding to uniquename)
+
+**Key Insight from PRT Source:**
+```csharp
+var name = $"{txtPrefix.Text}_{txtName.Text}";  // Line 185
+pluginPackage = new Entity("pluginpackage") {
+    {"name", name},           // prefix_packageId
+    {"uniquename", name},     // SAME value
+    {"content", content},
+    {"version", txtVersion.Text},
+};
+```
+
+**Files Created:**
+- `resources/webview/css/components/form-modal.css`
+- `resources/webview/js/components/FormModal.js`
+- `src/features/pluginRegistration/application/useCases/RegisterPluginPackageUseCase.ts`
+- `src/features/pluginRegistration/infrastructure/utils/NupkgFilenameParser.ts`
+- `src/features/pluginRegistration/presentation/sections/RegisterDropdownSection.ts`
+
+**Files Modified:**
+- `DataverseApiService.ts` - Added `Prefer: return=representation` for POST
+- `PluginRegistrationPanelComposed.ts` - Added register handlers, modal flow
+- `DataversePluginPackageRepository.ts` - Added `register()` method
+- `IPluginPackageRepository.ts` - Added `register()` interface
+- `ISolutionRepository.ts` - Added `findUnmanagedWithPublisherPrefix()`
+- `DataverseApiSolutionRepository.ts` - Implemented prefix query
+- `plugin-registration.js` - Added modal handling, dropdown events
+
+**Next: Register Assembly**
+- Simpler than package (no prefix, fixed isolation mode)
+- Solution optional (can register without)
+- Dataverse auto-discovers plugin types
 
 ---
 
