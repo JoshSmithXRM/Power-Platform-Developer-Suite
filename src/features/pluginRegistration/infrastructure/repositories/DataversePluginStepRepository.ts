@@ -35,10 +35,15 @@ interface PluginStepDto {
 	rank: number;
 	statecode: number;
 	filteringattributes: string | null;
+	description: string | null;
+	configuration: string | null; // Dataverse name for unsecure configuration
+	supporteddeployment: number; // 0=Server, 1=Offline, 2=Both
+	asyncautodelete: boolean;
 	ismanaged: boolean;
 	iscustomizable: ManagedPropertyDto;
 	ishidden: ManagedPropertyDto;
 	createdon: string;
+	modifiedon: string;
 	// Expanded message entity
 	sdkmessageid?: {
 		name: string;
@@ -71,7 +76,7 @@ interface PluginStepCollectionResponse {
 export class DataversePluginStepRepository implements IPluginStepRepository {
 	private static readonly ENTITY_SET = 'sdkmessageprocessingsteps';
 	private static readonly SELECT_FIELDS =
-		'sdkmessageprocessingstepid,name,_plugintypeid_value,_sdkmessageid_value,_sdkmessagefilterid_value,stage,mode,rank,statecode,filteringattributes,ismanaged,iscustomizable,ishidden,createdon';
+		'sdkmessageprocessingstepid,name,_plugintypeid_value,_sdkmessageid_value,_sdkmessagefilterid_value,stage,mode,rank,statecode,filteringattributes,description,configuration,supporteddeployment,asyncautodelete,ismanaged,iscustomizable,ishidden,createdon,modifiedon';
 
 	constructor(
 		private readonly apiService: IDataverseApiService,
@@ -484,10 +489,15 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			dto.rank,
 			StepStatus.fromValue(dto.statecode),
 			dto.filteringattributes,
+			dto.description,
+			dto.configuration,
+			dto.supporteddeployment,
+			dto.asyncautodelete,
 			dto.ismanaged,
 			isCustomizable,
 			isHidden,
-			new Date(dto.createdon)
+			new Date(dto.createdon),
+			new Date(dto.modifiedon)
 		);
 	}
 }

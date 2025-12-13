@@ -37,10 +37,15 @@ export class PluginStep {
 		private readonly rank: number,
 		private readonly status: StepStatus,
 		private readonly filteringAttributes: string | null,
+		private readonly description: string | null,
+		private readonly unsecureConfiguration: string | null,
+		private readonly supportedDeployment: number, // 0=Server, 1=Offline, 2=Both
+		private readonly asyncAutoDelete: boolean,
 		private readonly isManaged: boolean,
 		private readonly isCustomizable: boolean,
 		private readonly isHidden: boolean,
-		private readonly createdOn: Date
+		private readonly createdOn: Date,
+		private readonly modifiedOn: Date
 	) {}
 
 	/**
@@ -143,6 +148,22 @@ export class PluginStep {
 		return this.filteringAttributes;
 	}
 
+	public getDescription(): string | null {
+		return this.description;
+	}
+
+	public getUnsecureConfiguration(): string | null {
+		return this.unsecureConfiguration;
+	}
+
+	public getSupportedDeployment(): number {
+		return this.supportedDeployment;
+	}
+
+	public getAsyncAutoDelete(): boolean {
+		return this.asyncAutoDelete;
+	}
+
 	public isInManagedState(): boolean {
 		return this.isManaged;
 	}
@@ -157,5 +178,9 @@ export class PluginStep {
 
 	public getCreatedOn(): Date {
 		return this.createdOn;
+	}
+
+	public getModifiedOn(): Date {
+		return this.modifiedOn;
 	}
 }

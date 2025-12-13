@@ -680,19 +680,22 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				name?: string;
 				imageType?: number;
 				entityAlias?: string;
+				messagePropertyName?: string;
 				attributes?: string;
 			};
 			if (
 				imageData.stepId &&
 				imageData.name &&
 				imageData.imageType !== undefined &&
-				imageData.entityAlias
+				imageData.entityAlias &&
+				imageData.messagePropertyName
 			) {
 				await this.handleConfirmRegisterImage({
 					stepId: imageData.stepId,
 					name: imageData.name,
 					imageType: imageData.imageType,
 					entityAlias: imageData.entityAlias,
+					messagePropertyName: imageData.messagePropertyName,
 					attributes: imageData.attributes,
 				});
 			}
@@ -1749,6 +1752,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 		const step = await this.repositories.step.findById(this.currentEnvironmentId, stepId);
 		const stepName = step?.getName() ?? 'Unknown Step';
+		const messageName = step?.getMessageName() ?? 'Update';
 
 		// Send modal data to webview
 		await this.panel.postMessage({
@@ -1756,6 +1760,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			data: {
 				stepId,
 				stepName,
+				messageName,
 			},
 		});
 	}
@@ -1782,6 +1787,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				imageName: image.getName(),
 				imageType: image.getImageType().getValue(),
 				entityAlias: image.getEntityAlias(),
+				messagePropertyName: image.getMessagePropertyName(),
 				attributes: image.getAttributes(),
 			},
 		});
@@ -1999,6 +2005,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		name: string;
 		imageType: number;
 		entityAlias: string;
+		messagePropertyName: string;
 		attributes?: string | undefined;
 	}): Promise<void> {
 		this.logger.debug('Handling register image confirmation', data);
@@ -2021,6 +2028,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 							name: data.name,
 							imageType: data.imageType,
 							entityAlias: data.entityAlias,
+							messagePropertyName: data.messagePropertyName,
 							attributes: data.attributes,
 						}
 					);
