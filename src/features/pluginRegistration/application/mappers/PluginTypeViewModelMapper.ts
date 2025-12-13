@@ -26,7 +26,7 @@ export class PluginTypeViewModelMapper {
 			type: 'pluginType',
 			name: pluginType.getName(),
 			displayName: pluginType.getName(),
-			icon: '🔌',
+			icon: pluginType.isWorkflowActivity() ? '🔶' : '🔌',
 			metadata,
 			isManaged: false,
 			children: steps,

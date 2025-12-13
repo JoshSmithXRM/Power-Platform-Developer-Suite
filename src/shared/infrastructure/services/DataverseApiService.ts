@@ -77,15 +77,17 @@ export class DataverseApiService implements IDataverseApiService {
    * @param endpoint - Relative endpoint path
    * @param body - Request body
    * @param cancellationToken - Optional token to cancel the operation
+   * @param additionalHeaders - Optional additional headers (e.g., MSCRM.SolutionUniqueName)
    * @returns Promise resolving to the JSON response
    */
   async post<T = unknown>(
     environmentId: string,
     endpoint: string,
     body: unknown,
-    cancellationToken?: ICancellationToken
+    cancellationToken?: ICancellationToken,
+    additionalHeaders?: Record<string, string>
   ): Promise<T> {
-    return this.request<T>('POST', environmentId, endpoint, body, cancellationToken);
+    return this.request<T>('POST', environmentId, endpoint, body, cancellationToken, undefined, additionalHeaders);
   }
 
   /**
@@ -235,7 +237,8 @@ export class DataverseApiService implements IDataverseApiService {
     endpoint: string,
     body: unknown | undefined,
     cancellationToken?: ICancellationToken,
-    retries?: number
+    retries?: number,
+    additionalHeaders?: Record<string, string>
   ): Promise<T> {
     const effectiveRetries = retries ?? this.maxRetryAttempts;
     if (cancellationToken?.isCancellationRequested) {
@@ -251,7 +254,8 @@ export class DataverseApiService implements IDataverseApiService {
           body,
           cancellationToken,
           attempt,
-          effectiveRetries
+          effectiveRetries,
+          additionalHeaders
         );
       } catch (error) {
         if (error instanceof OperationCancelledException) {
@@ -287,7 +291,8 @@ export class DataverseApiService implements IDataverseApiService {
     body: unknown | undefined,
     cancellationToken: ICancellationToken | undefined,
     attempt: number,
-    retries: number
+    retries: number,
+    additionalHeaders?: Record<string, string>
   ): Promise<T> {
     const [accessToken, environmentUrl] = await Promise.all([
       this.getAccessToken(environmentId),
@@ -314,7 +319,9 @@ export class DataverseApiService implements IDataverseApiService {
       // Defensive cache prevention for admin tool reliability.
       // Admin tools must show current state; stale data could cause overwrites.
       'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache'
+      'Pragma': 'no-cache',
+      // Merge in any additional headers (e.g., MSCRM.SolutionUniqueName for solution context)
+      ...additionalHeaders
     };
 
     const fetchOptions: RequestInit = {

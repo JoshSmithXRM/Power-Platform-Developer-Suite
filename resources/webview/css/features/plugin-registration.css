@@ -78,11 +78,15 @@
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	margin-left: auto;
 	font-size: 12px;
 	color: var(--vscode-foreground);
 	cursor: pointer;
 	user-select: none;
+}
+
+/* Push first checkbox to the right, others follow naturally */
+.tree-toolbar-checkbox:first-of-type {
+	margin-left: auto;
 }
 
 .tree-toolbar-checkbox input[type="checkbox"] {

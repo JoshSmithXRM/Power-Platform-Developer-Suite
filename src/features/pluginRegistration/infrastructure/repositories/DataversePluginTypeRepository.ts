@@ -1,6 +1,9 @@
 import type { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
-import type { IPluginTypeRepository } from '../../domain/interfaces/IPluginTypeRepository';
+import type {
+	IPluginTypeRepository,
+	RegisterPluginTypeInput,
+} from '../../domain/interfaces/IPluginTypeRepository';
 import { PluginType } from '../../domain/entities/PluginType';
 
 /**
@@ -124,6 +127,71 @@ export class DataversePluginTypeRepository implements IPluginTypeRepository {
 			}
 			throw error;
 		}
+	}
+
+	public async register(
+		environmentId: string,
+		input: RegisterPluginTypeInput
+	): Promise<string> {
+		this.logger.info('DataversePluginTypeRepository: Registering plugin type', {
+			environmentId,
+			typeName: input.typeName,
+			friendlyName: input.friendlyName,
+			assemblyId: input.assemblyId,
+			isWorkflowActivity: input.isWorkflowActivity,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginTypeRepository.ENTITY_SET}`;
+
+		// Build payload following Dataverse API requirements
+		// pluginassemblyid is a lookup field - use @odata.bind syntax
+		const payload: Record<string, unknown> = {
+			typename: input.typeName,
+			friendlyname: input.friendlyName,
+			'pluginassemblyid@odata.bind': `/pluginassemblies(${input.assemblyId})`,
+		};
+
+		// For workflow activities, set the name and group name (appears in workflow designer)
+		// The 'name' field is required when 'workflowactivitygroupname' is set
+		// IMPORTANT: workflowactivitygroupname MUST be set for workflow activities - our domain
+		// entity uses this field to identify workflow activities (isWorkflowActivity() check)
+		if (input.isWorkflowActivity) {
+			// Use friendlyName as the activity name (what users see in workflow designer)
+			payload['name'] = input.friendlyName;
+			// Always set workflowactivitygroupname - default to friendlyName if not provided
+			payload['workflowactivitygroupname'] =
+				input.workflowActivityGroupName ?? input.friendlyName;
+		}
+
+		const response = await this.apiService.post<{ plugintypeid: string }>(
+			environmentId,
+			endpoint,
+			payload
+		);
+
+		const pluginTypeId = response.plugintypeid;
+
+		this.logger.info('DataversePluginTypeRepository: Plugin type registered', {
+			pluginTypeId,
+			typeName: input.typeName,
+		});
+
+		return pluginTypeId;
+	}
+
+	public async delete(environmentId: string, pluginTypeId: string): Promise<void> {
+		this.logger.info('DataversePluginTypeRepository: Deleting plugin type', {
+			environmentId,
+			pluginTypeId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginTypeRepository.ENTITY_SET}(${pluginTypeId})`;
+
+		await this.apiService.delete(environmentId, endpoint);
+
+		this.logger.info('DataversePluginTypeRepository: Plugin type deleted', {
+			pluginTypeId,
+		});
 	}
 
 	private mapToDomain(dto: PluginTypeDto): PluginType {

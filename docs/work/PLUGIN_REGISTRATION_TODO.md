@@ -483,19 +483,18 @@ After Expand All:
 - Dataverse POST returns 204 No Content by default - need `Prefer: return=representation` header
 - Analyzed Plugin Registration Tool source code (`PackageRegistrationForm.cs`) for correct field values
 
-#### Register New Assembly - IN PROGRESS 🔄
-- [x] Register dropdown → "New Assembly..." already wired up
+#### Register New Assembly - COMPLETE ✅
+- [x] Register dropdown → "New Assembly..." wired up
 - [x] File picker for .dll files
+- [x] Plugin Inspector tool analyzes DLL for IPlugin/CodeActivity types
 - [x] Modal with:
-  - Assembly name (extracted from filename, e.g., "PPDSDemo.Plugins")
-  - Solution selector (optional - can register without adding to solution)
-- [x] API: POST pluginassemblies with:
-  - `name`: Assembly name (NO prefix, unlike packages)
-  - `content`: Base64 DLL bytes
-  - `sourcetype`: 0 (Database) - only valid for cloud Dataverse
-  - `isolationmode`: 2 (Sandbox) - only valid for cloud Dataverse
+  - Assembly name (from inspector or filename)
+  - Assembly version (from inspector)
+  - Solution selector (optional)
+  - **Checkbox list of discovered plugin types** (all selected by default)
+- [x] API: POST pluginassemblies + POST plugintypes for each selected type
 - [x] Refresh tree after successful registration
-- [ ] **Plugin Type Registration** - BLOCKED (see below)
+- [x] **Plugin Type Registration** - Now handled automatically via inspector integration
 
 **Critical Finding:** Dataverse does NOT auto-discover plugin types. PRT uses .NET reflection to analyze the DLL and explicitly registers each `plugintype` record. Without plugin types, assemblies are useless (can't register steps).
 
@@ -712,10 +711,176 @@ After successful F5 test, discovered that Dataverse does NOT auto-discover plugi
 - `ListSolutionsUseCase.test.ts` - Fixed mock for new interface method
 
 **Next Steps:**
-1. Commit current changes
-2. Design .NET tool project structure and extension integration
-3. Implement Plugin Inspector Tool
-4. Integrate with assembly registration flow
+1. ~~Commit current changes~~ - DONE
+2. ~~Design .NET tool project structure and extension integration~~ - DONE
+3. ~~Implement Plugin Inspector Tool~~ - DONE (Session 11)
+4. ~~Integrate with assembly registration flow~~ - DONE (Session 11)
+5. F5 Test full flow with PPDSDemo.Plugins.dll
+6. Commit and push
+
+### Session 11 (2025-12-12)
+**Plugin Inspector Tool - COMPLETE**
+
+**Implemented:**
+- .NET 8.0 console app (`tools/PluginInspector/`) using Mono.Cecil
+- Detects IPlugin and CodeActivity implementations (including inherited)
+- TypeScript service (`PluginInspectorService.ts`) to invoke the tool
+- Full integration into assembly registration flow
+- Checkbox UI for type selection in registration modal
+
+**.NET Tool Details:**
+```
+tools/PluginInspector/
+├── Models/InspectionResult.cs    # JSON output model
+├── Services/AssemblyInspector.cs # Mono.Cecil inspection logic
+├── Program.cs                    # Entry point
+└── PluginInspector.csproj        # .NET 8.0 project
+```
+
+**Output format:**
+```json
+{
+  "success": true,
+  "assemblyName": "PPDSDemo.Plugins",
+  "assemblyVersion": "1.0.0.0",
+  "types": [
+    { "typeName": "PPDSDemo.Plugins.PreAccountCreate", "displayName": "PreAccountCreate", "typeKind": "Plugin" }
+  ],
+  "error": null
+}
+```
+
+**Updated Flow:**
+1. User clicks Register → New Assembly
+2. File picker for .dll
+3. Extension invokes PluginInspector tool
+4. Modal shows: assembly name, version, solution selector, **checkbox list of discovered types**
+5. User selects types to register (all selected by default)
+6. On submit: Register assembly → Register each selected plugin type
+7. Tree refreshes showing assembly with types
+
+**Key Files Created/Modified:**
+- `tools/PluginInspector/` - New .NET project
+- `src/.../services/PluginInspectorService.ts` - TypeScript wrapper
+- `IPluginTypeRepository.ts` - Added `register()` interface
+- `DataversePluginTypeRepository.ts` - Implemented `register()`
+- `RegisterPluginAssemblyUseCase.ts` - Extended to register types
+- `PluginRegistrationPanelComposed.ts` - Inspector integration
+- `plugin-registration.js` - Checkbox UI for type selection
+- `FormModal.js` - Added `checkboxGroup` field type
+- `form-modal.css` - Checkbox group styles
+- `package.json` - Added `build:tools` script
+- `.vscodeignore` - Exclude `tools/` source
+- `.gitignore` - Exclude .NET build artifacts
+
+**Build Integration:**
+- `npm run build:tools` publishes .NET tool to `resources/tools/`
+- Added to `compile`, `compile:fast`, `package` scripts
+- Extension looks for tool at `resources/tools/PluginInspector.dll`
+
+**Ready for F5 Testing:**
+- [ ] Test with PPDSDemo.Plugins.dll (3 types)
+- [ ] Test with assembly with workflow activities
+- [ ] Test partial selection (not all types)
+- [ ] Test error handling (no types found, invalid DLL)
+
+### Session 12 (2025-12-12)
+**Delta Updates for Tree UX - IN PROGRESS**
+
+**Problem:** After register/unregister operations, full tree refresh takes ~45 seconds (terrible UX).
+
+**Solution:** Implement delta updates - only update the affected node(s) instead of full refresh.
+
+**Design Decisions:**
+1. **Confirmed Updates Only** - Never update UI speculatively; only after server confirms
+2. **Fetch After Create** - After registration, fetch new assembly+types (1 API call) for accurate data
+3. **Partial Failure Handling** - Keep partial state, show error for failed types, UI reflects what succeeded
+4. **Timestamps** - Use server timestamps from fetch for accuracy
+5. **Visual Feedback** - Scroll new node into view (no animation initially)
+
+**For Unregister (instant):**
+1. DELETE assembly → 204 success
+2. Send `removeNode` command to webview with assemblyId
+3. Webview removes node from local `treeData` and re-renders
+4. Zero additional API calls
+
+**For Register (near-instant):**
+1. POST assembly → assemblyId
+2. POST types → typeIds[]
+3. **Fetch assembly with expanded types (1 API call):**
+   ```
+   GET pluginassemblies({id})?$select=...&$expand=pluginassembly_plugintype($select=...)
+   ```
+4. Build TreeItemViewModel from fetched server data
+5. Send `addStandaloneAssembly` to webview
+6. Webview adds node to local `treeData` and re-renders
+
+**Implementation Checklist:**
+- [x] Add `handleRemoveNode()` handler in plugin-registration.js
+- [x] Add `handleAddStandaloneAssembly()` handler in plugin-registration.js
+- [x] Add `findByIdWithTypes()` method to IPluginAssemblyRepository
+- [x] Implement `findByIdWithTypes()` in DataversePluginAssemblyRepository
+- [x] Update `unregisterAssembly()` in panel to send `removeNode` instead of `handleRefresh()`
+- [x] Update `handleConfirmRegisterAssembly()` to fetch and send `addStandaloneAssembly`
+- [x] Add scroll-into-view behavior for new nodes
+- [ ] Test register flow (should be near-instant)
+- [ ] Test unregister flow (should be instant)
+
+**Files Modified:**
+- `resources/webview/js/features/plugin-registration.js` - Added `handleRemoveNode()`, `handleAddStandaloneAssembly()`, `scrollNodeIntoView()`
+- `IPluginAssemblyRepository.ts` - Added `AssemblyWithTypes` interface and `findByIdWithTypes()` method
+- `DataversePluginAssemblyRepository.ts` - Implemented `findByIdWithTypes()` with $expand for plugintypes
+- `PluginRegistrationPanelComposed.ts` - Added `sendAssemblyDeltaUpdate()`, updated unregister to use `removeNode`, register to use `addStandaloneAssembly`
+
+### Session 13 (2025-12-12)
+**Update Assembly Type Selection (Like PRT) - COMPLETE**
+
+**Feature:** When updating an assembly, users can now select which types to register/unregister (matching PRT behavior).
+
+**Before:** Update Assembly modal showed plugin types as disabled checkboxes (read-only). Users couldn't add new types or remove existing ones.
+
+**After:** Checkboxes are editable. Users can:
+- Select new types to register (if new types were added to DLL)
+- Deselect existing types to unregister them
+- See clear status indicators: `[NEW]`, `[REMOVED FROM DLL]`
+
+**Implementation:**
+1. Added `delete()` method to `IPluginTypeRepository` interface
+2. Implemented `delete()` in `DataversePluginTypeRepository`
+3. Modified `updateAssembly()` to fetch existing registered types before showing modal
+4. Built merged type list showing:
+   - Types in new DLL (marked NEW if not registered)
+   - Types removed from DLL (marked REMOVED, unchecked by default)
+5. Made checkboxes editable in webview JS
+6. Modified `handleConfirmUpdateAssembly()` to:
+   - Register new types (selected but not existing)
+   - Unregister removed types (existing but not selected)
+   - Show summary message: "Assembly updated, X type(s) added, Y type(s) removed"
+
+**Bug Fix: Workflow Activity Icon Wrong After Re-registration**
+
+**Problem:** When user unregistered a workflow activity and re-registered it, it showed as a plugin (wrong icon) instead of workflow activity.
+
+**Root Cause:** `DataversePluginTypeRepository.register()` only set `workflowactivitygroupname` if explicitly provided. Without it, the field was null in Dataverse, and our domain entity's `isWorkflowActivity()` returned false (checks `workflowActivityGroupName !== null`).
+
+**Fix:** Always set `workflowactivitygroupname` when registering workflow activities, defaulting to `friendlyName` if not provided.
+
+```typescript
+// Before (bug):
+if (input.workflowActivityGroupName) {
+    payload['workflowactivitygroupname'] = input.workflowActivityGroupName;
+}
+
+// After (fixed):
+payload['workflowactivitygroupname'] =
+    input.workflowActivityGroupName ?? input.friendlyName;
+```
+
+**Files Modified:**
+- `IPluginTypeRepository.ts` - Added `delete()` method
+- `DataversePluginTypeRepository.ts` - Implemented `delete()`, fixed workflow activity registration
+- `PluginRegistrationPanelComposed.ts` - Added `pendingUpdateAssemblyTypes`, modified update flow
+- `plugin-registration.js` - Made checkboxes editable, added status indicators
 
 ---
 

@@ -49,6 +49,9 @@ export async function initializePluginRegistration(
 	const { DataverseStepImageRepository } = await import(
 		'../../infrastructure/repositories/DataverseStepImageRepository.js'
 	);
+	const { PluginInspectorService } = await import(
+		'../../infrastructure/services/PluginInspectorService.js'
+	);
 	const { LoadPluginRegistrationTreeUseCase } = await import(
 		'../../application/useCases/LoadPluginRegistrationTreeUseCase.js'
 	);
@@ -70,6 +73,9 @@ export async function initializePluginRegistration(
 	const { RegisterPluginAssemblyUseCase } = await import(
 		'../../application/useCases/RegisterPluginAssemblyUseCase.js'
 	);
+	const { UnregisterPluginAssemblyUseCase } = await import(
+		'../../application/useCases/UnregisterPluginAssemblyUseCase.js'
+	);
 	const { PluginRegistrationPanelComposed } = await import(
 		'../panels/PluginRegistrationPanelComposed.js'
 	);
@@ -79,6 +85,9 @@ export async function initializePluginRegistration(
 
 	const urlBuilder = new MakerUrlBuilder();
 	const solutionRepository = new DataverseApiSolutionRepository(dataverseApiService, logger);
+
+	// Create services
+	const pluginInspectorService = new PluginInspectorService(context.extensionPath, logger);
 
 	// Create repositories
 	const packageRepository = new DataversePluginPackageRepository(dataverseApiService, logger);
@@ -102,7 +111,12 @@ export async function initializePluginRegistration(
 	const updateAssemblyUseCase = new UpdatePluginAssemblyUseCase(assemblyRepository, logger);
 	const updatePackageUseCase = new UpdatePluginPackageUseCase(packageRepository, logger);
 	const registerPackageUseCase = new RegisterPluginPackageUseCase(packageRepository, logger);
-	const registerAssemblyUseCase = new RegisterPluginAssemblyUseCase(assemblyRepository, logger);
+	const registerAssemblyUseCase = new RegisterPluginAssemblyUseCase(
+		assemblyRepository,
+		pluginTypeRepository,
+		logger
+	);
+	const unregisterAssemblyUseCase = new UnregisterPluginAssemblyUseCase(assemblyRepository, logger);
 
 	// Bundle use cases and repositories for cleaner panel constructor
 	const useCases = {
@@ -113,6 +127,7 @@ export async function initializePluginRegistration(
 		updatePackage: updatePackageUseCase,
 		registerPackage: registerPackageUseCase,
 		registerAssembly: registerAssemblyUseCase,
+		unregisterAssembly: unregisterAssemblyUseCase,
 	};
 
 	const repositories = {
@@ -124,6 +139,10 @@ export async function initializePluginRegistration(
 		solution: solutionRepository,
 	};
 
+	const services = {
+		pluginInspector: pluginInspectorService,
+	};
+
 	await PluginRegistrationPanelComposed.createOrShow(
 		context.extensionUri,
 		context,
@@ -131,6 +150,7 @@ export async function initializePluginRegistration(
 		getEnvironmentById,
 		useCases,
 		repositories,
+		services,
 		urlBuilder,
 		logger,
 		initialEnvironmentId

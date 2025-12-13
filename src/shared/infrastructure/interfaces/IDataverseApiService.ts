@@ -24,13 +24,15 @@ export interface IDataverseApiService {
    * @param endpoint - Relative endpoint path
    * @param body - Request body
    * @param cancellationToken - Optional token to cancel the operation
+   * @param additionalHeaders - Optional additional headers (e.g., MSCRM.SolutionUniqueName)
    * @returns Promise resolving to the JSON response
    */
   post<T = unknown>(
     environmentId: string,
     endpoint: string,
     body: unknown,
-    cancellationToken?: ICancellationToken
+    cancellationToken?: ICancellationToken,
+    additionalHeaders?: Record<string, string>
   ): Promise<T>;
 
   /**
