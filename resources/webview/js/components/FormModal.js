@@ -37,7 +37,8 @@ window.showFormModal = function(options) {
 		cancelLabel = 'Cancel',
 		onSubmit,
 		onCancel,
-		onFieldChange
+		onFieldChange,
+		width
 	} = options;
 
 	// Create overlay
@@ -50,6 +51,12 @@ window.showFormModal = function(options) {
 	dialog.setAttribute('role', 'dialog');
 	dialog.setAttribute('aria-labelledby', 'form-modal-title');
 	dialog.setAttribute('aria-modal', 'true');
+
+	// Apply custom width if specified
+	if (width) {
+		dialog.style.width = width;
+		dialog.style.maxWidth = width;
+	}
 
 	// Create header with title and close button
 	const header = document.createElement('div');
@@ -81,6 +88,15 @@ window.showFormModal = function(options) {
 
 	// Create fields
 	fields.forEach(field => {
+		// Handle section headers (no input element)
+		if (field.type === 'section') {
+			const sectionHeader = document.createElement('div');
+			sectionHeader.className = 'form-modal-section-header';
+			sectionHeader.textContent = field.label;
+			body.appendChild(sectionHeader);
+			return; // Skip the rest
+		}
+
 		const fieldContainer = document.createElement('div');
 		fieldContainer.className = 'form-modal-field';
 
@@ -96,7 +112,30 @@ window.showFormModal = function(options) {
 		}
 
 		let input;
-		if (field.type === 'info') {
+		if (field.type === 'checkbox') {
+			// Single checkbox
+			const checkboxContainer = document.createElement('div');
+			checkboxContainer.className = 'form-modal-checkbox-single';
+
+			input = document.createElement('input');
+			input.type = 'checkbox';
+			input.id = `form-modal-${field.id}`;
+			input.className = 'form-modal-checkbox';
+			input.checked = field.value === true || field.value === 'true';
+
+			const checkboxLabel = document.createElement('label');
+			checkboxLabel.setAttribute('for', input.id);
+			checkboxLabel.className = 'form-modal-checkbox-label';
+			checkboxLabel.textContent = field.label;
+
+			checkboxContainer.appendChild(input);
+			checkboxContainer.appendChild(checkboxLabel);
+
+			inputElements[field.id] = { type: 'checkbox', element: input };
+			fieldContainer.appendChild(checkboxContainer);
+			body.appendChild(fieldContainer);
+			return; // Skip the rest
+		} else if (field.type === 'info') {
 			// Info type: display-only text (no input element)
 			input = document.createElement('div');
 			input.className = 'form-modal-info';
@@ -230,12 +269,18 @@ window.showFormModal = function(options) {
 		let isValid = true;
 
 		fields.forEach(field => {
-			// Skip info fields - they're display-only, not inputs
-			if (field.type === 'info') {
+			// Skip section headers and info fields - they're display-only
+			if (field.type === 'section' || field.type === 'info') {
 				return;
 			}
 
 			const input = inputElements[field.id];
+
+			// Handle single checkbox
+			if (field.type === 'checkbox') {
+				values[field.id] = input.element.checked;
+				return;
+			}
 
 			// Handle checkboxGroup fields specially
 			if (field.type === 'checkboxGroup') {

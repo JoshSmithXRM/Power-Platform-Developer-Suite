@@ -64,6 +64,8 @@
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
+	max-height: 60vh;
+	overflow-y: auto;
 }
 
 /* Field */
@@ -231,4 +233,36 @@ textarea.form-modal-input {
 .form-modal-checkbox-description {
 	color: var(--vscode-descriptionForeground);
 	font-size: 12px;
+}
+
+/* Section Header */
+.form-modal-section-header {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	padding: 8px 0 4px 0;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	margin-top: 8px;
+}
+
+.form-modal-section-header:first-child {
+	margin-top: 0;
+}
+
+/* Single Checkbox */
+.form-modal-checkbox-single {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 0;
+}
+
+.form-modal-checkbox-single .form-modal-checkbox {
+	margin: 0;
+}
+
+.form-modal-checkbox-single .form-modal-checkbox-label {
+	cursor: pointer;
+	font-size: 13px;
+	color: var(--vscode-foreground);
 }
