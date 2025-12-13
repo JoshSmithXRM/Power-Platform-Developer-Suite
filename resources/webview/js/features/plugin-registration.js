@@ -1013,19 +1013,20 @@ function handleShowRegisterPackageModal(data) {
 	}
 
 	// Build solution options for dropdown with placeholder
+	// Use uniqueName as value (required by Dataverse API header)
 	const solutionOptions = [
 		{ value: '', label: '-- Select a Solution --' },
 		...(solutions || []).map(s => ({
-			value: s.id,
+			value: s.uniqueName,
 			label: s.name,
 			prefix: s.prefix
 		}))
 	];
 
-	// Store solutions for prefix lookup
+	// Store solutions for prefix lookup (keyed by uniqueName)
 	const solutionPrefixMap = {};
 	(solutions || []).forEach(s => {
-		solutionPrefixMap[s.id] = s.prefix;
+		solutionPrefixMap[s.uniqueName] = s.prefix;
 	});
 
 	window.showFormModal({

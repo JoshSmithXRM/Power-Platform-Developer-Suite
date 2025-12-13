@@ -1059,6 +1059,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					filename: this.extractFilename(filename),
 					solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
 						id: s.id,
+						uniqueName: s.uniqueName,
 						name: s.name,
 						prefix: s.publisherPrefix,
 					})),
