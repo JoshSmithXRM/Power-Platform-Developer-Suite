@@ -1018,8 +1018,12 @@ payload['workflowactivitygroupname'] =
 | Filterable Message combobox | HIGH | Type-to-filter dropdown (hundreds of messages) |
 | Primary Entity autocomplete | HIGH | Filter entities based on selected message |
 | Secondary Entity field | HIGH | For messages that support it (Associate, SetState, etc.) |
-| Run in User's Context dropdown | HIGH | User lookup for impersonation |
-| Filtering Attributes picker | HIGH | Better than comma-separated text input |
+| Run in User's Context dropdown | HIGH | Type-to-search user lookup for impersonation |
+| Filtering Attributes picker | HIGH | Picker dialog with entity attribute checkboxes |
+| Solution selector for steps | HIGH | Add step to solution (like assemblies) |
+| Auto-expand after add step | HIGH | Show new step in tree without manual expand |
+| AsyncAutoDelete conditional | HIGH | Only enable for Asynchronous mode |
+| Step name auto-generation | HIGH | Match PRT naming convention (user researching)
 
 ### DEFERRED - Post-MVP
 | Feature | Priority | Notes |
@@ -1041,11 +1045,16 @@ payload['workflowactivitygroupname'] =
 
 **Required before MVP complete:**
 - ⬜ **Step form UX polish:**
-  - Filterable combobox for Message
-  - Primary Entity autocomplete (based on message)
+  - Filterable combobox for Message (type-to-filter)
+  - Primary Entity autocomplete (dynamic fetch based on message)
   - Secondary Entity field (for Associate, SetState, etc.)
-  - Run in User's Context dropdown (user lookup)
-  - Filtering Attributes picker
+  - Run in User's Context dropdown (type-to-search users)
+  - Filtering Attributes picker (dialog with checkboxes)
+  - Solution selector (add step to solution)
+  - Step name auto-generation (match PRT convention)
+- ⬜ **Step form behavior:**
+  - Auto-expand plugin type after adding step
+  - Disable "Delete AsyncOperation" when mode is Synchronous
 - ⬜ Detail panel (show metadata when node selected)
 - ⬜ Unit tests (required before PR)
 
@@ -1080,6 +1089,10 @@ Before merging Slices 1-3:
 3. **Secondary Entity Field**: Missing entirely - needed for Associate, SetState, etc.
 4. **Run in User's Context**: Missing - needed for impersonation scenarios
 5. **Filtering Attributes Field**: Plain text comma-separated - user must know exact attribute logical names
+6. **Solution Selector**: Missing - steps should be added to a solution like assemblies
+7. **AsyncAutoDelete**: Shows for Synchronous mode (invalid - only applies to Async)
+8. **Step Name**: Not auto-generated per PRT convention
+9. **After Add Step**: Tree doesn't expand to show new step
 
 ### Proposed Solutions
 
@@ -1165,24 +1178,84 @@ Modal opens → postMessage('getSystemUsers')
            → Populates dropdown with user options
 ```
 
+#### Phase 6: Solution Selector
+
+Add solution dropdown to Register Step form:
+- Same pattern as Register Assembly (optional solution)
+- Load unmanaged solutions with publisher prefix
+- Maps to `solutionUniqueName` query parameter on POST
+- Images inherit from step (no separate solution selector needed)
+
+#### Phase 7: Conditional AsyncAutoDelete
+
+- Only show/enable "Delete AsyncOperation if Successful" when Mode = Asynchronous
+- When Mode changes to Synchronous, hide or disable the checkbox
+- Use `onFieldChange` callback to react to mode changes
+
+#### Phase 8: Step Name Auto-Generation
+
+Match PRT naming convention (user researching exact format):
+- Likely: `{PluginTypeName}: {Message} of {Entity}`
+- Or: `{PluginTypeName}: {Stage} {Message} of {Entity}`
+- Auto-update as Message/Entity/Stage changes
+- User can still edit manually
+
+#### Phase 9: Auto-Expand After Add Step
+
+When step is successfully added:
+1. Find the plugin type node in tree
+2. Expand it (set expanded = true)
+3. Scroll new step into view
+4. Optionally highlight/select the new step
+
 ### Implementation Order
 
 1. **FilterableComboBox component** - Unlocks all other improvements
 2. **Message field → combobox** - Immediate high-value improvement
 3. **Primary Entity → combobox** - Need to load sdkmessagefilters per message
 4. **Secondary Entity field** - Similar to Primary Entity, conditional display
-5. **Run in User's Context dropdown** - Need to load system users
-6. **Filtering Attributes picker** - Most complex, needs metadata integration
+5. **Run in User's Context dropdown** - Type-to-search system users
+6. **Solution selector** - Reuse existing solution dropdown pattern
+7. **Filtering Attributes picker** - Dialog with entity attribute checkboxes
+8. **Conditional AsyncAutoDelete** - Simple JS show/hide logic
+9. **Step name auto-generation** - Format TBD based on PRT research
+10. **Auto-expand after add step** - Expand parent node + scroll into view
+
+### Design Decisions (Pending User Approval)
+
+#### Decision 1: Filtering Attributes - Picker Dialog vs Tag Input
+**Recommendation: Picker Dialog with Checkboxes**
+- Better discoverability - users see all available attributes
+- Select multiple with clicks vs typing each name
+- Can't misspell attribute names
+- Add search filter at top for large entities (Account has 100+ attributes)
+
+#### Decision 2: System Users - Filter/Limit Strategy
+**Recommendation: Type-to-search with minimum 2 characters**
+- "Calling User" as default (no impersonation, most common)
+- Type 2+ chars to trigger search: `$filter=isdisabled eq false and contains(fullname, '{search}')&$top=50`
+- No pre-loading (environments can have thousands of users)
+- Loading indicator during search
+
+#### Decision 3: Entity List - Pre-load vs Dynamic
+**Recommendation: Dynamic fetch with client-side caching**
+- On message change: `sdkmessagefilter?$filter=_sdkmessageid_value eq '{messageId}'`
+- Cache results in memory (Map of messageId → entities)
+- Re-selecting same message is instant from cache
+- Keeps modal open fast, small per-message payloads
 
 ### Technical Considerations
 
 **FormModal changes needed:**
 - Add `type: 'combobox'` field type
-- Support dynamic option updates (for Primary Entity)
+- Support dynamic option updates (for Primary Entity, Secondary Entity)
 - Support button addon for picker (for Filtering Attributes)
+- Support conditional show/hide (for AsyncAutoDelete)
+- Support `onFieldChange` for cross-field dependencies
 
 **Extension changes needed:**
-- Add `getEntitiesForMessage` handler in panel
+- Add `getEntitiesForMessage` handler in panel (fetch sdkmessagefilters)
+- Add `searchSystemUsers` handler (type-to-search users)
 - Add `getEntityAttributes` handler (leverage existing Metadata Browser code)
 - Send data back to webview via postMessage
 
@@ -1191,3 +1264,4 @@ Modal opens → postMessage('getSystemUsers')
 - Dropdown should be scrollable (max-height)
 - Selected item highlight
 - Keyboard focus indicators
+- Loading spinner for async operations
