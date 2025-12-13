@@ -1421,6 +1421,9 @@ MSCRM.SolutionUniqueName: MySolution
 **Note:** Query parameter `?solutionUniqueName=` does NOT work for pluginpackages - returns 400 error.
 Must use `MSCRM.SolutionUniqueName` header (same as pluginassemblies).
 
+**Additional fix:** Solution dropdown was using `id` (GUID) as value instead of `uniqueName`.
+Dataverse requires the actual unique name string, not the ID.
+
 **Files Modified:**
 - `resources/webview/js/features/plugin-registration.js`
 - `src/.../presentation/panels/PluginRegistrationPanelComposed.ts`
