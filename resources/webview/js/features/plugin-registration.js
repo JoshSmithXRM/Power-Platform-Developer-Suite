@@ -2074,31 +2074,10 @@ function handleShowRegisterImageModal(data) {
 		{ value: '2', label: 'Both' }
 	];
 
-	// Get valid property names for this message
+	// Auto-determine message property name (user doesn't need to see this)
+	// Use first/primary option for the message (e.g., "Target" for most messages)
 	const propertyNameOptions = getImagePropertyNamesForMessage(messageName);
-	const hasSingleOption = propertyNameOptions.length === 1;
-	const defaultPropertyName = hasSingleOption ? propertyNameOptions[0].value : '';
-
-	// Build property name field based on number of options
-	const propertyNameField = hasSingleOption
-		? {
-			id: 'messagePropertyName',
-			label: 'Message Property',
-			type: 'text',
-			value: propertyNameOptions[0].value,
-			readonly: true
-		}
-		: {
-			id: 'messagePropertyName',
-			label: 'Message Property',
-			type: 'select',
-			value: '',
-			options: [
-				{ value: '', label: '-- Select Property --' },
-				...propertyNameOptions
-			],
-			required: true
-		};
+	const messagePropertyName = propertyNameOptions[0].value;
 
 	window.showFormModal({
 		title: `Register Image for ${stepName}`,
@@ -2119,7 +2098,6 @@ function handleShowRegisterImageModal(data) {
 				options: imageTypeOptions,
 				required: true
 			},
-			propertyNameField,
 			{
 				id: 'entityAlias',
 				label: 'Entity Alias',
@@ -2139,8 +2117,6 @@ function handleShowRegisterImageModal(data) {
 		submitLabel: 'Register',
 		cancelLabel: 'Cancel',
 		onSubmit: (values) => {
-			// For single option, use the default since it's readonly
-			const messagePropertyName = hasSingleOption ? defaultPropertyName : values.messagePropertyName;
 			vscode.postMessage({
 				command: 'confirmRegisterImage',
 				data: {
@@ -2158,10 +2134,10 @@ function handleShowRegisterImageModal(data) {
 
 /**
  * Show the Edit Image modal.
- * @param {Object} data - { imageId, imageName, imageType, entityAlias, messagePropertyName, attributes }
+ * @param {Object} data - { imageId, imageName, imageType, entityAlias, attributes }
  */
 function handleShowEditImageModal(data) {
-	const { imageId, imageName, imageType, entityAlias, messagePropertyName, attributes } = data;
+	const { imageId, imageName, imageType, entityAlias, attributes } = data;
 
 	if (!window.showFormModal) {
 		console.error('FormModal component not loaded');
@@ -2192,13 +2168,6 @@ function handleShowEditImageModal(data) {
 				value: String(imageType),
 				options: imageTypeOptions,
 				required: true
-			},
-			{
-				id: 'messagePropertyName',
-				label: 'Message Property',
-				type: 'text',
-				value: messagePropertyName || 'Target',
-				readonly: true
 			},
 			{
 				id: 'entityAlias',
