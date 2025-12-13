@@ -476,9 +476,6 @@ export class SolutionDiffPanelComposed {
         this.selectedSolutionUniqueName
       );
 
-      // Map to ViewModel
-      this.comparisonViewModel = SolutionComparisonViewModelMapper.toViewModel(comparison);
-
       // Execute component comparison (only if both solutions exist)
       this.componentDiffViewModel = null;
       const sourceSolution = comparison.getSourceSolution();
@@ -500,6 +497,23 @@ export class SolutionDiffPanelComposed {
           summary: this.componentDiffViewModel.summary
         });
       }
+
+      // Map metadata to ViewModel WITH component diff info for combined status
+      const componentDiffSummary = this.componentDiffViewModel !== null
+        ? {
+            hasDifferences: this.componentDiffViewModel.addedCount > 0 ||
+              this.componentDiffViewModel.removedCount > 0 ||
+              this.componentDiffViewModel.modifiedCount > 0,
+            addedCount: this.componentDiffViewModel.addedCount,
+            removedCount: this.componentDiffViewModel.removedCount,
+            modifiedCount: this.componentDiffViewModel.modifiedCount
+          }
+        : undefined;
+
+      this.comparisonViewModel = SolutionComparisonViewModelMapper.toViewModel(
+        comparison,
+        componentDiffSummary
+      );
 
       this.logger.info('Comparison completed', {
         status: this.comparisonViewModel.status,

@@ -81,7 +81,8 @@ export class ComponentTypeRegistry {
   /**
    * Builds the configuration map for all supported component types.
    *
-   * Phase 1 Target Types (Option C - Data Components):
+   * Supported Types:
+   * - Entity (1) - Custom and system entities (tables)
    * - Workflow (29) - Cloud Flows and classic workflows
    * - PluginAssembly (91) - Plugin DLL binaries
    * - PluginStep (92) - SDK message processing steps
@@ -90,6 +91,40 @@ export class ComponentTypeRegistry {
    */
   private buildConfigs(): ReadonlyMap<ComponentType, ComponentTypeConfig> {
     return new Map<ComponentType, ComponentTypeConfig>([
+      [ComponentType.Entity, {
+        tableName: 'EntityDefinitions',
+        primaryKeyColumn: 'MetadataId',
+        displayNameColumn: 'LogicalName',
+        comparableColumns: [
+          'LogicalName',           // Logical name (e.g., "account")
+          'SchemaName',            // Schema name (e.g., "Account")
+          'EntitySetName',         // OData set name (e.g., "accounts")
+          'IsActivity',            // Is an activity entity
+          'IsValidForAdvancedFind',// Can be used in Advanced Find
+          'IsQuickCreateEnabled',  // Quick create form enabled
+          'IsConnectionsEnabled',  // Connections enabled
+          'IsDuplicateDetectionEnabled', // Duplicate detection enabled
+          'IsMailMergeEnabled',    // Mail merge enabled
+          'HasNotes',              // Notes attachment enabled
+          'HasActivities',         // Activities enabled
+          'OwnershipType'          // Ownership type (UserOwned, OrganizationOwned, etc.)
+        ],
+        columnDisplayNames: {
+          LogicalName: 'Logical Name',
+          SchemaName: 'Schema Name',
+          EntitySetName: 'API Set Name',
+          IsActivity: 'Is Activity',
+          IsValidForAdvancedFind: 'Advanced Find',
+          IsQuickCreateEnabled: 'Quick Create',
+          IsConnectionsEnabled: 'Connections',
+          IsDuplicateDetectionEnabled: 'Duplicate Detection',
+          IsMailMergeEnabled: 'Mail Merge',
+          HasNotes: 'Notes Enabled',
+          HasActivities: 'Activities Enabled',
+          OwnershipType: 'Ownership Type'
+        }
+      }],
+
       [ComponentType.Workflow, {
         tableName: 'workflows',
         primaryKeyColumn: 'workflowid',
@@ -195,11 +230,12 @@ export class ComponentTypeRegistry {
       [ComponentType.EnvironmentVariable, {
         tableName: 'environmentvariabledefinitions',
         primaryKeyColumn: 'environmentvariabledefinitionid',
-        displayNameColumn: 'displayname',
+        // Use schemaname (primary name attribute) - displayname may be null
+        displayNameColumn: 'schemaname',
         comparableColumns: [
           'defaultvalue',       // Default value
           'type',               // Type (100000000=String, 100000001=Number, 100000002=Boolean, 100000003=JSON, 100000004=DataSource)
-          'schemaname',         // Schema name
+          'displayname',        // Display name (localizable)
           'description',        // Description
           'ishidden',           // Is hidden
           'isrequired',         // Is required
@@ -208,7 +244,7 @@ export class ComponentTypeRegistry {
         columnDisplayNames: {
           defaultvalue: 'Default Value',
           type: 'Type',
-          schemaname: 'Schema Name',
+          displayname: 'Display Name',
           description: 'Description',
           ishidden: 'Is Hidden',
           isrequired: 'Is Required',

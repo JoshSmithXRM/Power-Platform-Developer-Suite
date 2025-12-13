@@ -48,11 +48,13 @@ function renderComponentTypeGroup(group: ComponentTypeGroupViewModel): string {
 	}
 
 	const hasChanges = group.hasDifferences;
+	// Ensure type name is never empty for proper rendering
+	const displayTypeName = group.typeName.trim() || 'Unknown Components';
 
 	return `
 		<details class="component-type-group" ${hasChanges ? 'open' : ''}>
 			<summary>
-				<span class="component-type-name">${escapeHtml(group.typeName)}</span>
+				<span class="component-type-name">${escapeHtml(displayTypeName)}</span>
 				<span class="component-type-counts">
 					${group.added.length > 0 ? `<span class="count-added">+${group.added.length}</span>` : ''}
 					${group.removed.length > 0 ? `<span class="count-removed">-${group.removed.length}</span>` : ''}
