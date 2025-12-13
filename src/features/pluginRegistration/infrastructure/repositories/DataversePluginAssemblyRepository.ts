@@ -200,6 +200,51 @@ export class DataversePluginAssemblyRepository implements IPluginAssemblyReposit
 		});
 	}
 
+	public async register(
+		environmentId: string,
+		name: string,
+		base64Content: string,
+		solutionUniqueName?: string
+	): Promise<string> {
+		this.logger.info('DataversePluginAssemblyRepository: Registering new assembly', {
+			environmentId,
+			name,
+			contentLength: base64Content.length,
+			solutionUniqueName,
+		});
+
+		// Build endpoint - optionally include solution for immediate association
+		let endpoint = `/api/data/v9.2/${DataversePluginAssemblyRepository.ENTITY_SET}`;
+		if (solutionUniqueName) {
+			endpoint += `?solutionUniqueName=${encodeURIComponent(solutionUniqueName)}`;
+		}
+
+		// Cloud-only fixed values per Microsoft documentation:
+		// - sourcetype: 0 = Database (on-prem can use 1=Disk or 2=GAC)
+		// - isolationmode: 2 = Sandbox (on-prem can use 1=None)
+		const payload = {
+			name,
+			content: base64Content,
+			sourcetype: 0,
+			isolationmode: 2,
+		};
+
+		const response = await this.apiService.post<{ pluginassemblyid: string }>(
+			environmentId,
+			endpoint,
+			payload
+		);
+
+		const assemblyId = response.pluginassemblyid;
+
+		this.logger.info('DataversePluginAssemblyRepository: Assembly registered', {
+			assemblyId,
+			name,
+		});
+
+		return assemblyId;
+	}
+
 	private mapToDomain(dto: PluginAssemblyDto): PluginAssembly {
 		return new PluginAssembly(
 			dto.pluginassemblyid,

@@ -96,7 +96,16 @@ window.showFormModal = function(options) {
 		}
 
 		let input;
-		if (field.type === 'textarea') {
+		if (field.type === 'info') {
+			// Info type: display-only text (no input element)
+			input = document.createElement('div');
+			input.className = 'form-modal-info';
+			input.textContent = field.value || '';
+			fieldContainer.appendChild(label);
+			fieldContainer.appendChild(input);
+			body.appendChild(fieldContainer);
+			return; // Skip the rest of input setup
+		} else if (field.type === 'textarea') {
 			input = document.createElement('textarea');
 			input.rows = field.rows || 3;
 		} else if (field.type === 'select') {
@@ -168,6 +177,11 @@ window.showFormModal = function(options) {
 		let isValid = true;
 
 		fields.forEach(field => {
+			// Skip info fields - they're display-only, not inputs
+			if (field.type === 'info') {
+				return;
+			}
+
 			const input = inputElements[field.id];
 			const value = input.value.trim();
 			values[field.id] = value;

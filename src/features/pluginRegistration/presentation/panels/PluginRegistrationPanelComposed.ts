@@ -31,6 +31,7 @@ import type { DisablePluginStepUseCase } from '../../application/useCases/Disabl
 import type { UpdatePluginAssemblyUseCase } from '../../application/useCases/UpdatePluginAssemblyUseCase';
 import type { UpdatePluginPackageUseCase } from '../../application/useCases/UpdatePluginPackageUseCase';
 import type { RegisterPluginPackageUseCase } from '../../application/useCases/RegisterPluginPackageUseCase';
+import type { RegisterPluginAssemblyUseCase } from '../../application/useCases/RegisterPluginAssemblyUseCase';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
 import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
 import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
@@ -56,6 +57,7 @@ export interface PluginRegistrationUseCases {
 	readonly updateAssembly: UpdatePluginAssemblyUseCase;
 	readonly updatePackage: UpdatePluginPackageUseCase;
 	readonly registerPackage: RegisterPluginPackageUseCase;
+	readonly registerAssembly: RegisterPluginAssemblyUseCase;
 }
 
 /**
@@ -84,7 +86,8 @@ type PluginRegistrationCommands =
 	| 'registerPackage'
 	| 'registerStep'
 	| 'registerImage'
-	| 'confirmRegisterPackage';
+	| 'confirmRegisterPackage'
+	| 'confirmRegisterAssembly';
 
 /**
  * Plugin Registration panel using PanelCoordinator architecture.
@@ -108,6 +111,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
 	private pendingPackageContent: string | null = null;
+	private pendingAssemblyContent: string | null = null;
 	private readonly filenameParser: NupkgFilenameParser;
 	private unmanagedSolutionsWithPrefix: Array<{
 		id: string;
@@ -472,6 +476,16 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				await this.handleConfirmRegisterPackage(name, version, prefix);
 			}
 		});
+
+		this.coordinator.registerHandler('confirmRegisterAssembly', async (data) => {
+			const { name, solutionUniqueName } = data as {
+				name?: string;
+				solutionUniqueName?: string;
+			};
+			if (name) {
+				await this.handleConfirmRegisterAssembly(name, solutionUniqueName);
+			}
+		});
 	}
 
 	private async handleRefresh(): Promise<void> {
@@ -586,16 +600,117 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 	/**
 	 * Handle Register Assembly action.
-	 * Shows file picker, then registers the assembly.
+	 * Shows file picker for .dll, then modal with assembly name and optional solution.
 	 */
 	private async handleRegisterAssembly(): Promise<void> {
 		this.logger.info('Register Assembly requested');
-		// TODO: Implement assembly registration
-		// 1. Show file picker for .dll
-		// 2. Show modal for isolation mode selection
-		// 3. Call RegisterPluginAssemblyUseCase
-		// 4. Refresh tree
-		void vscode.window.showInformationMessage('Register Assembly: Coming soon');
+
+		// Show file picker
+		const fileUri = await this.pickAssemblyFile();
+		if (!fileUri) {
+			return; // User cancelled
+		}
+
+		try {
+			// Read file content
+			const fileContent = await vscode.workspace.fs.readFile(fileUri);
+			const base64Content = Buffer.from(fileContent).toString('base64');
+
+			// Store for later use when confirm is received
+			this.pendingAssemblyContent = base64Content;
+
+			// Extract assembly name from filename (e.g., "PPDSDemo.Plugins.dll" → "PPDSDemo.Plugins")
+			const fullFilename = this.extractFilename(fileUri.fsPath);
+			const assemblyName = fullFilename.replace(/\.dll$/i, '');
+
+			this.logger.debug('Parsed assembly name from filename', {
+				fullFilename,
+				assemblyName,
+			});
+
+			// Load unmanaged solutions (optional for assemblies, unlike packages which require prefix)
+			this.unmanagedSolutionsWithPrefix =
+				await this.repositories.solution.findUnmanagedWithPublisherPrefix(
+					this.currentEnvironmentId
+				);
+
+			this.logger.debug('Loaded unmanaged solutions for assembly registration', {
+				count: this.unmanagedSolutionsWithPrefix.length,
+			});
+
+			// Send message to webview to show modal
+			await this.panel.postMessage({
+				command: 'showRegisterAssemblyModal',
+				data: {
+					name: assemblyName,
+					filename: fullFilename,
+					solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
+						id: s.id,
+						name: s.name,
+						uniqueName: s.uniqueName,
+					})),
+				},
+			});
+		} catch (error) {
+			this.logger.error('Failed to read assembly file', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(`Failed to read assembly file: ${errorMessage}`);
+			this.pendingAssemblyContent = null;
+		}
+	}
+
+	/**
+	 * Handle confirmation from the Register Assembly modal.
+	 * Calls the use case to register the assembly.
+	 */
+	private async handleConfirmRegisterAssembly(
+		name: string,
+		solutionUniqueName?: string
+	): Promise<void> {
+		if (!this.pendingAssemblyContent) {
+			this.logger.error('No pending assembly content for registration');
+			void vscode.window.showErrorMessage('No assembly file selected. Please try again.');
+			return;
+		}
+
+		const base64Content = this.pendingAssemblyContent;
+		this.pendingAssemblyContent = null; // Clear pending content
+
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Registering ${name} in ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.registerAssembly.execute(this.currentEnvironmentId, {
+						name,
+						base64Content,
+						solutionUniqueName,
+					});
+
+					const solutionInfo = solutionUniqueName
+						? ` and added to solution ${solutionUniqueName}`
+						: '';
+					void vscode.window.showInformationMessage(
+						`${name} registered successfully in ${environmentName}${solutionInfo}.`
+					);
+
+					// Refresh tree to show the new assembly
+					await this.handleRefresh();
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to register plugin assembly', error);
+					void vscode.window.showErrorMessage(
+						`Failed to register ${name} in ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
 	}
 
 	/**
