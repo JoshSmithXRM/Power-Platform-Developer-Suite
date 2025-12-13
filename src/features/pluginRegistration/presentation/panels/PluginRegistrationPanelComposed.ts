@@ -590,6 +590,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				sdkMessageId?: string;
 				sdkMessageFilterId?: string;
 				primaryEntity?: string; // For filter lookup
+				secondaryEntity?: string; // For Associate/Disassociate messages
 				name?: string;
 				stage?: number;
 				mode?: number;
@@ -617,6 +618,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					sdkMessageId: stepData.sdkMessageId,
 					sdkMessageFilterId: stepData.sdkMessageFilterId,
 					primaryEntity: stepData.primaryEntity,
+					secondaryEntity: stepData.secondaryEntity,
 					name: stepData.name,
 					stage: stepData.stage,
 					mode: stepData.mode,
@@ -1080,21 +1082,28 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				messageId
 			);
 
-			// Extract entity logical names, sorted by logical name
-			const entities = filters
+			// Extract primary entity logical names, sorted alphabetically
+			const primaryEntities = filters
 				.map((f) => f.getPrimaryEntityLogicalName())
-				.filter((e) => e !== 'none') // Filter out 'none' entities
+				.filter((e) => e !== 'none')
+				.sort((a, b) => a.localeCompare(b));
+
+			// Extract secondary entity logical names (for messages like Associate/Disassociate)
+			const secondaryEntities = filters
+				.filter((f) => f.hasSecondaryEntity())
+				.map((f) => f.getSecondaryEntityLogicalName())
+				.filter((e, i, arr) => arr.indexOf(e) === i) // Deduplicate
 				.sort((a, b) => a.localeCompare(b));
 
 			await this.panel.postMessage({
 				command: 'entitiesForMessage',
-				data: { messageId, entities },
+				data: { messageId, entities: primaryEntities, secondaryEntities },
 			});
 		} catch (error) {
 			this.logger.error('Failed to fetch entities for message', { messageId, error });
 			await this.panel.postMessage({
 				command: 'entitiesForMessage',
-				data: { messageId, entities: [], error: 'Failed to fetch entities' },
+				data: { messageId, entities: [], secondaryEntities: [], error: 'Failed to fetch entities' },
 			});
 		}
 	}
@@ -1782,6 +1791,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		sdkMessageId: string;
 		sdkMessageFilterId?: string | undefined;
 		primaryEntity?: string | undefined; // Used to lookup filter if not provided directly
+		secondaryEntity?: string | undefined; // For Associate/Disassociate messages (informational)
 		name: string;
 		stage: number;
 		mode: number;

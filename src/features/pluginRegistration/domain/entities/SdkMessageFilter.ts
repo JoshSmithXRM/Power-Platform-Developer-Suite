@@ -7,6 +7,7 @@ export class SdkMessageFilter {
 		private readonly id: string,
 		private readonly sdkMessageId: string,
 		private readonly primaryObjectTypeCode: string, // Entity logical name
+		private readonly secondaryObjectTypeCode: string, // Secondary entity (for Associate/Disassociate)
 		private readonly isCustomProcessingStepAllowed: boolean
 	) {}
 
@@ -24,6 +25,21 @@ export class SdkMessageFilter {
 	 */
 	public getPrimaryEntityLogicalName(): string {
 		return this.primaryObjectTypeCode;
+	}
+
+	/**
+	 * Gets the secondary entity logical name for this filter.
+	 * Returns 'none' for messages that don't have a secondary entity.
+	 */
+	public getSecondaryEntityLogicalName(): string {
+		return this.secondaryObjectTypeCode;
+	}
+
+	/**
+	 * Checks if this filter has a secondary entity (non-'none').
+	 */
+	public hasSecondaryEntity(): boolean {
+		return this.secondaryObjectTypeCode !== 'none' && this.secondaryObjectTypeCode !== '';
 	}
 
 	public isCustomStepAllowed(): boolean {
