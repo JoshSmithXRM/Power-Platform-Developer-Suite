@@ -10,9 +10,6 @@ interface SdkMessageDto {
 	sdkmessageid: string;
 	name: string;
 	isprivate: boolean;
-	iscustomizable: {
-		Value: boolean;
-	};
 }
 
 /**
@@ -28,7 +25,7 @@ interface SdkMessageCollectionResponse {
  */
 export class DataverseSdkMessageRepository implements ISdkMessageRepository {
 	private static readonly ENTITY_SET = 'sdkmessages';
-	private static readonly SELECT_FIELDS = 'sdkmessageid,name,isprivate,iscustomizable';
+	private static readonly SELECT_FIELDS = 'sdkmessageid,name,isprivate';
 
 	constructor(
 		private readonly apiService: IDataverseApiService,
@@ -109,7 +106,7 @@ export class DataverseSdkMessageRepository implements ISdkMessageRepository {
 			dto.sdkmessageid,
 			dto.name,
 			dto.isprivate,
-			dto.iscustomizable?.Value ?? true
+			true // Public messages are customizable
 		);
 	}
 }
