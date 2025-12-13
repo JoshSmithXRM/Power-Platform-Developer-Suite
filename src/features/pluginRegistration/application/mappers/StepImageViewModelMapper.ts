@@ -14,6 +14,7 @@ export class StepImageViewModelMapper {
 			entityAlias: image.getEntityAlias(),
 			attributes: image.getAttributesArray(),
 			createdOn: image.getCreatedOn().toISOString(),
+			canDelete: true, // Images can always be deleted (no managed state)
 		};
 
 		return {

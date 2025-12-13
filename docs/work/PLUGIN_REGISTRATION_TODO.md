@@ -920,18 +920,20 @@ payload['workflowactivitygroupname'] =
 | Register assembly (with Plugin Inspector) | ✅ Slice 3 |
 | Unregister assembly | ✅ Slice 3 |
 | Unregister package | ✅ Slice 3 |
+| Unregister step | ✅ Slice 3 |
+| Unregister image | ✅ Slice 3 |
 | Delta updates (instant UI for register/unregister) | ✅ Slice 3 |
 | Plugin Inspector .NET tool | ✅ Slice 3 |
 
 ### REMAINING - MVP
 | Feature | Complexity | Notes |
 |---------|------------|-------|
-| Register New Step | HIGH | Complex form: SDK message, entity, stage, mode, filtering attrs |
-| Edit Step | MEDIUM | Reuses Register Step form, pre-populated |
-| Delete Step | LOW | Confirmation dialog + API call |
-| Register New Image | MEDIUM | Form: image type, name, attributes |
-| Edit Image | MEDIUM | Reuses Register Image form, pre-populated |
-| Delete Image | LOW | Confirmation dialog + API call |
+| Register New Step | ✅ DONE | Complex form: SDK message, stage, mode, filtering attrs |
+| Edit Step | ✅ DONE | Reuses Register Step form, pre-populated |
+| Unregister Step | ✅ DONE | Confirmation dialog + API call |
+| Register New Image | ✅ DONE | Form: image type, name, attributes |
+| Edit Image | ✅ DONE | Reuses Register Image form, pre-populated |
+| Unregister Image | ✅ DONE | Confirmation dialog + API call |
 | Detail panel | MEDIUM | Show metadata when node selected |
 | Selected item indicator | LOW | Visual highlight for selected tree node |
 | Unit tests | HIGH | Domain + application layer (required before PR) |

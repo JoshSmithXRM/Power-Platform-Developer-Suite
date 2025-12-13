@@ -34,6 +34,13 @@ import type { RegisterPluginPackageUseCase } from '../../application/useCases/Re
 import type { RegisterPluginAssemblyUseCase } from '../../application/useCases/RegisterPluginAssemblyUseCase';
 import type { UnregisterPluginAssemblyUseCase } from '../../application/useCases/UnregisterPluginAssemblyUseCase';
 import type { UnregisterPluginPackageUseCase } from '../../application/useCases/UnregisterPluginPackageUseCase';
+import type { UnregisterPluginStepUseCase } from '../../application/useCases/UnregisterPluginStepUseCase';
+import type { UnregisterStepImageUseCase } from '../../application/useCases/UnregisterStepImageUseCase';
+import type { RegisterPluginStepUseCase } from '../../application/useCases/RegisterPluginStepUseCase';
+import type { UpdatePluginStepUseCase } from '../../application/useCases/UpdatePluginStepUseCase';
+import type { RegisterStepImageUseCase } from '../../application/useCases/RegisterStepImageUseCase';
+import type { UpdateStepImageUseCase } from '../../application/useCases/UpdateStepImageUseCase';
+import type { ISdkMessageRepository } from '../../domain/interfaces/ISdkMessageRepository';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
 import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
 import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
@@ -64,6 +71,12 @@ export interface PluginRegistrationUseCases {
 	readonly registerAssembly: RegisterPluginAssemblyUseCase;
 	readonly unregisterAssembly: UnregisterPluginAssemblyUseCase;
 	readonly unregisterPackage: UnregisterPluginPackageUseCase;
+	readonly unregisterStep: UnregisterPluginStepUseCase;
+	readonly unregisterImage: UnregisterStepImageUseCase;
+	readonly registerStep: RegisterPluginStepUseCase;
+	readonly updateStep: UpdatePluginStepUseCase;
+	readonly registerImage: RegisterStepImageUseCase;
+	readonly updateImage: UpdateStepImageUseCase;
 }
 
 /**
@@ -76,6 +89,7 @@ export interface PluginRegistrationRepositories {
 	readonly pluginType: IPluginTypeRepository;
 	readonly image: IStepImageRepository;
 	readonly solution: ISolutionRepository;
+	readonly sdkMessage: ISdkMessageRepository;
 }
 
 /**
@@ -103,7 +117,11 @@ type PluginRegistrationCommands =
 	| 'confirmRegisterAssembly'
 	| 'confirmUpdatePackage'
 	| 'confirmUpdateAssembly'
-	| 'unregisterAssembly';
+	| 'unregisterAssembly'
+	| 'confirmRegisterStep'
+	| 'confirmEditStep'
+	| 'confirmRegisterImage'
+	| 'confirmEditImage';
 
 /**
  * Plugin Registration panel using PanelCoordinator architecture.
@@ -541,6 +559,111 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			};
 			if (assemblyId) {
 				await this.handleConfirmUpdateAssembly(assemblyId, selectedTypes ?? []);
+			}
+		});
+
+		this.coordinator.registerHandler('confirmRegisterStep', async (data) => {
+			const stepData = data as {
+				pluginTypeId?: string;
+				sdkMessageId?: string;
+				name?: string;
+				stage?: number;
+				mode?: number;
+				rank?: number;
+				filteringAttributes?: string;
+			};
+			if (
+				stepData.pluginTypeId &&
+				stepData.sdkMessageId &&
+				stepData.name &&
+				stepData.stage !== undefined &&
+				stepData.mode !== undefined &&
+				stepData.rank !== undefined
+			) {
+				await this.handleConfirmRegisterStep({
+					pluginTypeId: stepData.pluginTypeId,
+					sdkMessageId: stepData.sdkMessageId,
+					name: stepData.name,
+					stage: stepData.stage,
+					mode: stepData.mode,
+					rank: stepData.rank,
+					filteringAttributes: stepData.filteringAttributes,
+				});
+			}
+		});
+
+		this.coordinator.registerHandler('confirmEditStep', async (data) => {
+			const stepData = data as {
+				stepId?: string;
+				name?: string;
+				stage?: number;
+				mode?: number;
+				rank?: number;
+				filteringAttributes?: string;
+			};
+			if (
+				stepData.stepId &&
+				stepData.name &&
+				stepData.stage !== undefined &&
+				stepData.mode !== undefined &&
+				stepData.rank !== undefined
+			) {
+				await this.handleConfirmEditStep({
+					stepId: stepData.stepId,
+					name: stepData.name,
+					stage: stepData.stage,
+					mode: stepData.mode,
+					rank: stepData.rank,
+					filteringAttributes: stepData.filteringAttributes,
+				});
+			}
+		});
+
+		this.coordinator.registerHandler('confirmRegisterImage', async (data) => {
+			const imageData = data as {
+				stepId?: string;
+				name?: string;
+				imageType?: number;
+				entityAlias?: string;
+				attributes?: string;
+			};
+			if (
+				imageData.stepId &&
+				imageData.name &&
+				imageData.imageType !== undefined &&
+				imageData.entityAlias
+			) {
+				await this.handleConfirmRegisterImage({
+					stepId: imageData.stepId,
+					name: imageData.name,
+					imageType: imageData.imageType,
+					entityAlias: imageData.entityAlias,
+					attributes: imageData.attributes,
+				});
+			}
+		});
+
+		this.coordinator.registerHandler('confirmEditImage', async (data) => {
+			const imageData = data as {
+				imageId?: string;
+				name?: string;
+				imageType?: number;
+				entityAlias?: string;
+				attributes?: string;
+			};
+			if (
+				imageData.imageId &&
+				imageData.name &&
+				imageData.imageType !== undefined &&
+				imageData.entityAlias
+			) {
+				await this.handleConfirmEditImage({
+					imageId: imageData.imageId,
+					name: imageData.name,
+					imageType: imageData.imageType,
+					entityAlias: imageData.entityAlias,
+					attributes: imageData.attributes,
+				});
 			}
 		});
 	}
@@ -1333,6 +1456,545 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					this.logger.error('Failed to unregister plugin package', error);
 					void vscode.window.showErrorMessage(
 						`Failed to unregister ${packageName} from ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
+	}
+
+	/**
+	 * Unregister (delete) a plugin step. Called from context menu command.
+	 * Shows confirmation dialog, then deletes the step.
+	 */
+	public async unregisterStep(stepId: string): Promise<void> {
+		this.logger.info('Unregistering plugin step', { stepId });
+
+		// Fetch step and environment info for better messaging
+		const [step, environment] = await Promise.all([
+			this.repositories.step.findById(this.currentEnvironmentId, stepId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+
+		const stepName = step?.getName() ?? 'Unknown Step';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		// Confirm deletion with user
+		const confirmation = await vscode.window.showWarningMessage(
+			`Are you sure you want to unregister "${stepName}" from ${environmentName}? This will delete the step and cannot be undone.`,
+			{ modal: true },
+			'Unregister'
+		);
+
+		if (confirmation !== 'Unregister') {
+			return; // User cancelled
+		}
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Unregistering ${stepName} from ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.unregisterStep.execute(
+						this.currentEnvironmentId,
+						stepId,
+						stepName
+					);
+
+					// Send delta update to webview (instant, no full refresh)
+					await this.panel.postMessage({
+						command: 'removeNode',
+						data: { nodeId: stepId },
+					});
+
+					void vscode.window.showInformationMessage(
+						`${stepName} unregistered successfully from ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to unregister plugin step', error);
+					void vscode.window.showErrorMessage(
+						`Failed to unregister ${stepName} from ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
+	}
+
+	/**
+	 * Unregister (delete) a step image. Called from context menu command.
+	 * Shows confirmation dialog, then deletes the image.
+	 */
+	public async unregisterImage(imageId: string): Promise<void> {
+		this.logger.info('Unregistering step image', { imageId });
+
+		// Fetch image and environment info for better messaging
+		const [image, environment] = await Promise.all([
+			this.repositories.image.findById(this.currentEnvironmentId, imageId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+
+		const imageName = image?.getName() ?? 'Unknown Image';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		// Confirm deletion with user
+		const confirmation = await vscode.window.showWarningMessage(
+			`Are you sure you want to unregister "${imageName}" from ${environmentName}? This will delete the image and cannot be undone.`,
+			{ modal: true },
+			'Unregister'
+		);
+
+		if (confirmation !== 'Unregister') {
+			return; // User cancelled
+		}
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Unregistering ${imageName} from ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.unregisterImage.execute(
+						this.currentEnvironmentId,
+						imageId,
+						imageName
+					);
+
+					// Send delta update to webview (instant, no full refresh)
+					await this.panel.postMessage({
+						command: 'removeNode',
+						data: { nodeId: imageId },
+					});
+
+					void vscode.window.showInformationMessage(
+						`${imageName} unregistered successfully from ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to unregister step image', error);
+					void vscode.window.showErrorMessage(
+						`Failed to unregister ${imageName} from ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
+	}
+
+	/**
+	 * Register a new plugin step. Called from context menu on plugin type.
+	 * Shows modal form, then creates the step.
+	 */
+	public async registerStep(pluginTypeId: string): Promise<void> {
+		this.logger.info('Registering new plugin step', { pluginTypeId });
+
+		// Fetch plugin type info and SDK messages for the form
+		const [pluginType, messages] = await Promise.all([
+			this.repositories.pluginType.findById(this.currentEnvironmentId, pluginTypeId),
+			this.repositories.sdkMessage.findAllPublic(this.currentEnvironmentId),
+		]);
+
+		const pluginTypeName = pluginType?.getName() ?? 'Unknown Plugin';
+
+		// Send modal data to webview
+		await this.panel.postMessage({
+			command: 'showRegisterStepModal',
+			data: {
+				pluginTypeId,
+				pluginTypeName,
+				messages: messages.map((m) => ({ id: m.getId(), name: m.getName() })),
+			},
+		});
+	}
+
+	/**
+	 * Edit an existing plugin step. Called from context menu on step.
+	 * Shows modal form pre-populated with current values, then updates the step.
+	 */
+	public async editStep(stepId: string): Promise<void> {
+		this.logger.info('Editing plugin step', { stepId });
+
+		// Fetch step and SDK messages
+		const [step, messages] = await Promise.all([
+			this.repositories.step.findById(this.currentEnvironmentId, stepId),
+			this.repositories.sdkMessage.findAllPublic(this.currentEnvironmentId),
+		]);
+
+		if (step === null) {
+			void vscode.window.showErrorMessage('Step not found.');
+			return;
+		}
+
+		// Send modal data to webview with pre-populated values
+		await this.panel.postMessage({
+			command: 'showEditStepModal',
+			data: {
+				stepId,
+				stepName: step.getName(),
+				sdkMessageId: step.getMessageId(),
+				sdkMessageName: step.getMessageName(),
+				stage: step.getStage().getValue(),
+				mode: step.getMode().getValue(),
+				rank: step.getRank(),
+				filteringAttributes: step.getFilteringAttributes() ?? '',
+				messages: messages.map((m) => ({ id: m.getId(), name: m.getName() })),
+			},
+		});
+	}
+
+	/**
+	 * Register a new step image. Called from context menu on step.
+	 * Shows modal form, then creates the image.
+	 */
+	public async registerImage(stepId: string): Promise<void> {
+		this.logger.info('Registering new step image', { stepId });
+
+		const step = await this.repositories.step.findById(this.currentEnvironmentId, stepId);
+		const stepName = step?.getName() ?? 'Unknown Step';
+
+		// Send modal data to webview
+		await this.panel.postMessage({
+			command: 'showRegisterImageModal',
+			data: {
+				stepId,
+				stepName,
+			},
+		});
+	}
+
+	/**
+	 * Edit an existing step image. Called from context menu on image.
+	 * Shows modal form pre-populated with current values, then updates the image.
+	 */
+	public async editImage(imageId: string): Promise<void> {
+		this.logger.info('Editing step image', { imageId });
+
+		const image = await this.repositories.image.findById(this.currentEnvironmentId, imageId);
+
+		if (image === null) {
+			void vscode.window.showErrorMessage('Image not found.');
+			return;
+		}
+
+		// Send modal data to webview with pre-populated values
+		await this.panel.postMessage({
+			command: 'showEditImageModal',
+			data: {
+				imageId,
+				imageName: image.getName(),
+				imageType: image.getImageType().getValue(),
+				entityAlias: image.getEntityAlias(),
+				attributes: image.getAttributes(),
+			},
+		});
+	}
+
+	/**
+	 * Handle confirmation from the Register Step modal.
+	 */
+	private async handleConfirmRegisterStep(data: {
+		pluginTypeId: string;
+		sdkMessageId: string;
+		name: string;
+		stage: number;
+		mode: number;
+		rank: number;
+		filteringAttributes?: string | undefined;
+	}): Promise<void> {
+		this.logger.debug('Handling register step confirmation', data);
+
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Registering step in ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					const stepId = await this.useCases.registerStep.execute(
+						this.currentEnvironmentId,
+						{
+							pluginTypeId: data.pluginTypeId,
+							sdkMessageId: data.sdkMessageId,
+							name: data.name,
+							stage: data.stage,
+							mode: data.mode,
+							rank: data.rank,
+							filteringAttributes: data.filteringAttributes,
+						}
+					);
+
+					// Fetch the new step and send delta update
+					const newStep = await this.repositories.step.findById(
+						this.currentEnvironmentId,
+						stepId
+					);
+
+					if (newStep) {
+						// Import mapper at runtime to avoid circular dependencies
+						const { PluginStepViewModelMapper } = await import(
+							'../../application/mappers/PluginStepViewModelMapper.js'
+						);
+						const mapper = new PluginStepViewModelMapper();
+						const stepViewModel = mapper.toTreeItem(newStep, data.pluginTypeId, []);
+
+						await this.panel.postMessage({
+							command: 'addNode',
+							data: {
+								parentId: data.pluginTypeId,
+								node: stepViewModel,
+							},
+						});
+					}
+
+					void vscode.window.showInformationMessage(
+						`Step "${data.name}" registered successfully in ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to register plugin step', error);
+					void vscode.window.showErrorMessage(
+						`Failed to register step in ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
+	}
+
+	/**
+	 * Handle confirmation from the Edit Step modal.
+	 */
+	private async handleConfirmEditStep(data: {
+		stepId: string;
+		name: string;
+		stage: number;
+		mode: number;
+		rank: number;
+		filteringAttributes?: string | undefined;
+	}): Promise<void> {
+		this.logger.debug('Handling edit step confirmation', data);
+
+		const [step, environment] = await Promise.all([
+			this.repositories.step.findById(this.currentEnvironmentId, data.stepId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+		const stepName = step?.getName() ?? 'Unknown Step';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Updating ${stepName} in ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.updateStep.execute(
+						this.currentEnvironmentId,
+						data.stepId,
+						{
+							name: data.name,
+							stage: data.stage,
+							mode: data.mode,
+							rank: data.rank,
+							filteringAttributes: data.filteringAttributes,
+						}
+					);
+
+					// Fetch updated step and send delta update
+					const updatedStep = await this.repositories.step.findById(
+						this.currentEnvironmentId,
+						data.stepId
+					);
+
+					if (updatedStep) {
+						const { PluginStepViewModelMapper } = await import(
+							'../../application/mappers/PluginStepViewModelMapper.js'
+						);
+						const mapper = new PluginStepViewModelMapper();
+						// Get existing images
+						const images = await this.repositories.image.findByStepId(
+							this.currentEnvironmentId,
+							data.stepId
+						);
+						const { StepImageViewModelMapper } = await import(
+							'../../application/mappers/StepImageViewModelMapper.js'
+						);
+						const imageMapper = new StepImageViewModelMapper();
+						const imageViewModels = images.map((img) =>
+							imageMapper.toTreeItem(img, data.stepId)
+						);
+
+						const stepViewModel = mapper.toTreeItem(
+							updatedStep,
+							updatedStep.getPluginTypeId(),
+							imageViewModels
+						);
+
+						await this.panel.postMessage({
+							command: 'updateNode',
+							data: { node: stepViewModel },
+						});
+					}
+
+					void vscode.window.showInformationMessage(
+						`${data.name} updated successfully in ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to update plugin step', error);
+					void vscode.window.showErrorMessage(
+						`Failed to update step in ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
+	}
+
+	/**
+	 * Handle confirmation from the Register Image modal.
+	 */
+	private async handleConfirmRegisterImage(data: {
+		stepId: string;
+		name: string;
+		imageType: number;
+		entityAlias: string;
+		attributes?: string | undefined;
+	}): Promise<void> {
+		this.logger.debug('Handling register image confirmation', data);
+
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Registering image in ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					const imageId = await this.useCases.registerImage.execute(
+						this.currentEnvironmentId,
+						{
+							stepId: data.stepId,
+							name: data.name,
+							imageType: data.imageType,
+							entityAlias: data.entityAlias,
+							attributes: data.attributes,
+						}
+					);
+
+					// Fetch the new image and send delta update
+					const newImage = await this.repositories.image.findById(
+						this.currentEnvironmentId,
+						imageId
+					);
+
+					if (newImage) {
+						const { StepImageViewModelMapper } = await import(
+							'../../application/mappers/StepImageViewModelMapper.js'
+						);
+						const mapper = new StepImageViewModelMapper();
+						const imageViewModel = mapper.toTreeItem(newImage, data.stepId);
+
+						await this.panel.postMessage({
+							command: 'addNode',
+							data: {
+								parentId: data.stepId,
+								node: imageViewModel,
+							},
+						});
+					}
+
+					void vscode.window.showInformationMessage(
+						`Image "${data.name}" registered successfully in ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to register step image', error);
+					void vscode.window.showErrorMessage(
+						`Failed to register image in ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
+	}
+
+	/**
+	 * Handle confirmation from the Edit Image modal.
+	 */
+	private async handleConfirmEditImage(data: {
+		imageId: string;
+		name: string;
+		imageType: number;
+		entityAlias: string;
+		attributes?: string | undefined;
+	}): Promise<void> {
+		this.logger.debug('Handling edit image confirmation', data);
+
+		const [image, environment] = await Promise.all([
+			this.repositories.image.findById(this.currentEnvironmentId, data.imageId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+		const imageName = image?.getName() ?? 'Unknown Image';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Updating ${imageName} in ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.updateImage.execute(
+						this.currentEnvironmentId,
+						data.imageId,
+						{
+							name: data.name,
+							imageType: data.imageType,
+							entityAlias: data.entityAlias,
+							attributes: data.attributes,
+						}
+					);
+
+					// Fetch updated image and send delta update
+					const updatedImage = await this.repositories.image.findById(
+						this.currentEnvironmentId,
+						data.imageId
+					);
+
+					if (updatedImage) {
+						const { StepImageViewModelMapper } = await import(
+							'../../application/mappers/StepImageViewModelMapper.js'
+						);
+						const mapper = new StepImageViewModelMapper();
+						const imageViewModel = mapper.toTreeItem(
+							updatedImage,
+							updatedImage.getStepId()
+						);
+
+						await this.panel.postMessage({
+							command: 'updateNode',
+							data: { node: imageViewModel },
+						});
+					}
+
+					void vscode.window.showInformationMessage(
+						`${data.name} updated successfully in ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to update step image', error);
+					void vscode.window.showErrorMessage(
+						`Failed to update image in ${environmentName}: ${errorMessage}`
 					);
 				}
 			}
