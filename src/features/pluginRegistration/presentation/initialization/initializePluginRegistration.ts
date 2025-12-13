@@ -79,6 +79,27 @@ export async function initializePluginRegistration(
 	const { UnregisterPluginPackageUseCase } = await import(
 		'../../application/useCases/UnregisterPluginPackageUseCase.js'
 	);
+	const { UnregisterPluginStepUseCase } = await import(
+		'../../application/useCases/UnregisterPluginStepUseCase.js'
+	);
+	const { UnregisterStepImageUseCase } = await import(
+		'../../application/useCases/UnregisterStepImageUseCase.js'
+	);
+	const { RegisterPluginStepUseCase } = await import(
+		'../../application/useCases/RegisterPluginStepUseCase.js'
+	);
+	const { UpdatePluginStepUseCase } = await import(
+		'../../application/useCases/UpdatePluginStepUseCase.js'
+	);
+	const { RegisterStepImageUseCase } = await import(
+		'../../application/useCases/RegisterStepImageUseCase.js'
+	);
+	const { UpdateStepImageUseCase } = await import(
+		'../../application/useCases/UpdateStepImageUseCase.js'
+	);
+	const { DataverseSdkMessageRepository } = await import(
+		'../../infrastructure/repositories/DataverseSdkMessageRepository.js'
+	);
 	const { PluginRegistrationPanelComposed } = await import(
 		'../panels/PluginRegistrationPanelComposed.js'
 	);
@@ -98,6 +119,7 @@ export async function initializePluginRegistration(
 	const pluginTypeRepository = new DataversePluginTypeRepository(dataverseApiService, logger);
 	const stepRepository = new DataversePluginStepRepository(dataverseApiService, logger);
 	const imageRepository = new DataverseStepImageRepository(dataverseApiService, logger);
+	const sdkMessageRepository = new DataverseSdkMessageRepository(dataverseApiService, logger);
 
 	// Create use cases
 	const loadTreeUseCase = new LoadPluginRegistrationTreeUseCase(
@@ -121,6 +143,12 @@ export async function initializePluginRegistration(
 	);
 	const unregisterAssemblyUseCase = new UnregisterPluginAssemblyUseCase(assemblyRepository, logger);
 	const unregisterPackageUseCase = new UnregisterPluginPackageUseCase(packageRepository, logger);
+	const unregisterStepUseCase = new UnregisterPluginStepUseCase(stepRepository, logger);
+	const unregisterImageUseCase = new UnregisterStepImageUseCase(imageRepository, logger);
+	const registerStepUseCase = new RegisterPluginStepUseCase(stepRepository, logger);
+	const updateStepUseCase = new UpdatePluginStepUseCase(stepRepository, logger);
+	const registerImageUseCase = new RegisterStepImageUseCase(imageRepository, logger);
+	const updateImageUseCase = new UpdateStepImageUseCase(imageRepository, logger);
 
 	// Bundle use cases and repositories for cleaner panel constructor
 	const useCases = {
@@ -133,6 +161,12 @@ export async function initializePluginRegistration(
 		registerAssembly: registerAssemblyUseCase,
 		unregisterAssembly: unregisterAssemblyUseCase,
 		unregisterPackage: unregisterPackageUseCase,
+		unregisterStep: unregisterStepUseCase,
+		unregisterImage: unregisterImageUseCase,
+		registerStep: registerStepUseCase,
+		updateStep: updateStepUseCase,
+		registerImage: registerImageUseCase,
+		updateImage: updateImageUseCase,
 	};
 
 	const repositories = {
@@ -142,6 +176,7 @@ export async function initializePluginRegistration(
 		pluginType: pluginTypeRepository,
 		image: imageRepository,
 		solution: solutionRepository,
+		sdkMessage: sdkMessageRepository,
 	};
 
 	const services = {

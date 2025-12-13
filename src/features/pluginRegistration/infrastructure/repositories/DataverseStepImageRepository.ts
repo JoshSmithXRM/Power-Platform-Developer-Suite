@@ -1,6 +1,10 @@
 import type { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
-import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRepository';
+import type {
+	IStepImageRepository,
+	RegisterImageInput,
+	UpdateImageInput,
+} from '../../domain/interfaces/IStepImageRepository';
 import { StepImage } from '../../domain/entities/StepImage';
 import { ImageType } from '../../domain/valueObjects/ImageType';
 
@@ -124,6 +128,93 @@ export class DataverseStepImageRepository implements IStepImageRepository {
 			}
 			throw error;
 		}
+	}
+
+	public async delete(environmentId: string, imageId: string): Promise<void> {
+		this.logger.debug('DataverseStepImageRepository: Deleting image', {
+			environmentId,
+			imageId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataverseStepImageRepository.ENTITY_SET}(${imageId})`;
+
+		await this.apiService.delete(environmentId, endpoint);
+
+		this.logger.debug('DataverseStepImageRepository: Image deleted', { imageId });
+	}
+
+	public async register(environmentId: string, input: RegisterImageInput): Promise<string> {
+		this.logger.debug('DataverseStepImageRepository: Registering image', {
+			environmentId,
+			name: input.name,
+			stepId: input.stepId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataverseStepImageRepository.ENTITY_SET}`;
+
+		// Build payload
+		const payload: Record<string, unknown> = {
+			name: input.name,
+			'sdkmessageprocessingstepid@odata.bind': `/sdkmessageprocessingsteps(${input.stepId})`,
+			imagetype: input.imageType,
+			entityalias: input.entityAlias,
+		};
+
+		if (input.attributes) {
+			payload['attributes'] = input.attributes;
+		}
+
+		interface CreateResponse {
+			sdkmessageprocessingstepimageid: string;
+		}
+
+		const response = await this.apiService.post<CreateResponse>(
+			environmentId,
+			endpoint,
+			payload
+		);
+
+		this.logger.debug('DataverseStepImageRepository: Image registered', {
+			imageId: response.sdkmessageprocessingstepimageid,
+		});
+
+		return response.sdkmessageprocessingstepimageid;
+	}
+
+	public async update(
+		environmentId: string,
+		imageId: string,
+		input: UpdateImageInput
+	): Promise<void> {
+		this.logger.debug('DataverseStepImageRepository: Updating image', {
+			environmentId,
+			imageId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataverseStepImageRepository.ENTITY_SET}(${imageId})`;
+
+		// Build payload with only provided fields
+		const payload: Record<string, unknown> = {};
+
+		if (input.name !== undefined) {
+			payload['name'] = input.name;
+		}
+
+		if (input.imageType !== undefined) {
+			payload['imagetype'] = input.imageType;
+		}
+
+		if (input.entityAlias !== undefined) {
+			payload['entityalias'] = input.entityAlias;
+		}
+
+		if (input.attributes !== undefined) {
+			payload['attributes'] = input.attributes || null;
+		}
+
+		await this.apiService.patch(environmentId, endpoint, payload);
+
+		this.logger.debug('DataverseStepImageRepository: Image updated', { imageId });
 	}
 
 	private mapToDomain(dto: StepImageDto): StepImage {

@@ -300,6 +300,7 @@ function buildVscodeContext(item) {
 	if (item.type === 'step' && item.metadata) {
 		context.canEnable = item.metadata.canEnable === true;
 		context.canDisable = item.metadata.canDisable === true;
+		context.canDelete = item.metadata.canDelete === true;
 	} else if (item.type === 'assembly' && item.metadata) {
 		context.canUpdate = item.metadata.canUpdate === true;
 		// packageId can be a GUID string or null - preserve it exactly
@@ -309,6 +310,8 @@ function buildVscodeContext(item) {
 		context.isStandalone = pkgId === null || pkgId === undefined;
 	} else if (item.type === 'package' && item.metadata) {
 		context.canUpdate = item.metadata.canUpdate === true;
+	} else if (item.type === 'image' && item.metadata) {
+		context.canDelete = item.metadata.canDelete === true;
 	}
 
 	return JSON.stringify(context);
@@ -966,6 +969,21 @@ window.createBehavior({
 			case 'showUpdateAssemblyModal':
 				handleShowUpdateAssemblyModal(message.data);
 				break;
+			case 'showRegisterStepModal':
+				handleShowRegisterStepModal(message.data);
+				break;
+			case 'showEditStepModal':
+				handleShowEditStepModal(message.data);
+				break;
+			case 'showRegisterImageModal':
+				handleShowRegisterImageModal(message.data);
+				break;
+			case 'showEditImageModal':
+				handleShowEditImageModal(message.data);
+				break;
+			case 'addNode':
+				handleAddNode(message.data);
+				break;
 		}
 	}
 });
@@ -1512,4 +1530,384 @@ function handleShowUpdateAssemblyModal(data) {
 			});
 		}
 	});
+}
+
+/**
+ * Show the Register Step modal.
+ * @param {Object} data - { pluginTypeId, pluginTypeName, messages }
+ */
+function handleShowRegisterStepModal(data) {
+	const { pluginTypeId, pluginTypeName, messages } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build message options for dropdown
+	const messageOptions = [
+		{ value: '', label: '-- Select a Message --' },
+		...(messages || []).map(m => ({ value: m.id, label: m.name }))
+	];
+
+	// Stage options (matching Dataverse values)
+	const stageOptions = [
+		{ value: '', label: '-- Select Stage --' },
+		{ value: '10', label: 'Pre-validation' },
+		{ value: '20', label: 'Pre-operation' },
+		{ value: '40', label: 'Post-operation' }
+	];
+
+	// Mode options
+	const modeOptions = [
+		{ value: '', label: '-- Select Mode --' },
+		{ value: '0', label: 'Synchronous' },
+		{ value: '1', label: 'Asynchronous' }
+	];
+
+	window.showFormModal({
+		title: `Register Step for ${pluginTypeName}`,
+		fields: [
+			{
+				id: 'sdkMessageId',
+				label: 'Message',
+				type: 'select',
+				value: '',
+				options: messageOptions,
+				required: true
+			},
+			{
+				id: 'stage',
+				label: 'Stage',
+				type: 'select',
+				value: '',
+				options: stageOptions,
+				required: true
+			},
+			{
+				id: 'mode',
+				label: 'Execution Mode',
+				type: 'select',
+				value: '',
+				options: modeOptions,
+				required: true
+			},
+			{
+				id: 'rank',
+				label: 'Execution Order',
+				type: 'number',
+				value: '1',
+				required: true,
+				placeholder: '1'
+			},
+			{
+				id: 'filteringAttributes',
+				label: 'Filtering Attributes',
+				type: 'text',
+				value: '',
+				placeholder: 'Comma-separated (for Update message only)'
+			},
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'Step name'
+			}
+		],
+		submitLabel: 'Register',
+		cancelLabel: 'Cancel',
+		onSubmit: (values) => {
+			vscode.postMessage({
+				command: 'confirmRegisterStep',
+				data: {
+					pluginTypeId,
+					sdkMessageId: values.sdkMessageId,
+					name: values.name,
+					stage: parseInt(values.stage, 10),
+					mode: parseInt(values.mode, 10),
+					rank: parseInt(values.rank, 10),
+					filteringAttributes: values.filteringAttributes || undefined
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Edit Step modal.
+ * @param {Object} data - { stepId, stepName, sdkMessageId, sdkMessageName, stage, mode, rank, filteringAttributes, messages }
+ */
+function handleShowEditStepModal(data) {
+	const { stepId, stepName, sdkMessageId, sdkMessageName, stage, mode, rank, filteringAttributes, messages } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build message options for dropdown
+	const messageOptions = [
+		{ value: '', label: '-- Select a Message --' },
+		...(messages || []).map(m => ({ value: m.id, label: m.name }))
+	];
+
+	// Stage options
+	const stageOptions = [
+		{ value: '10', label: 'Pre-validation' },
+		{ value: '20', label: 'Pre-operation' },
+		{ value: '40', label: 'Post-operation' }
+	];
+
+	// Mode options
+	const modeOptions = [
+		{ value: '0', label: 'Synchronous' },
+		{ value: '1', label: 'Asynchronous' }
+	];
+
+	window.showFormModal({
+		title: `Edit Step: ${stepName}`,
+		fields: [
+			{
+				id: 'sdkMessageId',
+				label: 'Message',
+				type: 'select',
+				value: sdkMessageId,
+				options: messageOptions,
+				readonly: true // Can't change message after creation
+			},
+			{
+				id: 'stage',
+				label: 'Stage',
+				type: 'select',
+				value: String(stage),
+				options: stageOptions,
+				required: true
+			},
+			{
+				id: 'mode',
+				label: 'Execution Mode',
+				type: 'select',
+				value: String(mode),
+				options: modeOptions,
+				required: true
+			},
+			{
+				id: 'rank',
+				label: 'Execution Order',
+				type: 'number',
+				value: String(rank),
+				required: true
+			},
+			{
+				id: 'filteringAttributes',
+				label: 'Filtering Attributes',
+				type: 'text',
+				value: filteringAttributes || '',
+				placeholder: 'Comma-separated (for Update message only)'
+			},
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: stepName,
+				required: true
+			}
+		],
+		submitLabel: 'Update',
+		cancelLabel: 'Cancel',
+		onSubmit: (values) => {
+			vscode.postMessage({
+				command: 'confirmEditStep',
+				data: {
+					stepId,
+					name: values.name,
+					stage: parseInt(values.stage, 10),
+					mode: parseInt(values.mode, 10),
+					rank: parseInt(values.rank, 10),
+					filteringAttributes: values.filteringAttributes || undefined
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Register Image modal.
+ * @param {Object} data - { stepId, stepName }
+ */
+function handleShowRegisterImageModal(data) {
+	const { stepId, stepName } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Image type options (matching Dataverse values)
+	const imageTypeOptions = [
+		{ value: '', label: '-- Select Image Type --' },
+		{ value: '0', label: 'PreImage' },
+		{ value: '1', label: 'PostImage' },
+		{ value: '2', label: 'Both' }
+	];
+
+	window.showFormModal({
+		title: `Register Image for ${stepName}`,
+		fields: [
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'Image name'
+			},
+			{
+				id: 'imageType',
+				label: 'Image Type',
+				type: 'select',
+				value: '',
+				options: imageTypeOptions,
+				required: true
+			},
+			{
+				id: 'entityAlias',
+				label: 'Entity Alias',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'e.g., PreImage or PostImage'
+			},
+			{
+				id: 'attributes',
+				label: 'Attributes',
+				type: 'text',
+				value: '',
+				placeholder: 'Comma-separated (leave empty for all)'
+			}
+		],
+		submitLabel: 'Register',
+		cancelLabel: 'Cancel',
+		onSubmit: (values) => {
+			vscode.postMessage({
+				command: 'confirmRegisterImage',
+				data: {
+					stepId,
+					name: values.name,
+					imageType: parseInt(values.imageType, 10),
+					entityAlias: values.entityAlias,
+					attributes: values.attributes || undefined
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Edit Image modal.
+ * @param {Object} data - { imageId, imageName, imageType, entityAlias, attributes }
+ */
+function handleShowEditImageModal(data) {
+	const { imageId, imageName, imageType, entityAlias, attributes } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Image type options
+	const imageTypeOptions = [
+		{ value: '0', label: 'PreImage' },
+		{ value: '1', label: 'PostImage' },
+		{ value: '2', label: 'Both' }
+	];
+
+	window.showFormModal({
+		title: `Edit Image: ${imageName}`,
+		fields: [
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: imageName,
+				required: true
+			},
+			{
+				id: 'imageType',
+				label: 'Image Type',
+				type: 'select',
+				value: String(imageType),
+				options: imageTypeOptions,
+				required: true
+			},
+			{
+				id: 'entityAlias',
+				label: 'Entity Alias',
+				type: 'text',
+				value: entityAlias,
+				required: true
+			},
+			{
+				id: 'attributes',
+				label: 'Attributes',
+				type: 'text',
+				value: attributes || '',
+				placeholder: 'Comma-separated (leave empty for all)'
+			}
+		],
+		submitLabel: 'Update',
+		cancelLabel: 'Cancel',
+		onSubmit: (values) => {
+			vscode.postMessage({
+				command: 'confirmEditImage',
+				data: {
+					imageId,
+					name: values.name,
+					imageType: parseInt(values.imageType, 10),
+					entityAlias: values.entityAlias,
+					attributes: values.attributes || undefined
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Handle adding a new node to the tree (delta update).
+ * @param {Object} data - { parentId, node }
+ */
+function handleAddNode(data) {
+	const { parentId, node } = data;
+	if (!parentId || !node || !node.id) return;
+
+	// Find parent node in tree and add child
+	function addToParent(items) {
+		for (const item of items) {
+			if (item.id === parentId) {
+				if (!item.children) {
+					item.children = [];
+				}
+				item.children.push(node);
+				return true;
+			}
+			if (item.children && addToParent(item.children)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	addToParent(treeData);
+	renderTree();
+
+	// Re-apply filter if active
+	if (currentFilter) {
+		filterTree(currentFilter);
+	}
+
+	// Expand parent and scroll to new node
+	expandedNodes.add(parentId);
+	scrollNodeIntoView(node.id);
 }

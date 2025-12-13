@@ -622,6 +622,108 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	);
 
+	const unregisterPluginStepCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.unregisterPluginStep',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const stepId = contextMenuContext?.nodeId;
+			if (!stepId) {
+				vscode.window.showWarningMessage('No step selected.');
+				return;
+			}
+			await panel.unregisterStep(stepId);
+		}
+	);
+
+	const unregisterStepImageCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.unregisterStepImage',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const imageId = contextMenuContext?.nodeId;
+			if (!imageId) {
+				vscode.window.showWarningMessage('No image selected.');
+				return;
+			}
+			await panel.unregisterImage(imageId);
+		}
+	);
+
+	const registerPluginStepCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.registerPluginStep',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const pluginTypeId = contextMenuContext?.nodeId;
+			if (!pluginTypeId) {
+				vscode.window.showWarningMessage('No plugin type selected.');
+				return;
+			}
+			await panel.registerStep(pluginTypeId);
+		}
+	);
+
+	const editPluginStepCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.editPluginStep',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const stepId = contextMenuContext?.nodeId;
+			if (!stepId) {
+				vscode.window.showWarningMessage('No step selected.');
+				return;
+			}
+			await panel.editStep(stepId);
+		}
+	);
+
+	const registerStepImageCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.registerStepImage',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const stepId = contextMenuContext?.nodeId;
+			if (!stepId) {
+				vscode.window.showWarningMessage('No step selected.');
+				return;
+			}
+			await panel.registerImage(stepId);
+		}
+	);
+
+	const editStepImageCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.editStepImage',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const imageId = contextMenuContext?.nodeId;
+			if (!imageId) {
+				vscode.window.showWarningMessage('No image selected.');
+				return;
+			}
+			await panel.editImage(imageId);
+		}
+	);
+
 	const metadataBrowserCommand = vscode.commands.registerCommand('power-platform-dev-suite.metadataBrowser', async (environmentItem?: { envId: string }) => {
 		try {
 			void initializeMetadataBrowser(context, factories.getEnvironments, factories.dataverseApiServiceFactory, container.environmentRepository, container.logger, environmentItem?.envId);
@@ -791,6 +893,12 @@ export function activate(context: vscode.ExtensionContext): void {
 		updatePluginPackageCommand,
 		unregisterPluginAssemblyCommand,
 		unregisterPluginPackageCommand,
+		unregisterPluginStepCommand,
+		unregisterStepImageCommand,
+		registerPluginStepCommand,
+		editPluginStepCommand,
+		registerStepImageCommand,
+		editStepImageCommand,
 		metadataBrowserCommand,
 		metadataBrowserPickEnvironmentCommand,
 		dataExplorerCommand,

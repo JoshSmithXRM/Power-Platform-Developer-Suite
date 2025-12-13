@@ -1,6 +1,10 @@
 import type { IDataverseApiService } from '../../../../shared/infrastructure/interfaces/IDataverseApiService';
 import type { ILogger } from '../../../../infrastructure/logging/ILogger';
-import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
+import type {
+	IPluginStepRepository,
+	RegisterStepInput,
+	UpdateStepInput,
+} from '../../domain/interfaces/IPluginStepRepository';
 import { PluginStep } from '../../domain/entities/PluginStep';
 import { ExecutionMode } from '../../domain/valueObjects/ExecutionMode';
 import { ExecutionStage } from '../../domain/valueObjects/ExecutionStage';
@@ -205,6 +209,117 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 		await this.apiService.patch(environmentId, endpoint, { statecode: 1 });
 
 		this.logger.debug('DataversePluginStepRepository: Step disabled', { stepId });
+	}
+
+	public async delete(environmentId: string, stepId: string): Promise<void> {
+		this.logger.debug('DataversePluginStepRepository: Deleting step', {
+			environmentId,
+			stepId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}(${stepId})`;
+
+		await this.apiService.delete(environmentId, endpoint);
+
+		this.logger.debug('DataversePluginStepRepository: Step deleted', { stepId });
+	}
+
+	public async register(environmentId: string, input: RegisterStepInput): Promise<string> {
+		this.logger.debug('DataversePluginStepRepository: Registering step', {
+			environmentId,
+			name: input.name,
+			sdkMessageId: input.sdkMessageId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}`;
+
+		// Build payload with required fields
+		const payload: Record<string, unknown> = {
+			name: input.name,
+			'sdkmessageid@odata.bind': `/sdkmessages(${input.sdkMessageId})`,
+			'plugintypeid@odata.bind': `/plugintypes(${input.pluginTypeId})`,
+			stage: input.stage,
+			mode: input.mode,
+			rank: input.rank,
+			// Steps are enabled by default
+			statecode: 0,
+			statuscode: 1,
+		};
+
+		// Add optional fields
+		if (input.primaryEntityLogicalName) {
+			// Need to find the sdkmessagefilter for this message+entity combination
+			// For now, we'll let the caller provide the filter ID if they have it
+			// TODO: Add sdkmessagefilterid lookup
+		}
+
+		if (input.filteringAttributes) {
+			payload['filteringattributes'] = input.filteringAttributes;
+		}
+
+		if (input.description) {
+			payload['description'] = input.description;
+		}
+
+		interface CreateResponse {
+			sdkmessageprocessingstepid: string;
+		}
+
+		const response = await this.apiService.post<CreateResponse>(
+			environmentId,
+			endpoint,
+			payload
+		);
+
+		this.logger.debug('DataversePluginStepRepository: Step registered', {
+			stepId: response.sdkmessageprocessingstepid,
+		});
+
+		return response.sdkmessageprocessingstepid;
+	}
+
+	public async update(
+		environmentId: string,
+		stepId: string,
+		input: UpdateStepInput
+	): Promise<void> {
+		this.logger.debug('DataversePluginStepRepository: Updating step', {
+			environmentId,
+			stepId,
+		});
+
+		const endpoint = `/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}(${stepId})`;
+
+		// Build payload with only provided fields
+		const payload: Record<string, unknown> = {};
+
+		if (input.name !== undefined) {
+			payload['name'] = input.name;
+		}
+
+		if (input.stage !== undefined) {
+			payload['stage'] = input.stage;
+		}
+
+		if (input.mode !== undefined) {
+			payload['mode'] = input.mode;
+		}
+
+		if (input.rank !== undefined) {
+			payload['rank'] = input.rank;
+		}
+
+		if (input.filteringAttributes !== undefined) {
+			payload['filteringattributes'] = input.filteringAttributes || null;
+		}
+
+		if (input.description !== undefined) {
+			payload['description'] = input.description || null;
+		}
+
+		await this.apiService.patch(environmentId, endpoint, payload);
+
+		this.logger.debug('DataversePluginStepRepository: Step updated', { stepId });
 	}
 
 	private mapToDomain(dto: PluginStepDto): PluginStep {

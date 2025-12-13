@@ -86,4 +86,5 @@ export interface ImageMetadata {
 	readonly entityAlias: string;
 	readonly attributes: string[];
 	readonly createdOn: string;
+	readonly canDelete: boolean;
 }
