@@ -951,6 +951,9 @@ window.createBehavior({
 			case 'showRegisterPackageModal':
 				handleShowRegisterPackageModal(message.data);
 				break;
+			case 'showRegisterAssemblyModal':
+				handleShowRegisterAssemblyModal(message.data);
+				break;
 		}
 	}
 });
@@ -1047,6 +1050,87 @@ function handleShowRegisterPackageModal(data) {
 					name: values.name,
 					version: values.version,
 					prefix: values.prefix
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Register Assembly modal with pre-filled metadata.
+ * @param {Object} data - { name, filename, solutions }
+ */
+function handleShowRegisterAssemblyModal(data) {
+	const { name, filename, solutions } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build solution options for dropdown - solution is OPTIONAL for assemblies (unlike packages)
+	const solutionOptions = [
+		{ value: '', label: 'None (do not add to solution)', uniqueName: '' },
+		...(solutions || []).map(s => ({
+			value: s.id,
+			label: s.name,
+			uniqueName: s.uniqueName
+		}))
+	];
+
+	// Store solution unique names for lookup
+	const solutionUniqueNameMap = {};
+	(solutions || []).forEach(s => {
+		solutionUniqueNameMap[s.id] = s.uniqueName;
+	});
+
+	window.showFormModal({
+		title: 'Register Plugin Assembly',
+		fields: [
+			{
+				id: 'filename',
+				label: 'File',
+				type: 'text',
+				value: filename || '',
+				readonly: true
+			},
+			{
+				id: 'name',
+				label: 'Assembly Name',
+				type: 'text',
+				value: name || '',
+				required: true,
+				placeholder: 'e.g., PPDSDemo.Plugins'
+			},
+			{
+				id: 'solution',
+				label: 'Add to Solution (Optional)',
+				type: 'select',
+				value: '', // None by default
+				options: solutionOptions,
+				required: false
+			},
+			{
+				id: 'info',
+				label: '',
+				type: 'info',
+				value: 'Plugin types will be discovered automatically after registration.'
+			}
+		],
+		submitLabel: 'Register',
+		cancelLabel: 'Cancel',
+		onSubmit: (values) => {
+			// Look up solution unique name if a solution was selected
+			const solutionUniqueName = values.solution
+				? solutionUniqueNameMap[values.solution]
+				: undefined;
+
+			// Send confirmation to extension
+			vscode.postMessage({
+				command: 'confirmRegisterAssembly',
+				data: {
+					name: values.name,
+					solutionUniqueName
 				}
 			});
 		}

@@ -67,6 +67,9 @@ export async function initializePluginRegistration(
 	const { RegisterPluginPackageUseCase } = await import(
 		'../../application/useCases/RegisterPluginPackageUseCase.js'
 	);
+	const { RegisterPluginAssemblyUseCase } = await import(
+		'../../application/useCases/RegisterPluginAssemblyUseCase.js'
+	);
 	const { PluginRegistrationPanelComposed } = await import(
 		'../panels/PluginRegistrationPanelComposed.js'
 	);
@@ -99,6 +102,7 @@ export async function initializePluginRegistration(
 	const updateAssemblyUseCase = new UpdatePluginAssemblyUseCase(assemblyRepository, logger);
 	const updatePackageUseCase = new UpdatePluginPackageUseCase(packageRepository, logger);
 	const registerPackageUseCase = new RegisterPluginPackageUseCase(packageRepository, logger);
+	const registerAssemblyUseCase = new RegisterPluginAssemblyUseCase(assemblyRepository, logger);
 
 	// Bundle use cases and repositories for cleaner panel constructor
 	const useCases = {
@@ -108,6 +112,7 @@ export async function initializePluginRegistration(
 		updateAssembly: updateAssemblyUseCase,
 		updatePackage: updatePackageUseCase,
 		registerPackage: registerPackageUseCase,
+		registerAssembly: registerAssemblyUseCase,
 	};
 
 	const repositories = {

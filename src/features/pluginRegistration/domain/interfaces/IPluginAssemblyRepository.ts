@@ -38,4 +38,23 @@ export interface IPluginAssemblyRepository {
 	 * @param base64Content - Base64-encoded DLL bytes
 	 */
 	updateContent(environmentId: string, assemblyId: string, base64Content: string): Promise<void>;
+
+	/**
+	 * Register a new plugin assembly.
+	 *
+	 * Cloud-only: Uses fixed values sourcetype=0 (Database), isolationmode=2 (Sandbox).
+	 * Dataverse auto-discovers IPlugin/CodeActivity classes after upload.
+	 *
+	 * @param environmentId - Target environment
+	 * @param name - Assembly name (NO prefix, e.g., "PPDSDemo.Plugins")
+	 * @param base64Content - Base64-encoded DLL bytes
+	 * @param solutionUniqueName - Optional solution to add assembly to
+	 * @returns ID of the created assembly
+	 */
+	register(
+		environmentId: string,
+		name: string,
+		base64Content: string,
+		solutionUniqueName?: string
+	): Promise<string>;
 }

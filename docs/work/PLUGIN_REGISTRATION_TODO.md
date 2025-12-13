@@ -483,27 +483,37 @@ After Expand All:
 - Dataverse POST returns 204 No Content by default - need `Prefer: return=representation` header
 - Analyzed Plugin Registration Tool source code (`PackageRegistrationForm.cs`) for correct field values
 
-#### Register New Assembly - NEXT UP
-- [ ] Register dropdown → "New Assembly..." already wired up
-- [ ] File picker for .dll files
-- [ ] Modal with:
+#### Register New Assembly - IN PROGRESS 🔄
+- [x] Register dropdown → "New Assembly..." already wired up
+- [x] File picker for .dll files
+- [x] Modal with:
   - Assembly name (extracted from filename, e.g., "PPDSDemo.Plugins")
   - Solution selector (optional - can register without adding to solution)
-  - Info text about automatic plugin type discovery
-- [ ] API: POST pluginassemblies with:
+- [x] API: POST pluginassemblies with:
   - `name`: Assembly name (NO prefix, unlike packages)
   - `content`: Base64 DLL bytes
   - `sourcetype`: 0 (Database) - only valid for cloud Dataverse
   - `isolationmode`: 2 (Sandbox) - only valid for cloud Dataverse
-- [ ] Dataverse auto-discovers plugin types and creates plugintype records
-- [ ] Refresh tree after successful registration
+- [x] Refresh tree after successful registration
+- [ ] **Plugin Type Registration** - BLOCKED (see below)
+
+**Critical Finding:** Dataverse does NOT auto-discover plugin types. PRT uses .NET reflection to analyze the DLL and explicitly registers each `plugintype` record. Without plugin types, assemblies are useless (can't register steps).
+
+**Solution: .NET Reflection Tool**
+We need to build a .NET tool that:
+1. Uses Mono.Cecil to inspect the DLL (metadata-only, no dependency loading)
+2. Finds all types implementing `Microsoft.Xrm.Sdk.IPlugin`
+3. Returns type names as JSON
+4. Gets bundled with the VS Code extension
+5. Extension invokes it when user selects a DLL
+
+See: `#### .NET Plugin Inspector Tool` section below for design.
 
 **Design Decisions for Assembly Registration:**
-1. **No plugin type selection (v1):** PRT uses .NET reflection to analyze DLL - not possible in TypeScript. Dataverse auto-discovers all IPlugin/CodeActivity classes after upload.
-2. **No isolation mode selector:** Only Sandbox (2) is valid for cloud Dataverse. (Microsoft docs: "Dataverse is not available for on-premises deployments, so you will always accept the default options of SandBox and Database")
-3. **No storage location selector:** Only Database (0) is valid for cloud Dataverse. Disk/GAC are on-prem only.
-4. **No prefix on name:** Unlike packages, assemblies use just the assembly name (e.g., "PPDSDemo.Plugins")
-5. **Solution optional:** Can register without adding to solution, matching PRT behavior.
+1. **No isolation mode selector:** Only Sandbox (2) is valid for cloud Dataverse. (Microsoft docs: "Dataverse is not available for on-premises deployments, so you will always accept the default options of SandBox and Database")
+2. **No storage location selector:** Only Database (0) is valid for cloud Dataverse. Disk/GAC are on-prem only.
+3. **No prefix on name:** Unlike packages, assemblies use just the assembly name (e.g., "PPDSDemo.Plugins")
+4. **Solution optional:** Can register without adding to solution, matching PRT behavior.
 
 #### Register New Step
 - [ ] Right-click plugin type → "Register New Step..."
@@ -541,13 +551,52 @@ After Expand All:
 - [ ] Right-click image → "Delete Image" (with confirmation)
 - [ ] Appropriate refresh after deletion
 
+#### .NET Plugin Inspector Tool - TODO
+A .NET console application bundled with the extension to analyze plugin DLLs.
+
+**Why needed:**
+- TypeScript cannot do .NET reflection
+- Dataverse does NOT auto-discover plugin types
+- Plugin devs should not manually type 50+ class names
+- PRT uses reflection - we need parity
+
+**Requirements:**
+- [ ] .NET 6+ console application (cross-platform)
+- [ ] Uses Mono.Cecil for metadata-only inspection (no dependency loading)
+- [ ] Input: DLL file path
+- [ ] Output: JSON with discovered types
+- [ ] Detects: IPlugin implementations, CodeActivity implementations
+- [ ] Returns: typename, friendlyname, isworkflowactivity flag
+
+**Output format:**
+```json
+{
+  "assemblyName": "PPDSDemo.Plugins",
+  "types": [
+    { "typeName": "PPDSDemo.Plugins.PreAccountCreate", "isWorkflowActivity": false },
+    { "typeName": "PPDSDemo.Plugins.PostContactUpdate", "isWorkflowActivity": false }
+  ]
+}
+```
+
+**Project structure:** TBD (see Session 10 design notes)
+
+**Integration with extension:**
+- [ ] Bundle compiled DLL with extension (in `resources/tools/` or similar)
+- [ ] Extension invokes: `dotnet <tool.dll> <plugin.dll>`
+- [ ] Parse JSON output
+- [ ] Populate type selection UI in registration modal
+- [ ] Register selected types as `plugintype` records
+
 ### Implementation Order (Updated)
 1. ✅ Register Package - COMPLETE
-2. **Register Assembly** - NEXT (simpler than package - no prefix, fixed isolation/source)
-3. Register Step (complex form, needs SDK message/entity lookups)
-4. Register Image (moderate complexity)
-5. Edit Step (reuses Register Step form)
-6. Delete operations (confirmation dialogs)
+2. 🔄 Register Assembly - IN PROGRESS (blocked on Plugin Inspector Tool)
+3. **Plugin Inspector Tool** - NEXT (unblocks assembly registration)
+4. Register Plugin Types (after tool complete)
+5. Register Step (complex form, needs SDK message/entity lookups)
+6. Register Image (moderate complexity)
+7. Edit Step (reuses Register Step form)
+8. Delete operations (confirmation dialogs)
 
 ### Session 9 (2025-12-12)
 **Register Plugin Package - COMPLETE**
@@ -599,6 +648,74 @@ pluginPackage = new Entity("pluginpackage") {
 - Simpler than package (no prefix, fixed isolation mode)
 - Solution optional (can register without)
 - Dataverse auto-discovers plugin types
+
+### Session 10 (2025-12-12)
+**Register Plugin Assembly - PARTIAL (Assembly uploads, but types not registered)**
+
+**Implemented:**
+- RegisterPluginAssemblyUseCase (orchestrates assembly registration)
+- IPluginAssemblyRepository.register() method
+- DataversePluginAssemblyRepository.register() with cloud-only fixed values
+- handleRegisterAssembly() in panel (file picker → modal flow)
+- handleConfirmRegisterAssembly() to call use case
+- showRegisterAssemblyModal handler in plugin-registration.js
+- FormModal 'info' field type for displaying helper text
+- Fixed FormModal validation bug (info fields were breaking submit)
+
+**Key Differences from Package Registration:**
+- NO prefix on assembly name (just "PPDSDemo.Plugins", unlike "et_PPDSDemo.PluginPackage")
+- Solution is OPTIONAL (user can select "None" to register without solution)
+- Fixed values for cloud: sourcetype=0 (Database), isolationmode=2 (Sandbox)
+- Uses solutionUniqueName query parameter for solution association
+
+**API Details:**
+```
+POST /api/data/v9.2/pluginassemblies?solutionUniqueName=MySolution
+{
+  "name": "PPDSDemo.Plugins",
+  "content": "<base64 DLL>",
+  "sourcetype": 0,
+  "isolationmode": 2
+}
+```
+
+**Critical Discovery:**
+After successful F5 test, discovered that Dataverse does NOT auto-discover plugin types.
+- Assembly registered successfully: "PPDSDemo.Plugins registered successfully in Demo - DEV"
+- But ZERO plugin types were created
+- This matches PRT behavior: PRT uses .NET reflection to find IPlugin types, then explicitly registers each
+
+**Analysis of Options:**
+1. Manual type entry - Rejected (50+ types is unacceptable UX)
+2. Pure TypeScript parsing of .NET metadata - No mature libraries exist, 3-5 days work
+3. .NET reflection tool bundled with extension - **SELECTED** (1.5-2 days, reliable)
+
+**Decision: Build .NET Plugin Inspector Tool**
+- Uses Mono.Cecil for metadata-only inspection
+- Cross-platform .NET 6+
+- Bundled with VS Code extension
+- Extension invokes when user selects DLL
+- Returns JSON with discovered types
+- See design section above
+
+**Files Created:**
+- `src/features/pluginRegistration/application/useCases/RegisterPluginAssemblyUseCase.ts`
+
+**Files Modified:**
+- `IPluginAssemblyRepository.ts` - Added `register()` interface
+- `DataversePluginAssemblyRepository.ts` - Implemented `register()`
+- `PluginRegistrationPanelComposed.ts` - Added assembly registration handlers
+- `initializePluginRegistration.ts` - Wired up RegisterPluginAssemblyUseCase
+- `plugin-registration.js` - Added showRegisterAssemblyModal handler
+- `FormModal.js` - Added 'info' field type support, fixed validation bug
+- `form-modal.css` - Added .form-modal-info styling
+- `ListSolutionsUseCase.test.ts` - Fixed mock for new interface method
+
+**Next Steps:**
+1. Commit current changes
+2. Design .NET tool project structure and extension integration
+3. Implement Plugin Inspector Tool
+4. Integrate with assembly registration flow
 
 ---
 
