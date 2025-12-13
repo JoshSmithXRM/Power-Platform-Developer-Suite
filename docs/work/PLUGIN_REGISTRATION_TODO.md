@@ -1061,9 +1061,118 @@ payload['workflowactivitygroupname'] =
 ### REMAINING - MVP
 | Feature | Complexity | Notes |
 |---------|------------|-------|
-| Detail panel | MEDIUM | Show metadata when node selected |
-| Selected item indicator | LOW | Visual highlight for selected tree node |
+| **Solution selector for steps** | LOW | Add step to solution on registration (like assemblies) |
+| **Detail panel** | MEDIUM | Show metadata when node selected |
 | Unit tests | HIGH | Domain + application layer (required before PR) |
+
+---
+
+## Implementation Plan: Solution Selector for Steps
+
+**Pattern:** Same as packages/assemblies - established pattern.
+
+**Changes:**
+1. **Webview** (`plugin-registration.js`):
+   - Add solution dropdown to Register Step form (after Description section)
+   - Load solutions same way as assembly registration
+   - Include `solutionUniqueName` in `confirmRegisterStep` message data
+
+2. **Panel** (`PluginRegistrationPanelComposed.ts`):
+   - Pass solutions list to `showRegisterStepModal` message
+   - Extract `solutionUniqueName` from `confirmRegisterStep` handler
+   - Pass to use case
+
+3. **Use Case** (`RegisterPluginStepUseCase.ts`):
+   - Add `solutionUniqueName?: string` to input interface
+   - Pass to repository
+
+4. **Repository Interface** (`IPluginStepRepository.ts`):
+   - Add `solutionUniqueName?: string` param to `register()` method
+
+5. **Repository Impl** (`DataversePluginStepRepository.ts`):
+   - Add `MSCRM.SolutionUniqueName` header to POST (same as packages/assemblies)
+
+**Effort:** ~30 minutes
+
+---
+
+## Implementation Plan: Detail Panel
+
+**Design:** Collapsible panel below tree (like PRT) showing metadata for selected node.
+
+### UI Layout
+```
+┌─────────────────────────────────────────┐
+│ [Refresh] [Expand All] [Collapse All]   │
+│ [Register ▼] [☐ Hide Microsoft] [☐ Hide]│
+│ ┌─────────────────────────────────────┐ │
+│ │ 🔍 Filter...                        │ │
+│ ├─────────────────────────────────────┤ │
+│ │ 📦 MyPackage                        │ │
+│ │   📚 MyAssembly ← SELECTED          │ │
+│ │     🔌 MyPlugin                     │ │
+│ │       ⚡ Create of account          │ │
+│ └─────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────┐ │
+│ │ ▼ Details                           │ │
+│ ├─────────────────────────────────────┤ │
+│ │ Name:        MyAssembly             │ │
+│ │ Version:     1.0.0.0                │ │
+│ │ Isolation:   Sandbox                │ │
+│ │ Source:      Database               │ │
+│ │ Managed:     No                     │ │
+│ │ Plugins:     3                      │ │
+│ └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+```
+
+### Changes Required
+
+1. **HTML** (`PluginRegistrationTreeSection.ts`):
+   - Add detail panel container after tree container
+   - Collapsible with header "Details"
+
+2. **CSS** (`plugin-registration.css`):
+   - `.tree-node--selected` - highlight for selected node
+   - `.detail-panel` - container styles
+   - `.detail-panel-header` - collapsible header
+   - `.detail-panel-content` - key-value grid
+   - `.detail-row`, `.detail-label`, `.detail-value`
+
+3. **JS** (`plugin-registration.js`):
+   - Track `selectedNodeId` state
+   - On node click: add selected class, post `nodeSelected` message
+   - Handle `showNodeDetails` message: render detail panel content
+   - `renderDetailPanel(nodeType, details)` function
+   - Detail templates for each node type
+
+4. **Panel** (`PluginRegistrationPanelComposed.ts`):
+   - Register `nodeSelected` handler
+   - Fetch full entity from appropriate repository based on node type
+   - Map to detail ViewModel
+   - Send `showNodeDetails` message with formatted data
+
+### Detail Fields by Node Type
+
+**Package:**
+- Name, Unique Name, Version, Publisher Prefix, Managed, Created On, Modified On
+
+**Assembly:**
+- Name, Version, Isolation Mode, Source Type, Managed, Plugin Count, Created On
+
+**Plugin Type:**
+- Full Type Name, Friendly Name, Is Workflow Activity, Assembly Name
+
+**Step:**
+- Name, Message, Primary Entity, Secondary Entity, Stage, Mode, Rank
+- Deployment, Async Auto Delete, Filtering Attributes
+- Unsecure Configuration (truncated), Has Secure Configuration (yes/no)
+- Enabled, Managed, Created On
+
+**Image:**
+- Name, Image Type, Entity Alias, Message Property, Attributes
+
+**Effort:** ~2-3 hours
 
 ### UX POLISH - CORE COMPLETE ✅
 | Feature | Status | Notes |
@@ -1081,9 +1190,9 @@ payload['workflowactivitygroupname'] =
 |---------|----------|-------|
 | Filtering Attributes picker | MEDIUM | Searchable checkbox dialog, sorted by logical name |
 | Solution selector for steps | MEDIUM | Add step to solution (like assemblies) |
-| AsyncAutoDelete conditional | LOW | Only show for Asynchronous mode |
+| ~~AsyncAutoDelete conditional~~ | ~~LOW~~ | ✅ DONE (Session 18) - Only shows for Async mode |
 | Description field | LOW | Separate from name, both auto-generate independently |
-| Image messagepropertyname | MEDIUM | Auto-set for single, dropdown for multi (Merge) |
+| ~~Image messagepropertyname~~ | ~~MEDIUM~~ | ✅ DONE (Session 18) - Auto-set based on message |
 | Image Attributes picker | MEDIUM | Same searchable checkbox dialog as Filtering Attributes |
 
 ### DEFERRED - Post-MVP
@@ -1117,10 +1226,10 @@ payload['workflowactivitygroupname'] =
 - ✅ **Step form behavior:**
   - ✅ Auto-expand plugin type after adding step
   - ✅ Async mode → force PostOperation
-  - ⬜ Hide/disable "Delete AsyncOperation" when mode is Synchronous (deferred)
-- ⬜ **Image form UX polish (deferred):**
-  - ⬜ Auto-set messagepropertyname (dropdown for multi-property messages like Merge)
-  - ⬜ Attributes picker (same searchable checkbox dialog as Filtering Attributes)
+  - ✅ Hide "Delete AsyncOperation" when mode is Synchronous (Session 18)
+- ✅ **Image form UX polish:**
+  - ✅ Auto-set messagepropertyname (Session 18) - hidden from user
+  - ⬜ Attributes picker (deferred - searchable checkbox dialog)
 - ⬜ Detail panel (show metadata when node selected)
 - ⬜ Unit tests (required before PR)
 
@@ -1446,6 +1555,54 @@ Dataverse requires the actual unique name string, not the ID.
 | Register Image | ⏳ NEEDS TESTING | |
 | Edit Image | ⏳ NEEDS TESTING | |
 | Unregister Image | ⏳ NEEDS TESTING | |
+
+### Session 18 (2025-12-13)
+**UX Polish & Bug Fixes - COMPLETE**
+
+**Fixes Implemented:**
+1. **Combobox highlight styling** - Was using background color as text color (unreadable)
+   - Fixed `filterable-combobox.css` to use proper background highlight only
+
+2. **AsyncAutoDelete checkbox placement** - Now only shows for async mode
+   - Moved field right after Mode selector
+   - Added `hidden` property support to FormModal fields
+   - Added 4th param to `updateField()` for visibility toggling
+   - Checkbox auto-shows when mode=Async, auto-hides when mode=Sync
+
+3. **Step name auto-generation** - Was inconsistent
+   - Fixed `userEditedName` flag to reset when user clears field
+   - Stored `generateStepName` in `activeStepModal` for async access
+   - Name now regenerates after async entity loading
+
+4. **Escape key dirty check** - Modal now warns if unsaved changes
+   - Added `initialValues` tracking for all field types
+   - Added `isDirty()` function to check for changes
+   - Escape/overlay click shows confirm dialog if dirty
+
+5. **Register dropdown wiring** - Steps and Images now work from dropdown
+   - Added `handleRegisterStepFromDropdown()` - shows quick pick of plugin types
+   - Added `handleRegisterImageFromDropdown()` - shows quick pick of steps
+   - Both use VS Code native quick pick for selection
+
+6. **Validation feedback** - Register step now shows which fields are missing
+   - Added explicit validation with `missingFields` array
+   - Shows error message: "Cannot register step: Missing required fields: X, Y, Z"
+
+7. **Notification messages** - Now include parent context
+   - Step: `Step "MyStep" registered for MyPluginType in Dev Environment.`
+   - Image: `Image "PreImage" registered for MyStep in Dev Environment.`
+
+8. **Message Property field hidden** - Auto-determined like PRT
+   - Removed from both Register and Edit Image forms
+   - Uses `getImagePropertyNamesForMessage()` to auto-select first/primary option
+
+**Files Modified:**
+- `resources/webview/css/components/filterable-combobox.css` - Fixed highlight styling
+- `resources/webview/js/components/FormModal.js` - Added visibility toggle, dirty tracking
+- `resources/webview/js/features/plugin-registration.js` - Multiple UX fixes
+- `src/.../presentation/panels/PluginRegistrationPanelComposed.ts` - Dropdown handlers, validation
+
+---
 
 ### Technical Considerations
 
