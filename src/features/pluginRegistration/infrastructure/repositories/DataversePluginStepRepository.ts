@@ -229,6 +229,7 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			environmentId,
 			name: input.name,
 			sdkMessageId: input.sdkMessageId,
+			sdkMessageFilterId: input.sdkMessageFilterId,
 		});
 
 		const endpoint = `/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}`;
@@ -241,24 +242,33 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			stage: input.stage,
 			mode: input.mode,
 			rank: input.rank,
+			supporteddeployment: input.supportedDeployment,
+			asyncautodelete: input.asyncAutoDelete,
 			// Steps are enabled by default
 			statecode: 0,
 			statuscode: 1,
 		};
 
-		// Add optional fields
-		if (input.primaryEntityLogicalName) {
-			// Need to find the sdkmessagefilter for this message+entity combination
-			// For now, we'll let the caller provide the filter ID if they have it
-			// TODO: Add sdkmessagefilterid lookup
+		// Add message filter (links message to entity)
+		if (input.sdkMessageFilterId) {
+			payload['sdkmessagefilterid@odata.bind'] = `/sdkmessagefilters(${input.sdkMessageFilterId})`;
 		}
 
+		// Add optional fields
 		if (input.filteringAttributes) {
 			payload['filteringattributes'] = input.filteringAttributes;
 		}
 
 		if (input.description) {
 			payload['description'] = input.description;
+		}
+
+		if (input.unsecureConfiguration) {
+			payload['configuration'] = input.unsecureConfiguration;
+		}
+
+		if (input.impersonatingUserId) {
+			payload['impersonatinguserid@odata.bind'] = `/systemusers(${input.impersonatingUserId})`;
 		}
 
 		interface CreateResponse {
@@ -271,11 +281,57 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			payload
 		);
 
+		const stepId = response.sdkmessageprocessingstepid;
+
+		// Handle secure configuration - stored in separate entity
+		if (input.secureConfiguration) {
+			await this.createSecureConfig(environmentId, stepId, input.secureConfiguration);
+		}
+
 		this.logger.debug('DataversePluginStepRepository: Step registered', {
-			stepId: response.sdkmessageprocessingstepid,
+			stepId,
 		});
 
-		return response.sdkmessageprocessingstepid;
+		return stepId;
+	}
+
+	/**
+	 * Creates a secure configuration record and links it to the step.
+	 */
+	private async createSecureConfig(
+		environmentId: string,
+		stepId: string,
+		secureConfig: string
+	): Promise<void> {
+		this.logger.debug('DataversePluginStepRepository: Creating secure config', { stepId });
+
+		// Create the secure config entity
+		const secureConfigEndpoint = '/api/data/v9.2/sdkmessageprocessingstepsecureconfigs';
+		const secureConfigPayload = {
+			secureconfig: secureConfig,
+		};
+
+		interface SecureConfigResponse {
+			sdkmessageprocessingstepsecureconfigid: string;
+		}
+
+		const secureConfigResponse = await this.apiService.post<SecureConfigResponse>(
+			environmentId,
+			secureConfigEndpoint,
+			secureConfigPayload
+		);
+
+		// Link it to the step
+		const stepEndpoint = `/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}(${stepId})`;
+		await this.apiService.patch(environmentId, stepEndpoint, {
+			'sdkmessageprocessingstepsecureconfigid@odata.bind':
+				`/sdkmessageprocessingstepsecureconfigs(${secureConfigResponse.sdkmessageprocessingstepsecureconfigid})`,
+		});
+
+		this.logger.debug('DataversePluginStepRepository: Secure config linked', {
+			stepId,
+			secureConfigId: secureConfigResponse.sdkmessageprocessingstepsecureconfigid,
+		});
 	}
 
 	public async update(
@@ -309,8 +365,29 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			payload['rank'] = input.rank;
 		}
 
+		if (input.supportedDeployment !== undefined) {
+			payload['supporteddeployment'] = input.supportedDeployment;
+		}
+
 		if (input.filteringAttributes !== undefined) {
 			payload['filteringattributes'] = input.filteringAttributes || null;
+		}
+
+		if (input.asyncAutoDelete !== undefined) {
+			payload['asyncautodelete'] = input.asyncAutoDelete;
+		}
+
+		if (input.unsecureConfiguration !== undefined) {
+			payload['configuration'] = input.unsecureConfiguration || null;
+		}
+
+		if (input.impersonatingUserId !== undefined) {
+			if (input.impersonatingUserId) {
+				payload['impersonatinguserid@odata.bind'] = `/systemusers(${input.impersonatingUserId})`;
+			} else {
+				// Clear impersonation (use calling user)
+				payload['impersonatinguserid'] = null;
+			}
 		}
 
 		if (input.description !== undefined) {
@@ -319,7 +396,62 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 
 		await this.apiService.patch(environmentId, endpoint, payload);
 
+		// Handle secure configuration update
+		// Note: This is more complex - need to either update existing or create new
+		// For now, we'll update if provided
+		if (input.secureConfiguration !== undefined) {
+			await this.updateSecureConfig(environmentId, stepId, input.secureConfiguration);
+		}
+
 		this.logger.debug('DataversePluginStepRepository: Step updated', { stepId });
+	}
+
+	/**
+	 * Updates or creates secure configuration for a step.
+	 */
+	private async updateSecureConfig(
+		environmentId: string,
+		stepId: string,
+		secureConfig: string | null
+	): Promise<void> {
+		// First, get the step to see if it has existing secure config
+		const stepEndpoint = `/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}(${stepId})?$select=_sdkmessageprocessingstepsecureconfigid_value`;
+
+		interface StepSecureConfigResponse {
+			_sdkmessageprocessingstepsecureconfigid_value: string | null;
+		}
+
+		const step = await this.apiService.get<StepSecureConfigResponse>(environmentId, stepEndpoint);
+		const existingConfigId = step._sdkmessageprocessingstepsecureconfigid_value;
+
+		if (!secureConfig) {
+			// Clear secure config
+			if (existingConfigId) {
+				// Unlink and delete
+				await this.apiService.patch(
+					environmentId,
+					`/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}(${stepId})`,
+					{ sdkmessageprocessingstepsecureconfigid: null }
+				);
+				await this.apiService.delete(
+					environmentId,
+					`/api/data/v9.2/sdkmessageprocessingstepsecureconfigs(${existingConfigId})`
+				);
+			}
+			return;
+		}
+
+		if (existingConfigId) {
+			// Update existing
+			await this.apiService.patch(
+				environmentId,
+				`/api/data/v9.2/sdkmessageprocessingstepsecureconfigs(${existingConfigId})`,
+				{ secureconfig: secureConfig }
+			);
+		} else {
+			// Create new
+			await this.createSecureConfig(environmentId, stepId, secureConfig);
+		}
 	}
 
 	private mapToDomain(dto: PluginStepDto): PluginStep {

@@ -41,6 +41,7 @@ import type { UpdatePluginStepUseCase } from '../../application/useCases/UpdateP
 import type { RegisterStepImageUseCase } from '../../application/useCases/RegisterStepImageUseCase';
 import type { UpdateStepImageUseCase } from '../../application/useCases/UpdateStepImageUseCase';
 import type { ISdkMessageRepository } from '../../domain/interfaces/ISdkMessageRepository';
+import type { ISdkMessageFilterRepository } from '../../domain/interfaces/ISdkMessageFilterRepository';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
 import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
 import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
@@ -90,6 +91,7 @@ export interface PluginRegistrationRepositories {
 	readonly image: IStepImageRepository;
 	readonly solution: ISolutionRepository;
 	readonly sdkMessage: ISdkMessageRepository;
+	readonly sdkMessageFilter: ISdkMessageFilterRepository;
 }
 
 /**
@@ -566,11 +568,19 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			const stepData = data as {
 				pluginTypeId?: string;
 				sdkMessageId?: string;
+				sdkMessageFilterId?: string;
+				primaryEntity?: string; // For filter lookup
 				name?: string;
 				stage?: number;
 				mode?: number;
 				rank?: number;
+				supportedDeployment?: number;
 				filteringAttributes?: string;
+				asyncAutoDelete?: boolean;
+				unsecureConfiguration?: string;
+				secureConfiguration?: string;
+				impersonatingUserId?: string;
+				description?: string;
 			};
 			if (
 				stepData.pluginTypeId &&
@@ -578,16 +588,26 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				stepData.name &&
 				stepData.stage !== undefined &&
 				stepData.mode !== undefined &&
-				stepData.rank !== undefined
+				stepData.rank !== undefined &&
+				stepData.supportedDeployment !== undefined &&
+				stepData.asyncAutoDelete !== undefined
 			) {
 				await this.handleConfirmRegisterStep({
 					pluginTypeId: stepData.pluginTypeId,
 					sdkMessageId: stepData.sdkMessageId,
+					sdkMessageFilterId: stepData.sdkMessageFilterId,
+					primaryEntity: stepData.primaryEntity,
 					name: stepData.name,
 					stage: stepData.stage,
 					mode: stepData.mode,
 					rank: stepData.rank,
+					supportedDeployment: stepData.supportedDeployment,
 					filteringAttributes: stepData.filteringAttributes,
+					asyncAutoDelete: stepData.asyncAutoDelete,
+					unsecureConfiguration: stepData.unsecureConfiguration,
+					secureConfiguration: stepData.secureConfiguration,
+					impersonatingUserId: stepData.impersonatingUserId,
+					description: stepData.description,
 				});
 			}
 		});
@@ -599,7 +619,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				stage?: number;
 				mode?: number;
 				rank?: number;
+				supportedDeployment?: number;
 				filteringAttributes?: string;
+				asyncAutoDelete?: boolean;
+				unsecureConfiguration?: string;
+				secureConfiguration?: string;
+				impersonatingUserId?: string;
+				description?: string;
 			};
 			if (
 				stepData.stepId &&
@@ -614,7 +640,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					stage: stepData.stage,
 					mode: stepData.mode,
 					rank: stepData.rank,
+					supportedDeployment: stepData.supportedDeployment,
 					filteringAttributes: stepData.filteringAttributes,
+					asyncAutoDelete: stepData.asyncAutoDelete,
+					unsecureConfiguration: stepData.unsecureConfiguration,
+					secureConfiguration: stepData.secureConfiguration,
+					impersonatingUserId: stepData.impersonatingUserId,
+					description: stepData.description,
 				});
 			}
 		});
@@ -1698,11 +1730,19 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private async handleConfirmRegisterStep(data: {
 		pluginTypeId: string;
 		sdkMessageId: string;
+		sdkMessageFilterId?: string | undefined;
+		primaryEntity?: string | undefined; // Used to lookup filter if not provided directly
 		name: string;
 		stage: number;
 		mode: number;
 		rank: number;
+		supportedDeployment: number;
 		filteringAttributes?: string | undefined;
+		asyncAutoDelete: boolean;
+		unsecureConfiguration?: string | undefined;
+		secureConfiguration?: string | undefined;
+		impersonatingUserId?: string | undefined;
+		description?: string | undefined;
 	}): Promise<void> {
 		this.logger.debug('Handling register step confirmation', data);
 
@@ -1717,16 +1757,34 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			},
 			async () => {
 				try {
+					// If primaryEntity is provided but not sdkMessageFilterId, look it up
+					let filterId = data.sdkMessageFilterId;
+					if (!filterId && data.primaryEntity) {
+						const filter = await this.repositories.sdkMessageFilter.findByMessageAndEntity(
+							this.currentEnvironmentId,
+							data.sdkMessageId,
+							data.primaryEntity
+						);
+						filterId = filter?.getId();
+					}
+
 					const stepId = await this.useCases.registerStep.execute(
 						this.currentEnvironmentId,
 						{
 							pluginTypeId: data.pluginTypeId,
 							sdkMessageId: data.sdkMessageId,
+							sdkMessageFilterId: filterId,
 							name: data.name,
 							stage: data.stage,
 							mode: data.mode,
 							rank: data.rank,
+							supportedDeployment: data.supportedDeployment,
 							filteringAttributes: data.filteringAttributes,
+							asyncAutoDelete: data.asyncAutoDelete,
+							unsecureConfiguration: data.unsecureConfiguration,
+							secureConfiguration: data.secureConfiguration,
+							impersonatingUserId: data.impersonatingUserId,
+							description: data.description,
 						}
 					);
 
@@ -1776,7 +1834,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		stage: number;
 		mode: number;
 		rank: number;
+		supportedDeployment?: number | undefined;
 		filteringAttributes?: string | undefined;
+		asyncAutoDelete?: boolean | undefined;
+		unsecureConfiguration?: string | undefined;
+		secureConfiguration?: string | undefined;
+		impersonatingUserId?: string | undefined;
+		description?: string | undefined;
 	}): Promise<void> {
 		this.logger.debug('Handling edit step confirmation', data);
 
@@ -1803,7 +1867,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 							stage: data.stage,
 							mode: data.mode,
 							rank: data.rank,
+							supportedDeployment: data.supportedDeployment,
 							filteringAttributes: data.filteringAttributes,
+							asyncAutoDelete: data.asyncAutoDelete,
+							unsecureConfiguration: data.unsecureConfiguration,
+							secureConfiguration: data.secureConfiguration,
+							impersonatingUserId: data.impersonatingUserId,
+							description: data.description,
 						}
 					);
 
