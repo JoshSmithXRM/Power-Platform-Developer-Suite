@@ -1012,12 +1012,16 @@ payload['workflowactivitygroupname'] =
 | Selected item indicator | LOW | Visual highlight for selected tree node |
 | Unit tests | HIGH | Domain + application layer (required before PR) |
 
-### NICE-TO-HAVE (Post-MVP UX Improvements)
+### REQUIRED UX POLISH (Before MVP Complete)
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| Searchable message dropdown | Medium | Autocomplete like PRT message selector |
-| Primary entity autocomplete | Medium | Based on selected message's supported entities |
-| Filtering attributes picker | Medium | Dialog with entity attributes as checkboxes |
+| Filterable Message combobox | HIGH | Type-to-filter dropdown (hundreds of messages) |
+| Primary Entity autocomplete | HIGH | Filter entities based on selected message |
+| Filtering Attributes picker | HIGH | Better than comma-separated text input |
+
+### DEFERRED UX (Post-MVP)
+| Feature | Priority | Notes |
+|---------|----------|-------|
 | Run in User's Context dropdown | Low | User lookup for impersonation |
 | Secondary entity field | Low | For messages that support it (Associate, etc.) |
 
@@ -1029,13 +1033,18 @@ payload['workflowactivitygroupname'] =
 | Persist filter checkboxes | Low | Remember Hide Microsoft / Hide Hidden Steps |
 
 ### MVP Definition (Updated)
-**MVP = Core CRUD operations complete!**
+**MVP = Core CRUD + Polished UX**
+
+**Completed:**
 - ✅ Tree browsing with filters (packages, assemblies, types, steps, images)
 - ✅ Assembly CRUD (register, update with type selection, unregister)
 - ✅ Package CRUD (register, update, unregister)
 - ✅ Step CRUD (register, edit, unregister, enable/disable)
 - ✅ Image CRUD (register, edit, unregister)
 - ✅ Plugin Inspector tool for DLL analysis
+
+**Required before MVP complete:**
+- ⬜ **Step form UX polish** (filterable combobox, entity autocomplete, attribute picker)
 - ⬜ Detail panel (show metadata when node selected)
 - ⬜ Unit tests (required before PR)
 
@@ -1043,7 +1052,8 @@ payload['workflowactivitygroupname'] =
 - Solution filtering (complex, deferred pending user feedback)
 - Add to Solution action (nice-to-have)
 - Filter checkbox persistence (nice-to-have)
-- Advanced UX (searchable dropdowns, attribute picker) - functional but basic
+- Run in User's Context dropdown
+- Secondary entity field
 
 ---
 
@@ -1059,6 +1069,99 @@ Before merging Slices 1-3:
 
 **Deferred to Post-MVP:**
 - [ ] Solution filtering - Filter tree by solution (complex, user feedback pending)
-- [ ] Searchable message dropdown (nice-to-have UX)
-- [ ] Entity autocomplete (nice-to-have UX)
-- [ ] Attribute picker dialog (nice-to-have UX)
+
+---
+
+## UX Polish Plan - Step Registration Forms
+
+### Current Problems
+
+1. **Message Field**: Standard `<select>` dropdown with hundreds of messages - impossible to find specific message quickly
+2. **Primary Entity Field**: Plain text input - user must know exact entity logical name
+3. **Filtering Attributes Field**: Plain text comma-separated - user must know exact attribute logical names
+
+### Proposed Solutions
+
+#### Phase 1: Filterable Combobox Component
+
+Create a reusable `FilterableComboBox` component that:
+- Shows input field with dropdown arrow
+- As user types, filters options (case-insensitive)
+- Supports keyboard navigation (↑/↓/Enter/Escape)
+- Shows "no matches" when filter has no results
+- Can still click dropdown to see all options
+
+**Files to create:**
+- `resources/webview/js/components/FilterableComboBox.js`
+- `resources/webview/css/components/filterable-combobox.css`
+
+**Apply to Message field:** Replace `type: 'select'` with `type: 'combobox'`
+
+#### Phase 2: Dynamic Primary Entity Options
+
+When message changes:
+1. Fetch available entities from `sdkmessagefilter` records for that message
+2. Populate Primary Entity combobox with those entities
+3. Some messages (like Create/Update) support ALL entities - show full entity list
+
+**Data flow:**
+```
+Message selected → postMessage('getEntitiesForMessage', messageId)
+                → Extension calls sdkMessageFilterRepository.findByMessageId()
+                → Returns entity list → Updates Primary Entity combobox options
+```
+
+**Alternative (simpler):** Pre-load ALL sdkmessagefilters when modal opens, filter client-side.
+
+#### Phase 3: Filtering Attributes Picker
+
+**Option A: Picker Dialog (Recommended)**
+- Add "..." button next to Filtering Attributes field
+- Only enabled when Primary Entity is selected AND message supports filtering
+- Clicking opens dialog with:
+  - Search/filter input
+  - Checkbox list of entity attributes
+  - OK/Cancel buttons
+- Returns comma-separated selected attribute names
+
+**Data flow:**
+```
+Click "..." → postMessage('getEntityAttributes', entityLogicalName)
+           → Extension calls metadataRepository.getEntityAttributes()
+           → Returns attribute list → Shows picker dialog
+```
+
+**Option B: Tag Input with Autocomplete**
+- Type attribute name, autocomplete suggests
+- Press Enter/comma to add tag
+- Click X to remove tag
+- More compact but less discoverable
+
+**Option C: Keep Text Field (Minimal)**
+- Add help text: "Enter attribute logical names (use Metadata Browser to find names)"
+- Least effort, acceptable for power users
+
+### Implementation Order
+
+1. **FilterableComboBox component** - Unlocks all other improvements
+2. **Message field → combobox** - Immediate high-value improvement
+3. **Primary Entity → combobox** - Need to load sdkmessagefilters per message
+4. **Filtering Attributes picker** - Most complex, needs metadata integration
+
+### Technical Considerations
+
+**FormModal changes needed:**
+- Add `type: 'combobox'` field type
+- Support dynamic option updates (for Primary Entity)
+- Support button addon for picker (for Filtering Attributes)
+
+**Extension changes needed:**
+- Add `getEntitiesForMessage` handler in panel
+- Add `getEntityAttributes` handler (leverage existing Metadata Browser code)
+- Send data back to webview via postMessage
+
+**CSS considerations:**
+- Dropdown must appear above modal footer (z-index)
+- Dropdown should be scrollable (max-height)
+- Selected item highlight
+- Keyboard focus indicators
