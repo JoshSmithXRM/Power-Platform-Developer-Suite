@@ -1091,7 +1091,8 @@ function handleShowRegisterPackageModal(data) {
 				data: {
 					name: values.name,
 					version: values.version,
-					prefix: values.prefix
+					prefix: values.prefix,
+					solutionUniqueName: values.solution
 				}
 			});
 		}

@@ -9,6 +9,7 @@ export interface RegisterPluginPackageInput {
 	readonly version: string;
 	readonly uniqueName: string;
 	readonly base64Content: string;
+	readonly solutionUniqueName: string;
 }
 
 /**
@@ -39,6 +40,7 @@ export class RegisterPluginPackageUseCase {
 			name: input.name,
 			uniqueName: input.uniqueName,
 			version: input.version,
+			solutionUniqueName: input.solutionUniqueName,
 		});
 
 		// Basic validation
@@ -58,18 +60,24 @@ export class RegisterPluginPackageUseCase {
 			throw new Error('Package content is required');
 		}
 
+		if (!input.solutionUniqueName || input.solutionUniqueName.trim().length === 0) {
+			throw new Error('Solution is required for package registration');
+		}
+
 		const packageId = await this.packageRepository.register(
 			environmentId,
 			input.name.trim(),
 			input.uniqueName.trim(),
 			input.version.trim(),
-			input.base64Content
+			input.base64Content,
+			input.solutionUniqueName.trim()
 		);
 
 		this.logger.info('RegisterPluginPackageUseCase completed', {
 			packageId,
 			name: input.name,
 			uniqueName: input.uniqueName,
+			solutionUniqueName: input.solutionUniqueName,
 		});
 
 		return packageId;

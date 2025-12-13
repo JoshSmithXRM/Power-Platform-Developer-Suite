@@ -141,17 +141,22 @@ export class DataversePluginPackageRepository implements IPluginPackageRepositor
 		name: string,
 		uniqueName: string,
 		version: string,
-		base64Content: string
+		base64Content: string,
+		solutionUniqueName: string
 	): Promise<string> {
 		this.logger.info('DataversePluginPackageRepository: Registering new package', {
 			environmentId,
 			name,
 			uniqueName,
 			version,
+			solutionUniqueName,
 			contentLength: base64Content.length,
 		});
 
-		const endpoint = `/api/data/v9.2/${DataversePluginPackageRepository.ENTITY_SET}`;
+		// Include solutionUniqueName query parameter to add package to solution
+		const endpoint =
+			`/api/data/v9.2/${DataversePluginPackageRepository.ENTITY_SET}` +
+			`?solutionUniqueName=${encodeURIComponent(solutionUniqueName)}`;
 
 		// Dataverse requires uniquename to start with publisher prefix
 		const payload = {
@@ -173,6 +178,7 @@ export class DataversePluginPackageRepository implements IPluginPackageRepositor
 			packageId,
 			name,
 			uniqueName,
+			solutionUniqueName,
 		});
 
 		return packageId;

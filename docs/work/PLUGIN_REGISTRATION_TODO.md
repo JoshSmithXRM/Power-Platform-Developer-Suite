@@ -1386,6 +1386,43 @@ Add separate description field (matches PRT).
 - Name: Short identifier shown in tree
 - Description: Can be more verbose, shown in details/tooltips
 
+### Session 17 (2025-12-13)
+**Bug Fix: Plugin Packages Not Added to Solutions**
+
+**Problem:** When registering a plugin package, it was created in Dataverse but NOT added to the selected solution. The package appeared in the tree but was not associated with any solution.
+
+**Root Cause:** The `solutionUniqueName` parameter was never propagated through the entire chain:
+1. Webview validated `values.solution` but didn't include it in posted data
+2. Panel handler only extracted `name`, `version`, `prefix` - missing solution
+3. Use case input didn't have `solutionUniqueName` property
+4. Repository `register()` method lacked the solution parameter
+
+**Fix (6 files modified):**
+1. **Webview** (`plugin-registration.js`): Added `solutionUniqueName: values.solution` to `confirmRegisterPackage` message data
+2. **Panel handler** (`PluginRegistrationPanelComposed.ts`): Extract and validate `solutionUniqueName` from message data
+3. **Panel method** (`handleConfirmRegisterPackage`): Accept `solutionUniqueName` parameter
+4. **Use case input** (`RegisterPluginPackageUseCase.ts`): Added `solutionUniqueName` to input interface with validation
+5. **Repository interface** (`IPluginPackageRepository.ts`): Added `solutionUniqueName` parameter to `register()` method
+6. **Repository implementation** (`DataversePluginPackageRepository.ts`): Added `?solutionUniqueName={value}` query parameter to POST endpoint
+
+**API pattern (matching PRT behavior):**
+```
+POST /api/data/v9.2/pluginpackages?solutionUniqueName=MySolution
+{
+  "name": "prefix_PackageName",
+  "uniquename": "prefix_PackageName",
+  "version": "1.0.0",
+  "content": "<base64>"
+}
+```
+
+**Files Modified:**
+- `resources/webview/js/features/plugin-registration.js`
+- `src/.../presentation/panels/PluginRegistrationPanelComposed.ts`
+- `src/.../application/useCases/RegisterPluginPackageUseCase.ts`
+- `src/.../domain/interfaces/IPluginPackageRepository.ts`
+- `src/.../infrastructure/repositories/DataversePluginPackageRepository.ts`
+
 ### Technical Considerations
 
 **FormModal changes needed:**
