@@ -16,8 +16,8 @@ export async function initializeSolutionDiff(
     getDataverseUrl: (envId: string) => Promise<string>;
   },
   logger: ILogger,
-  sourceEnvironmentId: string,
-  targetEnvironmentId: string
+  sourceEnvironmentId?: string,
+  targetEnvironmentId?: string
 ): Promise<void> {
   const { DataverseApiService } = await import('../../../../shared/infrastructure/services/DataverseApiService.js');
   const { DataverseApiSolutionRepository } = await import('../../../solutionExplorer/infrastructure/repositories/DataverseApiSolutionRepository.js');

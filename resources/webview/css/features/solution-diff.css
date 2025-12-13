@@ -122,18 +122,12 @@
   color: var(--vscode-descriptionForeground);
 }
 
-.loading-spinner {
+/* Larger spinner for comparison loading state */
+.comparison-spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid var(--vscode-progressBar-background);
-  border-top-color: var(--vscode-button-background);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+  border-width: 3px;
   margin-bottom: 16px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 /* Comparison Results */
@@ -256,10 +250,33 @@
   color: var(--vscode-foreground);
 }
 
+/* Make main-section a flex container for solution diff */
+.main-section:has(.solution-comparison-section) {
+  display: flex;
+  flex-direction: column;
+}
+
 /* Solution Comparison Section Container */
 .solution-comparison-section {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0; /* Allow flex children to shrink and scroll */
+  overflow: hidden; /* Let children handle scrolling */
+}
+
+/* Solution selector stays fixed at top */
+.solution-selector {
+  flex-shrink: 0;
+}
+
+/* Comparison results area is scrollable */
+.comparison-results,
+.comparison-placeholder,
+.comparison-loading {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* ============================================

@@ -27,10 +27,17 @@ export function renderDualEnvironmentSelector(
   }
 
   const renderOptions = (selectedId: string | undefined): string => {
-    return environments.map(env => {
+    // Add placeholder option if no environment is pre-selected
+    const placeholder = selectedId === undefined
+      ? '<option value="" selected>-- Select environment --</option>'
+      : '<option value="">-- Select environment --</option>';
+
+    const envOptions = environments.map(env => {
       const selected = env.id === selectedId ? ' selected' : '';
       return `<option value="${escapeHtml(env.id)}"${selected}>${escapeHtml(env.name)}</option>`;
     }).join('');
+
+    return placeholder + envOptions;
   };
 
   return `

@@ -2,238 +2,214 @@
 
 **Branch:** `feature/solution-diff`
 **Created:** 2025-12-08
-**Status:** Slice 1 + Slice 3 complete (metadata + component-level diff)
+**Status:** Phase 1 + Option C implementation in progress
 
 ---
 
 ## Overview
 
-**Goal:** Compare Power Platform solutions between two environments to identify differences in version, managed state, and metadata.
+**Goal:** Compare Power Platform solutions between two environments to identify meaningful differences in components and metadata.
 
-**Discovery Findings:**
-- Found: `ISolutionRepository` already supports environment-scoped queries
-- Found: `MsalAuthenticationService` supports concurrent auth to multiple environments
-- Found: `DataverseApiService` is environment-agnostic (takes environmentId param)
-- Will reuse: Existing Solution entity, repository, panel coordinator patterns
-- Need to create: NEW dual-environment panel pattern (first in codebase)
+**Key Decision (Session 3):** Current implementation only checks component EXISTENCE, not CONTENT. We need deep comparison that fetches actual component records and compares columns.
 
 ---
 
-## Requirements
+## Implementation Plan
 
-### Slice 1 (MVP) - Metadata Comparison
-- [x] Select source and target environments
-- [x] Select solution from dropdown (loads from source env)
-- [x] Compare solution metadata (version, isManaged, timestamps)
-- [x] Display comparison status (Same, Different, SourceOnly, TargetOnly)
-- [x] Show differences in side-by-side table
+### Phase 1: Bug Fixes (Required for PR)
+Fix issues that make current implementation misleading.
 
-### Slice 2 (Future) - Bulk Comparison
-- [ ] Compare all solutions at once
-- [ ] Filter to show only differences
-- [ ] Sort by status/name
+- [ ] Remove timestamp comparisons (modifiedOn, installedOn) - always different, pure noise
+- [ ] Make managed state informational only (expected: dev=unmanaged, downstream=managed)
+- [ ] Collapsible solution info section (consistent with component sections)
+- [ ] Remove redundant header (solution name already in dropdown)
+- [ ] Better status badge ("Version mismatch" not "3 differences found")
+- [ ] Add publisher comparison (should match, mismatch = problem)
 
-### Slice 3 - Component-Level Diff (COMPLETE)
-- [x] Fetch solution components from both environments
-- [x] Compare component lists (entities, flows, plugins, etc.)
-- [x] Show added/removed components with expandable sections
+### Phase 2: Component Type Registry (Domain)
+Map component types to their tables and comparable columns.
 
-### Slice 4 (Future) - Export
-- [ ] Export diff report (JSON/CSV)
-- [ ] Copy to clipboard
+- [ ] Create `ComponentTypeRegistry` class
+- [ ] Define for each type:
+  - Table name to query
+  - Comparable columns (content, config, etc.)
+  - Ignored columns (modifiedon, modifiedby, etc.)
+  - Display name column
+  - Identity column (for matching across environments)
+- [ ] Start with 5 data component types (Option C):
+  - Workflow (29) → `workflows` table
+  - PluginAssembly (91) → `pluginassemblies` table
+  - PluginStep (92) → `sdkmessageprocessingsteps` table
+  - WebResource (61) → `webresourceset` table
+  - EnvironmentVariable (380) → `environmentvariabledefinitions` table
 
-**Success Criteria:**
-- [x] Can compare same solution across two environments
-- [ ] Manual F5 testing confirms UI works correctly
-- [ ] Unit tests for domain layer pass
+### Phase 3: Component Fetcher (Infrastructure)
+Fetch actual component records for comparison.
 
----
+- [ ] Create `ComponentDataFetcher` service
+- [ ] Parallel fetch from both environments
+- [ ] Respect API limits (6000 req/5min, 52 concurrent)
+- [ ] Error handling for failed fetches
+- [ ] Progress callback for UI updates
 
-## Implementation Checklist
+### Phase 4: Deep Comparison (Domain)
+Compare actual component records column-by-column.
 
-### Domain Layer
-- [x] `ComparisonStatus` enum (Same, Different, SourceOnly, TargetOnly)
-- [x] `ComparisonResult` value object (immutable, factory methods)
-- [x] `SolutionComparison` entity (rich comparison logic)
-- [ ] Unit tests for SolutionComparison (target: 100%)
-- [ ] Unit tests for ComparisonResult (target: 100%)
-- [x] `npm run compile` passes
-- [x] Committed: `06ca1ff`
+- [ ] Update `ComponentComparison` entity
+- [ ] Add `Modified` category (in both, but columns differ)
+- [ ] Generate specific diff messages ("clientdata changed", "version: 1.0→1.1")
+- [ ] Column-by-column comparison logic
+- [ ] Handle different data types (strings, JSON, base64, etc.)
 
-### Application Layer
-- [x] `CompareSolutionMetadataUseCase` implementation
-- [x] `SolutionComparisonViewModel` definition
-- [x] `SolutionComparisonViewModelMapper` implementation
-- [ ] Unit tests for mapper (target: 90%)
-- [x] `npm run compile` passes
-- [x] Committed: `06ca1ff`
+### Phase 5: UI Enhancement (Presentation)
+Show meaningful diff results.
 
-### Infrastructure Layer
-- [x] Reuses existing `DataverseApiSolutionRepository` (no changes needed)
-- [x] `npm run compile` passes
-- [x] Committed: `06ca1ff`
-
-### Presentation Layer
-- [x] `SolutionDiffPanelComposed` (NEW dual-environment pattern)
-- [x] `DualEnvironmentSelectorSection` (source + target dropdowns)
-- [x] `SolutionComparisonSection` (comparison results)
-- [x] `dualEnvironmentSelectorView.ts` (HTML rendering)
-- [x] `solutionComparisonView.ts` (HTML rendering)
-- [x] `solution-diff.css` (styles)
-- [x] `SolutionDiffBehavior.js` (webview behavior)
-- [x] `initializeSolutionDiff.ts` (lazy loading)
-- [x] `npm run compile` passes
-- [x] Committed: `06ca1ff`
-
-### Extension Integration
-- [x] Command added to `package.json`
-- [x] Command registered in `extension.ts`
-- [x] Dual-environment picker workflow
-- [x] `npm run compile` passes
-- [x] Committed: `06ca1ff`
+- [ ] Progress bar for deep comparison (implement simple version, refactor when plugin-registration merges)
+- [ ] "Modified" section with expandable details
+- [ ] Show component display names (from fetched records)
+- [ ] Show which specific columns changed
+- [ ] Summary: "3 added, 2 removed, 5 modified, 40 unchanged"
 
 ---
 
-## Testing
+## Deferred Items
 
-- [ ] Unit tests pass: `npm test`
-- [ ] Integration tests for panel: Not started
-- [ ] E2E tests: Not required for Slice 1
-- [ ] Manual testing (F5): **PENDING**
+### Entity Metadata (Future - Before Relationships)
+- Requires Metadata API (different from OData)
+- Nested structure (entity → attributes → relationships)
+- Complex comparison logic
+- **Deferred:** Will implement after data components working
 
-### Manual Test Cases
+### Relationships (Future - After Entity Metadata)
+- Need to determine use cases first
+- Complex nested comparisons
+- **Deferred:** Need clearer requirements
 
-| Test Case | Status | Notes |
-|-----------|--------|-------|
-| Launch panel with 2 envs | Pending | |
-| Source env dropdown loads envs | Pending | |
-| Target env dropdown loads envs | Pending | |
-| Solution dropdown loads from source | Pending | |
-| Same solution, same version | Pending | Should show "Same" |
-| Same solution, different version | Pending | Should show "Different" |
-| Solution only in source | Pending | Should show "SourceOnly" |
-| Solution only in target | Pending | Should show "TargetOnly" |
-| Change source env reloads solutions | Pending | |
-| Change target env re-runs comparison | Pending | |
-
-### Bugs Found During Manual Testing
-
-| Bug | Status | Notes |
-|-----|--------|-------|
-| | | |
+### Additional Component Types (Future)
+- View (26) → `savedqueries`
+- Form (60) → `systemforms`
+- ModelDrivenApp (80) → `appmodules`
+- CanvasApp (300) → `canvasapps`
+- ConnectionReference (381) → `connectionreferences`
+- **Deferred:** Add incrementally based on user needs
 
 ---
 
-## Review & Merge
+## Component Type Reference
 
-- [ ] All implementation checkboxes complete
-- [ ] All bugs from manual testing fixed
-- [ ] `/code-review` - APPROVED
-- [ ] CHANGELOG.md updated
-- [ ] PR created: `gh pr create`
-- [ ] CI passes
+### Phase 2 Target Types (Option C - Data Components)
+
+| Type | Code | Table | Comparable Columns | Display Name |
+|------|------|-------|-------------------|--------------|
+| Workflow | 29 | `workflows` | clientdata, xaml, statecode, category | name |
+| PluginAssembly | 91 | `pluginassemblies` | content, version, publickeytoken | name |
+| PluginStep | 92 | `sdkmessageprocessingsteps` | configuration, stage, mode, filteringattributes | name |
+| WebResource | 61 | `webresourceset` | content, webresourcetype | displayname |
+| EnvVariable | 380 | `environmentvariabledefinitions` | defaultvalue, type | displayname |
+
+### Columns to ALWAYS Ignore
+- `modifiedon` - Per-environment timestamp
+- `modifiedby` - Per-environment user
+- `createdon` - Per-environment timestamp
+- `createdby` - Per-environment user
+- `ownerid` - May differ between environments
+- `organizationid` - Always different
 
 ---
 
-## Cleanup (After Merge)
+## Performance Analysis
 
-- [ ] Design doc (`docs/design/SOLUTION_DIFF_DESIGN.md`): Extract patterns to architecture docs OR delete
-- [ ] This tracking doc: Delete (`git rm`)
-- [ ] Related documentation updated
+Based on DATAVERSE_THROUGHPUT_GUIDE.md:
+
+| Metric | Value |
+|--------|-------|
+| API Limit | 6,000 requests per 5 minutes |
+| Concurrent | 52 requests |
+| Effective Rate | ~20 requests/second |
+
+**For 100-component solution:**
+- Current: 2 API calls (list components)
+- Deep: 2 + (100 × 2 envs) = 202 API calls
+- Time: 202 ÷ 20 = **~10 seconds**
+
+**For 500-component solution:**
+- Deep: 2 + (500 × 2) = 1002 API calls
+- Time: 1002 ÷ 20 = **~50 seconds**
+- **Progress bar essential for this case**
+
+---
+
+## Definition of "Difference"
+
+### Metadata Level
+| Attribute | Counts as Diff? | Rationale |
+|-----------|----------------|-----------|
+| Version | ✅ YES | Target behind = deployment needed |
+| Publisher | ✅ YES | Should match, mismatch = problem |
+| Managed State | ❌ NO | Expected: dev=unmanaged, downstream=managed |
+| Modified Date | ❌ NO | Per-environment timestamp |
+| Installed Date | ❌ NO | Per-environment timestamp |
+
+### Component Level
+| Status | Meaning | Actionable? |
+|--------|---------|-------------|
+| Added (target only) | Component exists in target but not source | ⚠️ Possible drift |
+| Removed (source only) | Component not deployed to target | ✅ Deploy needed |
+| Modified | Component in both but content differs | ✅ Deploy needed |
+| Unchanged | Component identical in both | ✅ No action |
+
+---
+
+## Completed Work
+
+### Slice 1: Metadata Comparison ✅
+- [x] Dual-environment selection
+- [x] Solution dropdown from source
+- [x] Side-by-side metadata table
+- [x] Status badges (Same, Different, SourceOnly, TargetOnly)
+
+### Slice 3: Component-Level Diff (Existence Only) ✅
+- [x] Fetch solutioncomponents from both environments
+- [x] Group by component type
+- [x] Expandable sections
+- [x] Added/Removed/Unchanged categories
+
+### Session 3 Fixes ✅
+- [x] Scrollbar on comparison results
+- [x] Solution Diff in Tools menu
+- [x] Panel opens directly (no picker dialog)
+- [x] Spinner uses standard animated class
+- [x] solutionDiffPickEnvironments command for context menu
 
 ---
 
 ## Session Notes
 
 ### Session 1 (2025-12-08)
-
-**Completed:**
-- Read requirements from `docs/future/ALM_DEVOPS.md`
-- Explored codebase for existing patterns
-- Created technical design document (`docs/design/SOLUTION_DIFF_DESIGN.md`)
-- Implemented Slice 1 (metadata comparison only)
-- Fixed bug: JS using wrong postMessage + event delegation
-- F5 tested - metadata diff working (version, timestamps, managed state)
-
-**User Feedback:**
-- Slice 1 works but is NOT deep enough for real troubleshooting
-- Need component-level diff to find actual problems
-- Current output only shows "version doesn't match" or "install dates differ"
-- **Priority: Implement Slice 3 (Component-Level Diff)**
-
-**Commits:**
-1. `0791acd` - Design document
-2. `06ca1ff` - Slice 1 implementation
-3. `1d45d38` - Bug fix (vscode.postMessage + event delegation)
-
-**What Slice 3 needs (Component-Level Diff):**
-
-1. **New API calls needed:**
-   - `GET /api/data/v9.2/solutioncomponents?$filter=_solutionid_value eq '{solutionId}'`
-   - Returns: componenttype, objectid, rootcomponentbehavior
-   - Component types: 1=Entity, 29=Workflow/Flow, 92=PluginAssembly, 61=WebResource, etc.
-
-2. **Domain entities to create:**
-   - `SolutionComponent` entity (componentType, objectId, name, etc.)
-   - `ComponentComparison` entity (compares components across envs)
-   - `ComponentDiff` value object (added, removed, modified components)
-
-3. **UI changes:**
-   - Expandable sections by component type (Entities, Flows, Plugins, etc.)
-   - Show added (green), removed (red), modified (yellow) components
-   - Click to expand component details
-
-4. **Deep comparison (future):**
-   - Entity schema diff (fields, relationships)
-   - Flow definition diff
-   - Plugin step configuration diff
-
-**Key Files:**
-- Panel: `src/features/solutionDiff/presentation/panels/SolutionDiffPanelComposed.ts`
-- Domain: `src/features/solutionDiff/domain/entities/SolutionComparison.ts`
-- JS Behavior: `resources/webview/js/behaviors/SolutionDiffBehavior.js`
-
-**Architecture Notes:**
-- First dual-environment feature in codebase
-- Uses `customData` in `SectionRenderData` for feature-specific properties
-- Panel is singleton (only one diff panel at a time)
-- Reuses existing `ISolutionRepository` for solution queries
+- Implemented Slice 1 (metadata comparison)
+- Fixed JS postMessage bug
 
 ### Session 2 (2025-12-09)
+- Implemented Slice 3 (component-level diff - existence only)
 
-**Completed:**
-- Created design document for Slice 3 (`docs/design/SOLUTION_DIFF_COMPONENT_DESIGN.md`)
-- Implemented Slice 3 (component-level diff):
+### Session 3 (2025-12-13)
+- Fixed scrollbar, Tools menu, spinner, panel direct open
+- Analyzed fundamental flaw: not comparing actual component content
+- Decided on Phase 1 + Option C approach
+- Key insight: Current "diff" only checks existence, not content
+- Plan: Implement deep comparison for data components (Workflow, Plugin, WebResource, EnvVariable)
+- Defer: Entity metadata, relationships, additional component types
+- Progress bar: Implement simple version now, refactor when plugin-registration merges
 
-**Domain Layer (NEW):**
-- `ComponentType.ts` - Enum with display name helpers
-- `SolutionComponent.ts` - Entity with matching logic
-- `ComponentDiff.ts` - Value object for categorized differences
-- `ComponentComparison.ts` - Entity with diff business logic
+---
 
-**Application Layer (NEW):**
-- `CompareSolutionComponentsUseCase.ts` - Orchestrates component comparison
-- `ComponentDiffViewModel.ts` - ViewModels for component diff
-- `ComponentDiffViewModelMapper.ts` - Maps domain to ViewModels
+## Next Steps
 
-**Infrastructure Layer (MODIFIED):**
-- `ISolutionComponentRepository.ts` - Added `findAllComponentsForSolution()` method + DTO
-- `DataverseApiSolutionComponentRepository.ts` - Implemented new method
-
-**Presentation Layer (MODIFIED/NEW):**
-- `componentDiffView.ts` - NEW HTML rendering for component diff
-- `solutionComparisonView.ts` - Extended to render component diff
-- `SolutionComparisonSection.ts` - Extended to include component diff data
-- `SolutionDiffPanelComposed.ts` - Extended to call component comparison use case
-- `initializeSolutionDiff.ts` - Extended to create component repository
-- `solution-diff.css` - Added component diff styles
-
-**Key Features:**
-- Components grouped by type (Entities, Flows, Plugins, etc.)
-- Expandable sections with counts
-- Color-coded: Added (green), Removed (red), Unchanged (gray)
-- Auto-expands groups with differences
-- Graceful handling: Component diff only shown if both solutions exist
-
-**Pending:**
-- F5 manual testing with real environments
+1. **Commit current session changes** (bug fixes, tracking doc)
+2. **Phase 1**: Fix metadata comparison bugs
+3. **Phase 2**: Create ComponentTypeRegistry
+4. **Phase 3**: Create ComponentDataFetcher
+5. **Phase 4**: Implement deep comparison
+6. **Phase 5**: UI enhancements with progress bar
+7. **Test**: Manual F5 testing with real solutions
+8. **PR**: After all phases complete

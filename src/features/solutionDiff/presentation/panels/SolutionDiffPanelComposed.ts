@@ -54,8 +54,8 @@ export class SolutionDiffPanelComposed {
   private readonly compareComponentsUseCase: CompareSolutionComponentsUseCase;
 
   // Dual environment state
-  private sourceEnvironmentId: string;
-  private targetEnvironmentId: string;
+  private sourceEnvironmentId: string | undefined;
+  private targetEnvironmentId: string | undefined;
   private selectedSolutionUniqueName: string | null = null;
   private solutions: SolutionOptionViewModel[] = [];
   private comparisonViewModel: SolutionComparisonViewModel | null = null;
@@ -68,8 +68,8 @@ export class SolutionDiffPanelComposed {
     private readonly solutionRepository: ISolutionRepository,
     private readonly componentRepository: ISolutionComponentRepository,
     private readonly logger: ILogger,
-    sourceEnvironmentId: string,
-    targetEnvironmentId: string
+    sourceEnvironmentId?: string,
+    targetEnvironmentId?: string
   ) {
     this.sourceEnvironmentId = sourceEnvironmentId;
     this.targetEnvironmentId = targetEnvironmentId;
@@ -109,8 +109,8 @@ export class SolutionDiffPanelComposed {
     solutionRepository: ISolutionRepository,
     componentRepository: ISolutionComponentRepository,
     logger: ILogger,
-    sourceEnvironmentId: string,
-    targetEnvironmentId: string
+    sourceEnvironmentId?: string,
+    targetEnvironmentId?: string
   ): Promise<SolutionDiffPanelComposed> {
     // Singleton pattern - only one diff panel at a time
     if (SolutionDiffPanelComposed.currentPanel !== undefined) {
@@ -274,6 +274,12 @@ export class SolutionDiffPanelComposed {
     // Load environments
     const environments = await this.getEnvironments();
 
+    // If no source environment selected, just show empty state
+    if (this.sourceEnvironmentId === undefined) {
+      await this.scaffoldingBehavior.refresh(this.createRenderData(environments));
+      return;
+    }
+
     // Initial render with loading state
     await this.scaffoldingBehavior.refresh(this.createRenderData(environments, {
       isSolutionsLoading: true
@@ -284,6 +290,11 @@ export class SolutionDiffPanelComposed {
   }
 
   private async loadSolutionsFromSource(): Promise<void> {
+    if (this.sourceEnvironmentId === undefined) {
+      this.logger.debug('No source environment selected, skipping solution load');
+      return;
+    }
+
     try {
       this.logger.debug('Loading solutions from source environment', {
         sourceEnvironmentId: this.sourceEnvironmentId
@@ -313,11 +324,32 @@ export class SolutionDiffPanelComposed {
 
   private async handleSourceEnvironmentChange(newEnvironmentId: string): Promise<void> {
     this.logger.debug('Source environment changed', { newEnvironmentId });
+
+    // Handle empty selection (user selected placeholder)
+    if (newEnvironmentId === '') {
+      this.sourceEnvironmentId = undefined;
+      this.selectedSolutionUniqueName = null;
+      this.solutions = [];
+      this.comparisonViewModel = null;
+      this.componentDiffViewModel = null;
+
+      await this.panel.postMessage({
+        command: 'setButtonState',
+        buttonId: 'refresh',
+        disabled: true
+      });
+
+      const environments = await this.getEnvironments();
+      await this.scaffoldingBehavior.refresh(this.createRenderData(environments));
+      return;
+    }
+
     this.sourceEnvironmentId = newEnvironmentId;
 
     // Clear solution selection and comparison (solution may not exist in new environment)
     this.selectedSolutionUniqueName = null;
     this.comparisonViewModel = null;
+    this.componentDiffViewModel = null;
 
     // Disable compare button
     await this.panel.postMessage({
@@ -326,16 +358,36 @@ export class SolutionDiffPanelComposed {
       disabled: true
     });
 
-    // Reload solutions from new source environment
+    // Show loading state and reload solutions from new source environment
+    const environments = await this.getEnvironments();
+    await this.scaffoldingBehavior.refresh(this.createRenderData(environments, {
+      isSolutionsLoading: true
+    }));
+
     await this.loadSolutionsFromSource();
   }
 
   private async handleTargetEnvironmentChange(newEnvironmentId: string): Promise<void> {
     this.logger.debug('Target environment changed', { newEnvironmentId });
+
+    // Handle empty selection (user selected placeholder)
+    if (newEnvironmentId === '') {
+      this.targetEnvironmentId = undefined;
+      this.comparisonViewModel = null;
+      this.componentDiffViewModel = null;
+
+      const environments = await this.getEnvironments();
+      await this.scaffoldingBehavior.refresh(this.createRenderData(environments, {
+        selectedSolutionUniqueName: this.selectedSolutionUniqueName ?? undefined
+      }));
+      return;
+    }
+
     this.targetEnvironmentId = newEnvironmentId;
 
     // Clear comparison (needs to be re-run with new target)
     this.comparisonViewModel = null;
+    this.componentDiffViewModel = null;
 
     // Re-run comparison if solution already selected
     if (this.selectedSolutionUniqueName !== null) {
@@ -379,6 +431,11 @@ export class SolutionDiffPanelComposed {
   private async handleCompare(): Promise<void> {
     if (this.selectedSolutionUniqueName === null) {
       this.logger.warn('Compare called without solution selected');
+      return;
+    }
+
+    if (this.sourceEnvironmentId === undefined || this.targetEnvironmentId === undefined) {
+      this.logger.warn('Compare called without both environments selected');
       return;
     }
 

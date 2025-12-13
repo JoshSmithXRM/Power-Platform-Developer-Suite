@@ -295,6 +295,11 @@
                 "command": "power-platform-dev-suite.solutionDiff",
                 "title": "Solution Diff",
                 "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.solutionDiffPickEnvironments",
+                "title": "Solution Diff (Pick Environments)",
+                "category": "Power Platform Developer Suite"
             }
         ],
         "viewsContainers": {

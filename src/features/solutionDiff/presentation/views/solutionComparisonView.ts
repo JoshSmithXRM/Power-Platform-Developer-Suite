@@ -76,7 +76,7 @@ export function renderComparisonPlaceholder(): string {
 export function renderComparisonLoading(): string {
   return `
     <div class="comparison-loading">
-      <div class="loading-spinner"></div>
+      <div class="spinner comparison-spinner"></div>
       <p>Comparing solutions...</p>
     </div>
   `;

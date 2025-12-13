@@ -616,8 +616,25 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	});
 
-	// Solution Diff command (dual-environment feature)
+	// Solution Diff command - opens panel directly (user selects environments in panel)
 	const solutionDiffCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionDiff', async () => {
+		try {
+			await initializeSolutionDiff(
+				context,
+				factories.getEnvironments,
+				factories.dataverseApiServiceFactory,
+				container.logger
+			);
+		} catch (error) {
+			container.logger.error('Failed to open Solution Diff', error);
+			vscode.window.showErrorMessage(
+				`Failed to open Solution Diff: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	});
+
+	// Solution Diff with environment picker (for context menu / quick access)
+	const solutionDiffPickEnvironmentsCommand = vscode.commands.registerCommand('power-platform-dev-suite.solutionDiffPickEnvironments', async () => {
 		try {
 			const environments = await container.environmentRepository.getAll();
 
@@ -645,7 +662,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			});
 			if (!targetEnv) return;
 
-			// Open panel with both environments
+			// Open panel with both environments pre-selected
 			await initializeSolutionDiff(
 				context,
 				factories.getEnvironments,
@@ -695,6 +712,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		webResourcesCommand,
 		webResourcesPickEnvironmentCommand,
 		solutionDiffCommand,
+		solutionDiffPickEnvironmentsCommand,
 		removeEnvironmentCommand,
 		openMakerCommand,
 		openDynamicsCommand,
