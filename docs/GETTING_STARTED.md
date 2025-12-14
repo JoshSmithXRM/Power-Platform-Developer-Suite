@@ -322,8 +322,8 @@ The extension supports 4 authentication methods. Choose based on your use case:
 ## Getting Help
 
 - **Documentation**: [Full documentation index](./README.md)
-- **Issues**: [GitHub Issues](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/discussions)
+- **Issues**: [GitHub Issues](https://github.com/joshsmithxrm/power-platform-developer-suite/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/joshsmithxrm/power-platform-developer-suite/discussions)
 
 ---
 

@@ -7,12 +7,12 @@
     "publisher": "JoshSmithXRM",
     "repository": {
         "type": "git",
-        "url": "https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite.git"
+        "url": "https://github.com/joshsmithxrm/power-platform-developer-suite.git"
     },
     "bugs": {
-        "url": "https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/issues"
+        "url": "https://github.com/joshsmithxrm/power-platform-developer-suite/issues"
     },
-    "homepage": "https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite#readme",
+    "homepage": "https://github.com/joshsmithxrm/power-platform-developer-suite#readme",
     "engines": {
         "vscode": "^1.74.0"
     },

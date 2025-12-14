@@ -25,7 +25,7 @@ Security vulnerabilities should **not** be reported via public GitHub issues. Pu
 ### 2. Report Privately
 
 **Use GitHub's private vulnerability reporting:**
-1. Go to the [Security tab](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/security)
+1. Go to the [Security tab](https://github.com/joshsmithxrm/power-platform-developer-suite/security)
 2. Click "Report a vulnerability"
 3. Fill out the form with details
 
@@ -246,9 +246,9 @@ If you're contributing code, please review:
 
 ## Contact
 
-- **Security Issues**: [GitHub Private Vulnerability Reporting](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/security/advisories/new)
-- **General Security Questions**: Open a [GitHub Discussion](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/discussions)
-- **Non-Security Bugs**: Open a [GitHub Issue](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/issues)
+- **Security Issues**: [GitHub Private Vulnerability Reporting](https://github.com/joshsmithxrm/power-platform-developer-suite/security/advisories/new)
+- **General Security Questions**: Open a [GitHub Discussion](https://github.com/joshsmithxrm/power-platform-developer-suite/discussions)
+- **Non-Security Bugs**: Open a [GitHub Issue](https://github.com/joshsmithxrm/power-platform-developer-suite/issues)
 
 ---
 

@@ -236,7 +236,7 @@ cat package.json | grep version
 
 #### 3.1 Create GitHub Release
 
-1. **Go to GitHub**: https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/releases
+1. **Go to GitHub**: https://github.com/joshsmithxrm/power-platform-developer-suite/releases
 2. **Click**: "Draft a new release"
 3. **Fill in details**:
    - **Tag**: `v0.2.0` (create new tag from main)
@@ -261,8 +261,8 @@ Complete architectural transformation to Clean Architecture with rich domain mod
 
 ## Documentation
 
-- **[Full Release Notes](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/blob/main/docs/releases/v0.2.0.md)** - Technical deep-dive
-- **[CHANGELOG](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/blob/main/CHANGELOG.md#020---2025-11-24)** - User-facing summary
+- **[Full Release Notes](https://github.com/joshsmithxrm/power-platform-developer-suite/blob/main/docs/releases/v0.2.0.md)** - Technical deep-dive
+- **[CHANGELOG](https://github.com/joshsmithxrm/power-platform-developer-suite/blob/main/CHANGELOG.md#020---2025-11-24)** - User-facing summary
 
 ## Installation
 

@@ -29,8 +29,8 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/Power-Platform-Developer-Suite.git
-cd Power-Platform-Developer-Suite
+git clone https://github.com/YOUR_USERNAME/power-platform-developer-suite.git
+cd power-platform-developer-suite
 
 # Install dependencies
 npm install
@@ -112,7 +112,7 @@ npm run lint         # Zero ESLint violations
 
 ### 1. Pick an Issue
 
-- Browse [open issues](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/issues)
+- Browse [open issues](https://github.com/joshsmithxrm/power-platform-developer-suite/issues)
 - Comment on the issue to claim it
 - For new features, open an issue first to discuss
 
@@ -319,8 +319,8 @@ npm run marketplace    # Revert to marketplace version
 ### Getting Help
 
 - **Documentation**: Start with [CLAUDE.md](./CLAUDE.md) and [Clean Architecture Guide](./docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md)
-- **Issues**: Search [existing issues](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/issues) or open a new one
-- **Discussions**: Use [GitHub Discussions](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/discussions) for questions
+- **Issues**: Search [existing issues](https://github.com/joshsmithxrm/power-platform-developer-suite/issues) or open a new one
+- **Discussions**: Use [GitHub Discussions](https://github.com/joshsmithxrm/power-platform-developer-suite/discussions) for questions
 
 ---
 
@@ -348,9 +348,9 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ## Questions?
 
-- **General questions**: Open a [GitHub Discussion](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/discussions)
-- **Bug reports**: Open an [issue](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/issues)
-- **Feature requests**: Open an [issue](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/issues) with `enhancement` label
+- **General questions**: Open a [GitHub Discussion](https://github.com/joshsmithxrm/power-platform-developer-suite/discussions)
+- **Bug reports**: Open an [issue](https://github.com/joshsmithxrm/power-platform-developer-suite/issues)
+- **Feature requests**: Open an [issue](https://github.com/joshsmithxrm/power-platform-developer-suite/issues) with `enhancement` label
 
 ---
 

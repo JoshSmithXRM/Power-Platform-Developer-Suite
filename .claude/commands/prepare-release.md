@@ -178,10 +178,10 @@ Read `package.json` and check version field:
 
 Check `README.md` for version badge:
 
-1. **Verify badge is dynamic:** Should use `github/package-json/v/JoshSmithXRM/Power-Platform-Developer-Suite`
+1. **Verify badge is dynamic:** Should use `github/package-json/v/joshsmithxrm/power-platform-developer-suite`
 2. **If static badge found:** Convert to dynamic format:
    ```markdown
-   ![version](https://img.shields.io/github/package-json/v/JoshSmithXRM/Power-Platform-Developer-Suite)
+   ![version](https://img.shields.io/github/package-json/v/joshsmithxrm/power-platform-developer-suite)
    ```
 3. **Dynamic badge auto-updates** from package.json on each push - no manual update needed
 
@@ -305,7 +305,7 @@ When creating the GitHub release after merge, write a brief summary:
 - [Main feature 2]
 - [Key bug fixes]
 
-See [CHANGELOG.md](https://github.com/JoshSmithXRM/Power-Platform-Developer-Suite/blob/main/CHANGELOG.md) for full details.
+See [CHANGELOG.md](https://github.com/joshsmithxrm/power-platform-developer-suite/blob/main/CHANGELOG.md) for full details.
 ```
 
 This avoids duplication while giving users a quick overview on the release page.
