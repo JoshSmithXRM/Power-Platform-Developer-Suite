@@ -68,6 +68,17 @@ export class PluginRegistrationTreeSection implements ISection {
 					<p>No plugin assemblies found.</p>
 					<p class="help-text">Register assemblies using the Plugin Registration Tool.</p>
 				</div>
+
+				<!-- Detail Panel -->
+				<div class="detail-panel" id="detailPanel" style="display: none;">
+					<div class="detail-panel-header" id="detailPanelHeader">
+						<span class="detail-panel-toggle">▼</span>
+						<span class="detail-panel-title">Details</span>
+					</div>
+					<div class="detail-panel-content" id="detailPanelContent">
+						<p class="detail-placeholder">Select an item to view details</p>
+					</div>
+				</div>
 			</div>
 		`;
 	}

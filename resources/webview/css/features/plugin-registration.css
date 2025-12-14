@@ -337,3 +337,133 @@
 	width: 100%;
 	pointer-events: none;
 }
+
+/* Detail Panel */
+.detail-panel {
+	border-top: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-sideBar-background);
+	flex-shrink: 0;
+	max-height: 40%;
+	display: flex;
+	flex-direction: column;
+}
+
+.detail-panel-header {
+	display: flex;
+	align-items: center;
+	padding: 8px 12px;
+	cursor: pointer;
+	user-select: none;
+	background: var(--vscode-sideBarSectionHeader-background);
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.detail-panel-header:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.detail-panel-toggle {
+	margin-right: 8px;
+	font-size: 10px;
+	color: var(--vscode-foreground);
+	opacity: 0.7;
+	transition: transform 0.15s ease;
+}
+
+.detail-panel.collapsed .detail-panel-toggle {
+	transform: rotate(-90deg);
+}
+
+.detail-panel-title {
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--vscode-sideBarSectionHeader-foreground);
+}
+
+.detail-panel-content {
+	padding: 12px;
+	overflow-y: auto;
+	flex: 1;
+}
+
+.detail-panel.collapsed .detail-panel-content {
+	display: none;
+}
+
+.detail-placeholder {
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+	font-style: italic;
+	margin: 0;
+	text-align: center;
+	padding: 20px;
+}
+
+/* Detail Panel - Key/Value Grid */
+.detail-grid {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 6px 12px;
+	font-size: 12px;
+}
+
+.detail-label {
+	color: var(--vscode-descriptionForeground);
+	white-space: nowrap;
+}
+
+.detail-value {
+	color: var(--vscode-foreground);
+	word-break: break-word;
+}
+
+.detail-value.monospace {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 11px;
+}
+
+.detail-value.truncated {
+	max-height: 60px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.detail-section-title {
+	grid-column: 1 / -1;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	margin-top: 8px;
+	padding-top: 8px;
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
+.detail-section-title:first-child {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: none;
+}
+
+/* Status indicators */
+.detail-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.detail-status-icon {
+	font-size: 12px;
+}
+
+.detail-status-icon.enabled {
+	color: var(--vscode-testing-iconPassed, #73c991);
+}
+
+.detail-status-icon.disabled {
+	color: var(--vscode-testing-iconFailed, #f48771);
+}
+
+.detail-status-icon.managed {
+	color: var(--vscode-charts-blue, #3794ff);
+}

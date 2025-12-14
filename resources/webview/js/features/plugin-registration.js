@@ -14,6 +14,7 @@ let expandedNodes = new Set();
 let currentFilter = '';
 let hideHiddenSteps = true; // Default: hide internal system steps (ishidden=true)
 let hideMicrosoftAssemblies = true; // Default: hide Microsoft assemblies
+let selectedNodeId = null; // Currently selected node for detail panel
 
 // Cache for entities per message (messageId -> entity logical names array)
 const entityCacheByMessage = new Map();
@@ -420,18 +421,48 @@ function getBadge(item) {
 function handleNodeClick(event) {
 	const node = event.currentTarget;
 	const id = node.dataset.id;
+	const nodeType = node.dataset.type;
 	const hasChildren = node.dataset.hasChildren === 'true';
 
 	if (hasChildren) {
 		toggleExpansion(node, id);
 	}
 
-	// Notify extension of selection (use window.vscode from messaging.js)
+	// Update visual selection
+	updateNodeSelection(node, id);
+
+	// Notify extension of selection for detail panel
 	if (window.vscode) {
 		window.vscode.postMessage({
 			command: 'selectNode',
-			nodeId: id
+			nodeId: id,
+			nodeType: nodeType
 		});
+	}
+}
+
+/**
+ * Update visual selection state of tree nodes.
+ * @param {HTMLElement} node - The clicked node element
+ * @param {string} id - The node ID
+ */
+function updateNodeSelection(node, id) {
+	// Remove selection from previous node
+	if (selectedNodeId) {
+		const prevNode = document.querySelector(`.tree-node[data-id="${selectedNodeId}"]`);
+		if (prevNode) {
+			prevNode.classList.remove('selected');
+		}
+	}
+
+	// Add selection to new node
+	node.classList.add('selected');
+	selectedNodeId = id;
+
+	// Show detail panel if hidden
+	const detailPanel = document.getElementById('detailPanel');
+	if (detailPanel && detailPanel.style.display === 'none') {
+		detailPanel.style.display = 'flex';
 	}
 }
 
@@ -944,6 +975,17 @@ window.createBehavior({
 				}
 			});
 		}
+
+		// Wire up detail panel collapse/expand toggle
+		const detailPanelHeader = document.getElementById('detailPanelHeader');
+		if (detailPanelHeader) {
+			detailPanelHeader.addEventListener('click', () => {
+				const detailPanel = document.getElementById('detailPanel');
+				if (detailPanel) {
+					detailPanel.classList.toggle('collapsed');
+				}
+			});
+		}
 	},
 
 	handleMessage(message) {
@@ -995,6 +1037,9 @@ window.createBehavior({
 				break;
 			case 'entitiesForMessage':
 				handleEntitiesForMessage(message.data);
+				break;
+			case 'showNodeDetails':
+				handleShowNodeDetails(message.data);
 				break;
 		}
 	}
@@ -2301,5 +2346,232 @@ function handleEntitiesForMessage(data) {
 				activeStepModal.updateField('name', activeStepModal.generateStepName());
 			}
 		}
+	}
+}
+
+/**
+ * Handle showing node details in the detail panel.
+ * Renders details based on node type.
+ * @param {Object} data - Details object with nodeType and type-specific fields
+ */
+function handleShowNodeDetails(data) {
+	const { nodeType } = data;
+	const detailContent = document.getElementById('detailPanelContent');
+
+	if (!detailContent) {
+		console.warn('[PluginRegistration] Detail panel content element not found');
+		return;
+	}
+
+	// Render based on node type
+	let html = '<div class="detail-grid">';
+
+	switch (nodeType) {
+		case 'package':
+			html += renderPackageDetails(data);
+			break;
+		case 'assembly':
+			html += renderAssemblyDetails(data);
+			break;
+		case 'pluginType':
+			html += renderPluginTypeDetails(data);
+			break;
+		case 'step':
+			html += renderStepDetails(data);
+			break;
+		case 'image':
+			html += renderImageDetails(data);
+			break;
+		default:
+			html = '<p class="detail-placeholder">Unknown node type</p>';
+	}
+
+	if (nodeType !== 'unknown') {
+		html += '</div>';
+	}
+
+	detailContent.innerHTML = html;
+}
+
+/**
+ * Render package details.
+ */
+function renderPackageDetails(data) {
+	return `
+		<span class="detail-label">Name:</span>
+		<span class="detail-value">${escapeHtml(data.name || '')}</span>
+		<span class="detail-label">Unique Name:</span>
+		<span class="detail-value monospace">${escapeHtml(data.uniqueName || '')}</span>
+		<span class="detail-label">Version:</span>
+		<span class="detail-value">${escapeHtml(data.version || '')}</span>
+		<span class="detail-label">Managed:</span>
+		<span class="detail-value">${renderManagedStatus(data.isManaged)}</span>
+		<span class="detail-label">Created:</span>
+		<span class="detail-value">${formatDate(data.createdOn)}</span>
+		<span class="detail-label">Modified:</span>
+		<span class="detail-value">${formatDate(data.modifiedOn)}</span>
+	`;
+}
+
+/**
+ * Render assembly details.
+ */
+function renderAssemblyDetails(data) {
+	return `
+		<span class="detail-label">Name:</span>
+		<span class="detail-value">${escapeHtml(data.name || '')}</span>
+		<span class="detail-label">Version:</span>
+		<span class="detail-value">${escapeHtml(data.version || '')}</span>
+		<span class="detail-label">Isolation Mode:</span>
+		<span class="detail-value">${escapeHtml(data.isolationMode || '')}</span>
+		<span class="detail-label">Source Type:</span>
+		<span class="detail-value">${escapeHtml(data.sourceType || '')}</span>
+		<span class="detail-label">Managed:</span>
+		<span class="detail-value">${renderManagedStatus(data.isManaged)}</span>
+		<span class="detail-label">Plugin Count:</span>
+		<span class="detail-value">${data.pluginCount ?? '-'}</span>
+		<span class="detail-label">In Package:</span>
+		<span class="detail-value">${data.packageName ? escapeHtml(data.packageName) : 'No (standalone)'}</span>
+		<span class="detail-label">Created:</span>
+		<span class="detail-value">${formatDate(data.createdOn)}</span>
+	`;
+}
+
+/**
+ * Render plugin type details.
+ */
+function renderPluginTypeDetails(data) {
+	return `
+		<span class="detail-label">Type Name:</span>
+		<span class="detail-value monospace">${escapeHtml(data.typeName || '')}</span>
+		<span class="detail-label">Friendly Name:</span>
+		<span class="detail-value">${escapeHtml(data.friendlyName || '')}</span>
+		<span class="detail-label">Type:</span>
+		<span class="detail-value">${data.isWorkflowActivity ? '⚙️ Workflow Activity' : '🔌 Plugin'}</span>
+		<span class="detail-label">Assembly:</span>
+		<span class="detail-value">${escapeHtml(data.assemblyName || '')}</span>
+		<span class="detail-label">Step Count:</span>
+		<span class="detail-value">${data.stepCount ?? '-'}</span>
+	`;
+}
+
+/**
+ * Render step details.
+ */
+function renderStepDetails(data) {
+	let html = `
+		<span class="detail-section-title">General</span>
+		<span class="detail-label">Name:</span>
+		<span class="detail-value">${escapeHtml(data.name || '')}</span>
+		<span class="detail-label">Message:</span>
+		<span class="detail-value">${escapeHtml(data.message || '')}</span>
+		<span class="detail-label">Primary Entity:</span>
+		<span class="detail-value">${escapeHtml(data.primaryEntity || 'none')}</span>
+	`;
+
+	if (data.secondaryEntity) {
+		html += `
+		<span class="detail-label">Secondary Entity:</span>
+		<span class="detail-value">${escapeHtml(data.secondaryEntity)}</span>
+		`;
+	}
+
+	html += `
+		<span class="detail-section-title">Execution</span>
+		<span class="detail-label">Stage:</span>
+		<span class="detail-value">${escapeHtml(data.stage || '')}</span>
+		<span class="detail-label">Mode:</span>
+		<span class="detail-value">${escapeHtml(data.mode || '')}</span>
+		<span class="detail-label">Execution Order:</span>
+		<span class="detail-value">${data.rank ?? '-'}</span>
+		<span class="detail-label">Deployment:</span>
+		<span class="detail-value">${escapeHtml(data.deployment || '')}</span>
+	`;
+
+	if (data.mode === 'Asynchronous') {
+		html += `
+		<span class="detail-label">Auto Delete:</span>
+		<span class="detail-value">${data.asyncAutoDelete ? 'Yes' : 'No'}</span>
+		`;
+	}
+
+	if (data.filteringAttributes) {
+		html += `
+		<span class="detail-label">Filtering Attrs:</span>
+		<span class="detail-value monospace truncated">${escapeHtml(data.filteringAttributes)}</span>
+		`;
+	}
+
+	html += `
+		<span class="detail-section-title">Status</span>
+		<span class="detail-label">Enabled:</span>
+		<span class="detail-value">${renderEnabledStatus(data.isEnabled)}</span>
+		<span class="detail-label">Managed:</span>
+		<span class="detail-value">${renderManagedStatus(data.isManaged)}</span>
+	`;
+
+	if (data.unsecureConfig) {
+		html += `
+		<span class="detail-label">Unsecure Config:</span>
+		<span class="detail-value monospace truncated">${escapeHtml(data.unsecureConfig)}</span>
+		`;
+	}
+
+	html += `
+		<span class="detail-label">Created:</span>
+		<span class="detail-value">${formatDate(data.createdOn)}</span>
+	`;
+
+	return html;
+}
+
+/**
+ * Render image details.
+ */
+function renderImageDetails(data) {
+	return `
+		<span class="detail-label">Name:</span>
+		<span class="detail-value">${escapeHtml(data.name || '')}</span>
+		<span class="detail-label">Image Type:</span>
+		<span class="detail-value">${escapeHtml(data.imageType || '')}</span>
+		<span class="detail-label">Entity Alias:</span>
+		<span class="detail-value monospace">${escapeHtml(data.entityAlias || '')}</span>
+		<span class="detail-label">Message Property:</span>
+		<span class="detail-value monospace">${escapeHtml(data.messagePropertyName || '')}</span>
+		<span class="detail-label">Attributes:</span>
+		<span class="detail-value monospace truncated">${escapeHtml(data.attributes || 'All attributes')}</span>
+	`;
+}
+
+/**
+ * Render enabled/disabled status with icon.
+ */
+function renderEnabledStatus(isEnabled) {
+	if (isEnabled) {
+		return '<span class="detail-status"><span class="detail-status-icon enabled">✓</span> Enabled</span>';
+	}
+	return '<span class="detail-status"><span class="detail-status-icon disabled">✗</span> Disabled</span>';
+}
+
+/**
+ * Render managed status with icon.
+ */
+function renderManagedStatus(isManaged) {
+	if (isManaged) {
+		return '<span class="detail-status"><span class="detail-status-icon managed">🔒</span> Yes</span>';
+	}
+	return 'No';
+}
+
+/**
+ * Format date for display.
+ */
+function formatDate(dateString) {
+	if (!dateString) return '-';
+	try {
+		const date = new Date(dateString);
+		return date.toLocaleString();
+	} catch {
+		return dateString;
 	}
 }

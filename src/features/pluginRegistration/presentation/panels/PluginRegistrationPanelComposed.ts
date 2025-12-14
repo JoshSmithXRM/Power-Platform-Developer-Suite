@@ -496,9 +496,9 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		});
 
 		this.coordinator.registerHandler('selectNode', async (data) => {
-			const nodeId = (data as { nodeId?: string })?.nodeId;
-			if (nodeId) {
-				this.handleNodeSelection(nodeId);
+			const { nodeId, nodeType } = data as { nodeId?: string; nodeType?: string };
+			if (nodeId && nodeType) {
+				await this.handleNodeSelection(nodeId, nodeType);
 			}
 		});
 
@@ -836,9 +836,162 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		await this.handleRefresh();
 	}
 
-	private handleNodeSelection(nodeId: string): void {
-		this.logger.debug('Node selected', { nodeId });
-		// Future: Show detail panel for selected node
+	/**
+	 * Handle node selection - fetch entity details and send to webview for detail panel.
+	 */
+	private async handleNodeSelection(nodeId: string, nodeType: string): Promise<void> {
+		this.logger.debug('Node selected', { nodeId, nodeType });
+
+		try {
+			let details: Record<string, unknown> | null = null;
+
+			switch (nodeType) {
+				case 'package':
+					details = await this.fetchPackageDetails(nodeId);
+					break;
+				case 'assembly':
+					details = await this.fetchAssemblyDetails(nodeId);
+					break;
+				case 'pluginType':
+					details = await this.fetchPluginTypeDetails(nodeId);
+					break;
+				case 'step':
+					details = await this.fetchStepDetails(nodeId);
+					break;
+				case 'image':
+					details = await this.fetchImageDetails(nodeId);
+					break;
+				default:
+					this.logger.warn('Unknown node type', { nodeType });
+					return;
+			}
+
+			if (details) {
+				await this.panel.postMessage({ command: 'showNodeDetails', data: details });
+			}
+		} catch (error) {
+			this.logger.error('Failed to fetch node details', { nodeId, nodeType, error });
+		}
+	}
+
+	private async fetchPackageDetails(packageId: string): Promise<Record<string, unknown> | null> {
+		const pkg = await this.repositories.package.findById(this.currentEnvironmentId, packageId);
+		if (!pkg) return null;
+
+		return {
+			nodeType: 'package',
+			name: pkg.getName(),
+			uniqueName: pkg.getUniqueName(),
+			version: pkg.getVersion(),
+			isManaged: pkg.isInManagedState(),
+			createdOn: pkg.getCreatedOn()?.toISOString(),
+			modifiedOn: pkg.getModifiedOn()?.toISOString(),
+		};
+	}
+
+	private async fetchAssemblyDetails(assemblyId: string): Promise<Record<string, unknown> | null> {
+		const assembly = await this.repositories.assembly.findById(
+			this.currentEnvironmentId,
+			assemblyId
+		);
+		if (!assembly) return null;
+
+		// Count plugins for this assembly
+		const pluginTypes = await this.repositories.pluginType.findByAssemblyId(
+			this.currentEnvironmentId,
+			assemblyId
+		);
+
+		return {
+			nodeType: 'assembly',
+			name: assembly.getName(),
+			version: assembly.getVersion(),
+			isolationMode: assembly.getIsolationMode().getName(),
+			sourceType: assembly.getSourceType().getName(),
+			isManaged: assembly.isInManagedState(),
+			pluginCount: pluginTypes.length,
+			packageName: assembly.getPackageId() ? 'In package' : null,
+			createdOn: assembly.getCreatedOn()?.toISOString(),
+		};
+	}
+
+	private async fetchPluginTypeDetails(pluginTypeId: string): Promise<Record<string, unknown> | null> {
+		const pluginType = await this.repositories.pluginType.findById(
+			this.currentEnvironmentId,
+			pluginTypeId
+		);
+		if (!pluginType) return null;
+
+		// Count steps for this plugin type
+		const steps = await this.repositories.step.findByPluginTypeId(
+			this.currentEnvironmentId,
+			pluginTypeId
+		);
+
+		return {
+			nodeType: 'pluginType',
+			typeName: pluginType.getName(),
+			friendlyName: pluginType.getFriendlyName(),
+			isWorkflowActivity: pluginType.isWorkflowActivity(),
+			assemblyName: pluginType.getAssemblyId(),
+			stepCount: steps.length,
+		};
+	}
+
+	private async fetchStepDetails(stepId: string): Promise<Record<string, unknown> | null> {
+		const step = await this.repositories.step.findById(this.currentEnvironmentId, stepId);
+		if (!step) return null;
+
+		return {
+			nodeType: 'step',
+			name: step.getName(),
+			message: step.getMessageName(),
+			primaryEntity: step.getPrimaryEntityLogicalName(),
+			stage: step.getStage().getName(),
+			mode: step.getMode().getName(),
+			rank: step.getRank(),
+			deployment: this.getDeploymentDisplayName(step.getSupportedDeployment()),
+			asyncAutoDelete: step.getAsyncAutoDelete(),
+			filteringAttributes: step.getFilteringAttributes(),
+			isEnabled: step.isEnabled(),
+			isManaged: step.isInManagedState(),
+			unsecureConfig: step.getUnsecureConfiguration()
+				? this.truncateText(step.getUnsecureConfiguration() ?? '', 200)
+				: null,
+			createdOn: step.getCreatedOn()?.toISOString(),
+		};
+	}
+
+	private async fetchImageDetails(imageId: string): Promise<Record<string, unknown> | null> {
+		const image = await this.repositories.image.findById(this.currentEnvironmentId, imageId);
+		if (!image) return null;
+
+		return {
+			nodeType: 'image',
+			name: image.getName(),
+			imageType: image.getImageType().getName(),
+			entityAlias: image.getEntityAlias(),
+			messagePropertyName: image.getMessagePropertyName(),
+			attributes: image.getAttributes(),
+		};
+	}
+
+	private getDeploymentDisplayName(deployment: number): string {
+		switch (deployment) {
+			case 0:
+				return 'Server Only';
+			case 1:
+				return 'Offline Only';
+			case 2:
+				return 'Server and Offline';
+			default:
+				return 'Unknown';
+		}
+	}
+
+	private truncateText(text: string, maxLength: number): string {
+		if (text.length <= maxLength) return text;
+		return text.slice(0, maxLength) + '...';
 	}
 
 	// ========================================
