@@ -476,4 +476,12 @@ See `.claude/agents/` for agent definitions.
 
 ---
 
-**Git Commits & PRs:** No "Generated with Claude Code" footers, Co-authored-by lines, or AI attribution in commits or PR descriptions. Keep messages clean and conventional.
+## Decision Presentation
+
+When presenting choices or asking questions:
+1. **Lead with your recommendation** and rationale
+2. **List alternatives considered** and why they're not preferred
+3. **Ask for confirmation**, not open-ended input
+
+❌ "What testing approach should we use?"
+✅ "I recommend X because Y. Alternatives considered: A (rejected because B), C (rejected because D). Do you agree?"
