@@ -1625,3 +1625,81 @@ Dataverse requires the actual unique name string, not the ID.
 - Selected item highlight
 - Keyboard focus indicators
 - Loading spinner for async operations
+
+---
+
+### Session 20 (2025-12-18)
+**Bug Fixes - Multiple Issues**
+
+**Bugs Reported:**
+1. ❓ **Solution picker not loading** - Dropdown shows "Loading..." and never populates
+2. ✅ **Register Step/Image buttons disabled** - Dropdown items were permanently disabled
+3. ✅ **Primary entity showing "(none)"** - Edit Step modal was missing `primaryEntity` field
+4. ✅ **Tree click behavior** - Clicking nodes would toggle expand/collapse unexpectedly
+5. ✅ **Images not showing under steps** - First click fix broke expansion behavior
+6. ✅ **Step form validation** - Async mode + non-Server Only deployment allowed (Dataverse rejects)
+
+**Fixes Implemented:**
+
+**1. Step Form Async/Deployment Validation (✅ FIXED)**
+- **Problem:** Dataverse returns "400 Bad Request - Asynchronous steps are only supported in ServerOnly mode" when user selects Async + Offline deployment
+- **Solution:**
+  - Added 5th `disabled` parameter to `updateField()` in FormModal.js
+  - When mode changes to Async, auto-set deployment to "Server Only" and disable dropdown
+  - Re-enable dropdown when mode changes back to Synchronous
+- **Files:** `FormModal.js`, `plugin-registration.js`
+
+**2. Tree Click Behavior (✅ FIXED)**
+- **Problem:** Clicking anywhere on a node would both show details AND toggle expand/collapse
+- **Solution:**
+  - Click on toggle arrow (▶) → toggle expand/collapse only
+  - Click on node content → expand if collapsed + select + show details (never collapse)
+- **File:** `plugin-registration.js` - `handleNodeClick()` function
+
+**3. Images Not Showing (✅ FIXED - was caused by #2)**
+- **Problem:** After first click fix, clicking on steps didn't expand to show images
+- **Root Cause:** First fix removed expansion entirely on content click
+- **Solution:** Content click now expands if collapsed, but doesn't collapse if already expanded
+- **File:** `plugin-registration.js` - `handleNodeClick()` function
+
+**4. Register Step/Image Buttons (✅ FIXED)**
+- **Problem:** "Register New Step" and "Register New Image" dropdown items were permanently disabled
+- **Solution:** Removed `disabled: true` from dropdown item definitions
+- **File:** `RegisterDropdownSection.ts`
+
+**5. Edit Step Modal Missing Fields (✅ FIXED)**
+- **Problem:** Edit Step modal showed "(none)" for Primary Entity even when step had one
+- **Root Cause:** `showEditStepModal` command was missing `primaryEntity` in data
+- **Solution:** Added missing fields to modal data:
+  - `primaryEntity`
+  - `supportedDeployment`
+  - `asyncAutoDelete`
+  - `unsecureConfiguration`
+- **File:** `PluginRegistrationPanelComposed.ts` - `editStep()` method
+
+**6. Solution Picker (✅ WORKING)**
+- **Problem:** Was reported as not loading, but testing confirmed it works
+- **Status:** Working correctly - solutions load and populate the dropdown
+
+**7. Images Filtered Out by Solution Filter (✅ FIXED)**
+- **Problem:** Images disappeared when solution filter was active (even Default Solution)
+- **Root Cause:** `filterBySolution()` recursively filtered ALL children, including images. But images are NOT solution components - Dataverse only tracks assemblies, plugin types, and steps in `solutioncomponent`.
+- **Solution:** Modified `filterBySolution()` to skip filtering image children - when processing a step, keep all its images without checking solution membership.
+- **File:** `plugin-registration.js` - `filterBySolution()` function
+
+**Files Modified:**
+- `resources/webview/js/components/FormModal.js` - Added disabled parameter to updateField
+- `resources/webview/js/features/plugin-registration.js` - Click behavior fixes
+- `src/.../presentation/panels/PluginRegistrationPanelComposed.ts` - Edit modal data, solution debug logging
+- `src/.../presentation/sections/RegisterDropdownSection.ts` - Enabled step/image buttons
+
+**Testing Status:**
+| Issue | Status | Notes |
+|-------|--------|-------|
+| Async/Deployment validation | ✅ Fixed | Dropdown disables when Async selected |
+| Tree click behavior | ✅ Fixed | Content click expands, arrow toggles |
+| Images showing under steps | ✅ Fixed | Expansion works correctly |
+| Register Step/Image buttons | ✅ Fixed | Dropdown items now enabled |
+| Edit Step primary entity | ✅ Fixed | Shows correct entity name |
+| Solution picker | ✅ Working | Loads and populates correctly |
+| Images filtered by solution | ✅ Fixed | Images now preserved when parent step is in solution |

@@ -22,8 +22,8 @@ export class RegisterDropdownSection extends DropdownSection {
 			{ id: 'assembly', label: 'Register New Assembly', icon: 'file-binary' },
 			{ id: 'package', label: 'Register New Package', icon: 'package' },
 			{ id: 'separator1', label: '', separator: true },
-			{ id: 'step', label: 'Register New Step', icon: 'zap', disabled: true },
-			{ id: 'image', label: 'Register New Image', icon: 'file-media', disabled: true },
+			{ id: 'step', label: 'Register New Step', icon: 'zap' },
+			{ id: 'image', label: 'Register New Image', icon: 'file-media' },
 		];
 	}
 

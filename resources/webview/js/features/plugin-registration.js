@@ -431,7 +431,19 @@ function handleNodeClick(event) {
 	const nodeType = node.dataset.type;
 	const hasChildren = node.dataset.hasChildren === 'true';
 
-	if (hasChildren) {
+	// Check if click was on the toggle icon (expand/collapse arrow)
+	const clickedOnToggle = event.target.classList.contains('tree-node-toggle');
+
+	if (clickedOnToggle && hasChildren) {
+		// Toggle icon click: toggle expansion (both expand and collapse)
+		toggleExpansion(node, id);
+		return; // Don't update selection or show details
+	}
+
+	// Content click: expand if collapsed, but don't collapse if already expanded
+	// This allows users to expand nodes by clicking anywhere, but prevents
+	// accidental collapse when clicking to view details
+	if (hasChildren && !expandedNodes.has(id)) {
 		toggleExpansion(node, id);
 	}
 
@@ -842,8 +854,15 @@ function filterBySolution(items, memberIds) {
 			const isDirectMember = memberIds.has(item.id);
 
 			if (clone.children && clone.children.length > 0) {
-				// Recursively filter children
-				clone.children = filterBySolution(clone.children, memberIds);
+				// Images are NOT solution components - keep them if parent step is kept
+				// Only filter non-image children by solution membership
+				if (clone.type === 'step') {
+					// Steps contain images - keep all images (don't filter them)
+					clone.children = clone.children.map(child => ({ ...child }));
+				} else {
+					// Recursively filter children (packages, assemblies, plugin types)
+					clone.children = filterBySolution(clone.children, memberIds);
+				}
 			}
 
 			// Store membership flags
@@ -1992,11 +2011,17 @@ function handleShowRegisterStepModal(data) {
 
 			// Stage/Mode validation: Async mode forces PostOperation
 			// Also toggle asyncAutoDelete visibility (only relevant for async)
+			// Deployment validation: Async mode requires Server Only deployment
 			if (fieldId === 'mode') {
 				const isAsync = value === '1';
 				if (isAsync) {
 					// Asynchronous - force PostOperation (stage 40)
 					updateField('stage', '40');
+					// Asynchronous - force Server Only deployment (Dataverse constraint)
+					updateField('supportedDeployment', '0', undefined, undefined, true);
+				} else {
+					// Synchronous - re-enable deployment selection
+					updateField('supportedDeployment', undefined, undefined, undefined, false);
 				}
 				// Show/hide asyncAutoDelete based on mode (4th param is visibility)
 				updateField('asyncAutoDelete', undefined, undefined, isAsync);
@@ -2143,7 +2168,8 @@ function handleShowEditStepModal(data) {
 				type: 'select',
 				value: String(supportedDeployment ?? 0),
 				options: deploymentOptions,
-				required: true
+				required: true,
+				disabled: mode === 1 // Disable if current mode is Async (Dataverse constraint)
 			},
 			{
 				id: 'sectionConfiguration',
@@ -2170,11 +2196,17 @@ function handleShowEditStepModal(data) {
 		onFieldChange: (fieldId, value, updateField) => {
 			// Stage/Mode validation: Async mode forces PostOperation
 			// Also toggle asyncAutoDelete visibility (only relevant for async)
+			// Deployment validation: Async mode requires Server Only deployment
 			if (fieldId === 'mode') {
 				const isAsync = value === '1';
 				if (isAsync) {
 					// Asynchronous - force PostOperation (stage 40)
 					updateField('stage', '40');
+					// Asynchronous - force Server Only deployment (Dataverse constraint)
+					updateField('supportedDeployment', '0', undefined, undefined, true);
+				} else {
+					// Synchronous - re-enable deployment selection
+					updateField('supportedDeployment', undefined, undefined, undefined, false);
 				}
 				// Show/hide asyncAutoDelete based on mode (4th param is visibility)
 				updateField('asyncAutoDelete', undefined, undefined, isAsync);

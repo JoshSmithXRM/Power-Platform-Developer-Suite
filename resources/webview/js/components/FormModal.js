@@ -234,7 +234,7 @@ window.showFormModal = function(options) {
 				disabled: field.disabled,
 				onChange: (value) => {
 					if (onFieldChange) {
-						const updateField = (targetFieldId, newValue, targetOptions, visibility) => {
+						const updateField = (targetFieldId, newValue, targetOptions, visibility, disabled) => {
 							// Handle visibility toggling
 							if (visibility !== undefined) {
 								const container = fieldContainers[targetFieldId];
@@ -250,11 +250,25 @@ window.showFormModal = function(options) {
 								if (newValue !== undefined) {
 									target.instance.setValue(newValue);
 								}
-							} else if (target && newValue !== undefined) {
+								// Handle disabled state for combobox
+								if (disabled !== undefined && target.instance.setDisabled) {
+									target.instance.setDisabled(disabled);
+								}
+							} else if (target) {
 								if (target.type === 'checkbox') {
-									target.element.checked = newValue === true || newValue === 'true';
+									if (newValue !== undefined) {
+										target.element.checked = newValue === true || newValue === 'true';
+									}
+									if (disabled !== undefined) {
+										target.element.disabled = disabled;
+									}
 								} else if (target.value !== undefined) {
-									target.value = newValue;
+									if (newValue !== undefined) {
+										target.value = newValue;
+									}
+									if (disabled !== undefined) {
+										target.disabled = disabled;
+									}
 								}
 							}
 						};
@@ -376,7 +390,7 @@ window.showFormModal = function(options) {
 
 			if (onFieldChange) {
 				input.addEventListener('input', () => {
-					const updateField = (targetFieldId, newValue, targetOptions, visibility) => {
+					const updateField = (targetFieldId, newValue, targetOptions, visibility, disabled) => {
 						if (visibility !== undefined) {
 							const container = fieldContainers[targetFieldId];
 							if (container) {
@@ -384,9 +398,12 @@ window.showFormModal = function(options) {
 							}
 						}
 						const target = inputElements[targetFieldId];
-						if (target && newValue !== undefined) {
-							if (target.value !== undefined) {
+						if (target) {
+							if (newValue !== undefined && target.value !== undefined) {
 								target.value = newValue;
+							}
+							if (disabled !== undefined) {
+								target.disabled = disabled;
 							}
 						}
 					};
@@ -421,7 +438,7 @@ window.showFormModal = function(options) {
 		if (onFieldChange) {
 			const eventType = field.type === 'select' ? 'change' : 'input';
 			input.addEventListener(eventType, () => {
-				const updateField = (targetFieldId, newValue, targetOptions, visibility) => {
+				const updateField = (targetFieldId, newValue, targetOptions, visibility, disabled) => {
 					// Handle visibility toggling
 					if (visibility !== undefined) {
 						const container = fieldContainers[targetFieldId];
@@ -438,11 +455,25 @@ window.showFormModal = function(options) {
 						if (newValue !== undefined) {
 							target.instance.setValue(newValue);
 						}
-					} else if (target && newValue !== undefined) {
+						// Handle disabled state for combobox
+						if (disabled !== undefined && target.instance.setDisabled) {
+							target.instance.setDisabled(disabled);
+						}
+					} else if (target) {
 						if (target.type === 'checkbox') {
-							target.element.checked = newValue === true || newValue === 'true';
+							if (newValue !== undefined) {
+								target.element.checked = newValue === true || newValue === 'true';
+							}
+							if (disabled !== undefined) {
+								target.element.disabled = disabled;
+							}
 						} else if (target.value !== undefined) {
-							target.value = newValue;
+							if (newValue !== undefined) {
+								target.value = newValue;
+							}
+							if (disabled !== undefined) {
+								target.disabled = disabled;
+							}
 						}
 					}
 				};
