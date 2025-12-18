@@ -2028,7 +2028,6 @@ function handleShowRegisterStepModal(data) {
 			}
 		},
 		onSubmit: (values) => {
-			console.debug('[PluginRegistration] onSubmit called with values:', values);
 			vscode.postMessage({
 				command: 'confirmRegisterStep',
 				data: {
@@ -2266,7 +2265,7 @@ function getImagePropertyNamesForMessage(messageName) {
  * @param {Object} data - { stepId, stepName, messageName }
  */
 function handleShowRegisterImageModal(data) {
-	const { stepId, stepName, messageName } = data;
+	const { stepId, stepName, messageName, primaryEntity } = data;
 
 	if (!window.showFormModal) {
 		console.error('FormModal component not loaded');
@@ -2286,41 +2285,65 @@ function handleShowRegisterImageModal(data) {
 	const propertyNameOptions = getImagePropertyNamesForMessage(messageName);
 	const messagePropertyName = propertyNameOptions[0].value;
 
+	// Build fields array - include entity display if we have one
+	const fields = [
+		{
+			id: 'name',
+			label: 'Name',
+			type: 'text',
+			value: '',
+			required: true,
+			placeholder: 'Image name'
+		},
+		{
+			id: 'imageType',
+			label: 'Image Type',
+			type: 'select',
+			value: '',
+			options: imageTypeOptions,
+			required: true
+		},
+		{
+			id: 'entityAlias',
+			label: 'Entity Alias',
+			type: 'text',
+			value: '',
+			required: true,
+			placeholder: 'e.g., PreImage or PostImage'
+		}
+	];
+
+	// Add entity display and attribute picker if we have a primary entity
+	if (primaryEntity) {
+		fields.push({
+			id: 'primaryEntity',
+			label: 'Entity',
+			type: 'text',
+			value: primaryEntity,
+			readonly: true
+		});
+		fields.push({
+			id: 'attributes',
+			label: 'Attributes',
+			type: 'attributeInput',
+			value: '',
+			placeholder: 'Comma-separated (leave empty for all)',
+			entityField: 'primaryEntity'
+		});
+	} else {
+		// No entity - use plain text field
+		fields.push({
+			id: 'attributes',
+			label: 'Attributes',
+			type: 'text',
+			value: '',
+			placeholder: 'Comma-separated (leave empty for all)'
+		});
+	}
+
 	window.showFormModal({
 		title: `Register Image for ${stepName}`,
-		fields: [
-			{
-				id: 'name',
-				label: 'Name',
-				type: 'text',
-				value: '',
-				required: true,
-				placeholder: 'Image name'
-			},
-			{
-				id: 'imageType',
-				label: 'Image Type',
-				type: 'select',
-				value: '',
-				options: imageTypeOptions,
-				required: true
-			},
-			{
-				id: 'entityAlias',
-				label: 'Entity Alias',
-				type: 'text',
-				value: '',
-				required: true,
-				placeholder: 'e.g., PreImage or PostImage'
-			},
-			{
-				id: 'attributes',
-				label: 'Attributes',
-				type: 'text',
-				value: '',
-				placeholder: 'Comma-separated (leave empty for all)'
-			}
-		],
+		fields,
 		submitLabel: 'Register',
 		cancelLabel: 'Cancel',
 		onSubmit: (values) => {
@@ -2341,10 +2364,10 @@ function handleShowRegisterImageModal(data) {
 
 /**
  * Show the Edit Image modal.
- * @param {Object} data - { imageId, imageName, imageType, entityAlias, attributes }
+ * @param {Object} data - { imageId, imageName, imageType, entityAlias, attributes, primaryEntity }
  */
 function handleShowEditImageModal(data) {
-	const { imageId, imageName, imageType, entityAlias, attributes } = data;
+	const { imageId, imageName, imageType, entityAlias, attributes, primaryEntity } = data;
 
 	if (!window.showFormModal) {
 		console.error('FormModal component not loaded');
@@ -2358,39 +2381,63 @@ function handleShowEditImageModal(data) {
 		{ value: '2', label: 'Both' }
 	];
 
+	// Build fields array - include entity display if we have one
+	const fields = [
+		{
+			id: 'name',
+			label: 'Name',
+			type: 'text',
+			value: imageName,
+			required: true
+		},
+		{
+			id: 'imageType',
+			label: 'Image Type',
+			type: 'select',
+			value: String(imageType),
+			options: imageTypeOptions,
+			required: true
+		},
+		{
+			id: 'entityAlias',
+			label: 'Entity Alias',
+			type: 'text',
+			value: entityAlias,
+			required: true
+		}
+	];
+
+	// Add entity display and attribute picker if we have a primary entity
+	if (primaryEntity) {
+		fields.push({
+			id: 'primaryEntity',
+			label: 'Entity',
+			type: 'text',
+			value: primaryEntity,
+			readonly: true
+		});
+		fields.push({
+			id: 'attributes',
+			label: 'Attributes',
+			type: 'attributeInput',
+			value: attributes || '',
+			placeholder: 'Comma-separated (leave empty for all)',
+			entityField: 'primaryEntity'
+		});
+	} else {
+		// No entity - use plain text field
+		fields.push({
+			id: 'attributes',
+			label: 'Attributes',
+			type: 'text',
+			value: attributes || '',
+			placeholder: 'Comma-separated (leave empty for all)'
+		});
+	}
+
 	window.showFormModal({
 		title: `Edit Image: ${imageName}`,
-		fields: [
-			{
-				id: 'name',
-				label: 'Name',
-				type: 'text',
-				value: imageName,
-				required: true
-			},
-			{
-				id: 'imageType',
-				label: 'Image Type',
-				type: 'select',
-				value: String(imageType),
-				options: imageTypeOptions,
-				required: true
-			},
-			{
-				id: 'entityAlias',
-				label: 'Entity Alias',
-				type: 'text',
-				value: entityAlias,
-				required: true
-			},
-			{
-				id: 'attributes',
-				label: 'Attributes',
-				type: 'text',
-				value: attributes || '',
-				placeholder: 'Comma-separated (leave empty for all)'
-			}
-		],
+		fields,
 		submitLabel: 'Update',
 		cancelLabel: 'Cancel',
 		onSubmit: (values) => {

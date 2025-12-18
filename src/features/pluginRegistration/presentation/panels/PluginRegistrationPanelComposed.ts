@@ -2131,6 +2131,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		const step = await this.repositories.step.findById(this.currentEnvironmentId, stepId);
 		const stepName = step?.getName() ?? 'Unknown Step';
 		const messageName = step?.getMessageName() ?? 'Update';
+		const primaryEntity = step?.getPrimaryEntityLogicalName() ?? null;
 
 		// Send modal data to webview
 		await this.panel.postMessage({
@@ -2139,6 +2140,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				stepId,
 				stepName,
 				messageName,
+				primaryEntity,
 			},
 		});
 	}
@@ -2157,6 +2159,10 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			return;
 		}
 
+		// Get the step to retrieve the primary entity for the attribute picker
+		const step = await this.repositories.step.findById(this.currentEnvironmentId, image.getStepId());
+		const primaryEntity = step?.getPrimaryEntityLogicalName() ?? null;
+
 		// Send modal data to webview with pre-populated values
 		await this.panel.postMessage({
 			command: 'showEditImageModal',
@@ -2167,6 +2173,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				entityAlias: image.getEntityAlias(),
 				messagePropertyName: image.getMessagePropertyName(),
 				attributes: image.getAttributes(),
+				primaryEntity,
 			},
 		});
 	}

@@ -1703,3 +1703,15 @@ Dataverse requires the actual unique name string, not the ID.
 | Edit Step primary entity | ✅ Fixed | Shows correct entity name |
 | Solution picker | ✅ Working | Loads and populates correctly |
 | Images filtered by solution | ✅ Fixed | Images now preserved when parent step is in solution |
+
+**8. Attribute Picker for Images (✅ FIXED)**
+- **Problem:** Image forms (Register/Edit) used plain text fields for attributes instead of the attribute picker
+- **Root Cause:** `handleShowRegisterImageModal` and `handleShowEditImageModal` weren't updated to use `type: 'attributeInput'`
+- **Solution:**
+  - Extension already sends `primaryEntity` from the step when showing image modals
+  - Updated `handleShowRegisterImageModal` to use `type: 'attributeInput'` with `entityField: 'primaryEntity'`
+  - Updated `handleShowEditImageModal` to use the same pattern
+  - If no primary entity available, falls back to plain text field
+- **File:** `plugin-registration.js` - Both image modal handlers
+
+| Attribute picker for images | ✅ Fixed | Uses same attribute picker as steps |
