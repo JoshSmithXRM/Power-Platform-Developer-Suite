@@ -97,6 +97,18 @@ export async function initializePluginRegistration(
 	const { UpdateStepImageUseCase } = await import(
 		'../../application/useCases/UpdateStepImageUseCase.js'
 	);
+	const { LoadSolutionMembershipsUseCase } = await import(
+		'../../application/useCases/LoadSolutionMembershipsUseCase.js'
+	);
+	const { DataverseApiSolutionComponentRepository } = await import(
+		'../../../../shared/infrastructure/repositories/DataverseApiSolutionComponentRepository.js'
+	);
+	const { DataverseAttributePickerRepository } = await import(
+		'../../infrastructure/repositories/DataverseAttributePickerRepository.js'
+	);
+	const { LoadAttributesForPickerUseCase } = await import(
+		'../../application/useCases/LoadAttributesForPickerUseCase.js'
+	);
 	const { DataverseSdkMessageRepository } = await import(
 		'../../infrastructure/repositories/DataverseSdkMessageRepository.js'
 	);
@@ -124,6 +136,14 @@ export async function initializePluginRegistration(
 	const imageRepository = new DataverseStepImageRepository(dataverseApiService, logger);
 	const sdkMessageRepository = new DataverseSdkMessageRepository(dataverseApiService, logger);
 	const sdkMessageFilterRepository = new DataverseSdkMessageFilterRepository(
+		dataverseApiService,
+		logger
+	);
+	const solutionComponentRepository = new DataverseApiSolutionComponentRepository(
+		dataverseApiService,
+		logger
+	);
+	const attributePickerRepository = new DataverseAttributePickerRepository(
 		dataverseApiService,
 		logger
 	);
@@ -156,6 +176,14 @@ export async function initializePluginRegistration(
 	const updateStepUseCase = new UpdatePluginStepUseCase(stepRepository, logger);
 	const registerImageUseCase = new RegisterStepImageUseCase(imageRepository, logger);
 	const updateImageUseCase = new UpdateStepImageUseCase(imageRepository, logger);
+	const loadMembershipsUseCase = new LoadSolutionMembershipsUseCase(
+		solutionComponentRepository,
+		logger
+	);
+	const loadAttributesForPickerUseCase = new LoadAttributesForPickerUseCase(
+		attributePickerRepository,
+		logger
+	);
 
 	// Bundle use cases and repositories for cleaner panel constructor
 	const useCases = {
@@ -174,6 +202,8 @@ export async function initializePluginRegistration(
 		updateStep: updateStepUseCase,
 		registerImage: registerImageUseCase,
 		updateImage: updateImageUseCase,
+		loadMemberships: loadMembershipsUseCase,
+		loadAttributesForPicker: loadAttributesForPickerUseCase,
 	};
 
 	const repositories = {

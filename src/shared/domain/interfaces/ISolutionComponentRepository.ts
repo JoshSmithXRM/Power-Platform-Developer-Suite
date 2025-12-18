@@ -41,4 +41,21 @@ export interface ISolutionComponentRepository {
 		options?: QueryOptions,
 		cancellationToken?: ICancellationToken
 	): Promise<string[]>;
+
+	/**
+	 * Finds all solution components for specified component types.
+	 * Used for building a solution membership cache for client-side filtering.
+	 *
+	 * Returns a map of solutionId -> Set of objectIds for each component type.
+	 *
+	 * @param environmentId - Environment GUID
+	 * @param componentTypes - Array of component type codes (e.g., 91=Assembly, 93=Step)
+	 * @param cancellationToken - Optional cancellation token
+	 * @returns Map of solutionId to Set of component objectIds
+	 */
+	findAllByComponentTypes(
+		environmentId: string,
+		componentTypes: number[],
+		cancellationToken?: ICancellationToken
+	): Promise<Map<string, Set<string>>>;
 }

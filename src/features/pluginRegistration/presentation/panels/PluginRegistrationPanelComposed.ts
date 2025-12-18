@@ -40,6 +40,11 @@ import type { RegisterPluginStepUseCase } from '../../application/useCases/Regis
 import type { UpdatePluginStepUseCase } from '../../application/useCases/UpdatePluginStepUseCase';
 import type { RegisterStepImageUseCase } from '../../application/useCases/RegisterStepImageUseCase';
 import type { UpdateStepImageUseCase } from '../../application/useCases/UpdateStepImageUseCase';
+import {
+	LoadSolutionMembershipsUseCase,
+	type SolutionMembershipsDto,
+} from '../../application/useCases/LoadSolutionMembershipsUseCase';
+import type { LoadAttributesForPickerUseCase } from '../../application/useCases/LoadAttributesForPickerUseCase';
 import type { ISdkMessageRepository } from '../../domain/interfaces/ISdkMessageRepository';
 import type { ISdkMessageFilterRepository } from '../../domain/interfaces/ISdkMessageFilterRepository';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
@@ -78,6 +83,8 @@ export interface PluginRegistrationUseCases {
 	readonly updateStep: UpdatePluginStepUseCase;
 	readonly registerImage: RegisterStepImageUseCase;
 	readonly updateImage: UpdateStepImageUseCase;
+	readonly loadMemberships: LoadSolutionMembershipsUseCase;
+	readonly loadAttributesForPicker: LoadAttributesForPickerUseCase;
 }
 
 /**
@@ -124,7 +131,8 @@ type PluginRegistrationCommands =
 	| 'confirmEditStep'
 	| 'confirmRegisterImage'
 	| 'confirmEditImage'
-	| 'getEntitiesForMessage';
+	| 'getEntitiesForMessage'
+	| 'showAttributePicker';
 
 /**
  * Plugin Registration panel using PanelCoordinator architecture.
@@ -435,6 +443,18 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 							'webview',
 							'js',
 							'components',
+							'AttributePickerModal.js'
+						)
+					)
+					.toString(),
+				this.panel.webview
+					.asWebviewUri(
+						vscode.Uri.joinPath(
+							this.extensionUri,
+							'resources',
+							'webview',
+							'js',
+							'components',
 							'FilterableComboBox.js'
 						)
 					)
@@ -733,6 +753,17 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				});
 			}
 		});
+
+		this.coordinator.registerHandler('showAttributePicker', async (data) => {
+			const { entityLogicalName, currentAttributes, fieldId } = data as {
+				entityLogicalName?: string;
+				currentAttributes?: string;
+				fieldId?: string;
+			};
+			if (entityLogicalName && fieldId) {
+				await this.handleShowAttributePicker(entityLogicalName, currentAttributes || '', fieldId);
+			}
+		});
 	}
 
 	private async handleRefresh(): Promise<void> {
@@ -752,21 +783,31 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				});
 			};
 
-			const result = await this.useCases.loadTree.execute(
-				this.currentEnvironmentId,
-				this.currentSolutionId === DEFAULT_SOLUTION_ID ? undefined : this.currentSolutionId,
-				onProgress
-			);
+			// Load tree and solution memberships in parallel for no UX regression
+			const [treeResult, membershipsResult] = await Promise.all([
+				this.useCases.loadTree.execute(
+					this.currentEnvironmentId,
+					this.currentSolutionId === DEFAULT_SOLUTION_ID ? undefined : this.currentSolutionId,
+					onProgress
+				),
+				this.loadSolutionMemberships(),
+			]);
 
-			const treeItems = this.treeMapper.toTreeItems(result.packages, result.standaloneAssemblies);
+			const treeItems = this.treeMapper.toTreeItems(treeResult.packages, treeResult.standaloneAssemblies);
 
 			this.logger.info('Plugin registration tree loaded', {
-				totalNodeCount: result.totalNodeCount,
+				totalNodeCount: treeResult.totalNodeCount,
+				solutionMembershipCount: Object.keys(membershipsResult).length,
 			});
 
+			// Send tree and memberships together - memberships enable client-side filtering
 			await this.panel.postMessage({
 				command: 'updateTree',
-				data: { treeItems, isEmpty: result.totalNodeCount === 0 },
+				data: {
+					treeItems,
+					isEmpty: treeResult.totalNodeCount === 0,
+					solutionMemberships: membershipsResult,
+				},
 			});
 		} catch (error: unknown) {
 			this.logger.error('Error loading plugin registration tree', error);
@@ -776,6 +817,20 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			);
 		} finally {
 			await this.loadingBehavior.setLoading(false);
+		}
+	}
+
+	/**
+	 * Loads solution memberships for client-side filtering.
+	 * Errors are logged but don't fail the main tree load.
+	 */
+	private async loadSolutionMemberships(): Promise<SolutionMembershipsDto> {
+		try {
+			const memberships = await this.useCases.loadMemberships.execute(this.currentEnvironmentId);
+			return LoadSolutionMembershipsUseCase.toDto(memberships);
+		} catch (error: unknown) {
+			this.logger.warn('Failed to load solution memberships (filtering disabled)', error);
+			return {};
 		}
 	}
 
@@ -833,7 +888,54 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private async handleSolutionChange(solutionId: string): Promise<void> {
 		this.logger.debug('Solution changed', { solutionId });
 		this.currentSolutionId = solutionId;
-		await this.handleRefresh();
+
+		// Send to webview for client-side filtering (no server reload needed)
+		await this.panel.postMessage({
+			command: 'solutionFilterChanged',
+			data: { solutionId },
+		});
+	}
+
+	/**
+	 * Handle attribute picker request from webview.
+	 * Fetches entity attributes and sends them to the webview for modal display.
+	 */
+	private async handleShowAttributePicker(
+		entityLogicalName: string,
+		currentAttributes: string,
+		fieldId: string
+	): Promise<void> {
+		this.logger.debug('Showing attribute picker', { entityLogicalName, fieldId });
+
+		try {
+			const result = await this.useCases.loadAttributesForPicker.execute(
+				this.currentEnvironmentId,
+				entityLogicalName
+			);
+
+			// Parse current attributes to mark as selected
+			const currentSet = new Set(
+				currentAttributes
+					.split(',')
+					.map((a) => a.trim().toLowerCase())
+					.filter((a) => a.length > 0)
+			);
+
+			// Send attributes to webview
+			await this.panel.postMessage({
+				command: 'showAttributePickerModal',
+				data: {
+					entityLogicalName,
+					fieldId,
+					attributes: result.attributes,
+					currentSelection: Array.from(currentSet),
+				},
+			});
+		} catch (error: unknown) {
+			this.logger.error('Failed to load attributes for picker', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(`Failed to load attributes: ${errorMessage}`);
+		}
 	}
 
 	/**

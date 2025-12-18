@@ -128,6 +128,95 @@ export class DataverseApiSolutionComponentRepository implements ISolutionCompone
 	}
 
 	/**
+	 * Finds all solution components for specified component types.
+	 * Builds a map of solutionId -> Set of objectIds for client-side filtering.
+	 */
+	async findAllByComponentTypes(
+		environmentId: string,
+		componentTypes: number[],
+		cancellationToken?: ICancellationToken
+	): Promise<Map<string, Set<string>>> {
+		if (componentTypes.length === 0) {
+			return new Map();
+		}
+
+		this.logger.debug('Fetching solution components by types from Dataverse API', {
+			environmentId,
+			componentTypes
+		});
+
+		// Build filter for all component types: componenttype eq 91 or componenttype eq 92 or ...
+		const typeFilters = componentTypes.map(type => `componenttype eq ${type}`).join(' or ');
+		const queryOptions: QueryOptions = {
+			select: ['solutioncomponentid', 'objectid', 'componenttype', '_solutionid_value'],
+			filter: typeFilters
+		};
+
+		const queryString = ODataQueryBuilder.build(queryOptions);
+		const initialEndpoint = `/api/data/v9.2/solutioncomponents${queryString ? '?' + queryString : ''}`;
+
+		CancellationHelper.throwIfCancelled(cancellationToken);
+
+		try {
+			const solutionMemberships = new Map<string, Set<string>>();
+			let currentEndpoint: string | null = initialEndpoint;
+			let pageCount = 0;
+			let totalRecords = 0;
+
+			while (currentEndpoint !== null) {
+				CancellationHelper.throwIfCancelled(cancellationToken);
+
+				const response: SolutionComponentsResponse = await this.apiService.get<SolutionComponentsResponse>(
+					environmentId,
+					currentEndpoint,
+					cancellationToken
+				);
+
+				CancellationHelper.throwIfCancelled(cancellationToken);
+
+				// Process each component and add to the appropriate solution's set
+				for (const dto of response.value) {
+					const solutionId = dto._solutionid_value;
+					const objectId = dto.objectid;
+
+					let objectIds = solutionMemberships.get(solutionId);
+					if (objectIds === undefined) {
+						objectIds = new Set<string>();
+						solutionMemberships.set(solutionId, objectIds);
+					}
+					objectIds.add(objectId);
+				}
+
+				totalRecords += response.value.length;
+				pageCount++;
+
+				// Check for next page
+				const nextLink: string | undefined = response['@odata.nextLink'];
+				if (nextLink) {
+					const url: URL = new URL(nextLink);
+					currentEndpoint = url.pathname + url.search;
+				} else {
+					currentEndpoint = null;
+				}
+			}
+
+			this.logger.debug('Fetched solution component memberships from Dataverse', {
+				environmentId,
+				componentTypes,
+				totalRecords,
+				solutionCount: solutionMemberships.size,
+				pages: pageCount
+			});
+
+			return solutionMemberships;
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.logger.error('Failed to fetch solution components by types from Dataverse API', normalizedError);
+			throw normalizedError;
+		}
+	}
+
+	/**
 	 * Finds all component IDs of a specific entity type within a solution.
 	 */
 	async findComponentIdsBySolution(

@@ -15,6 +15,8 @@ let currentFilter = '';
 let hideHiddenSteps = true; // Default: hide internal system steps (ishidden=true)
 let hideMicrosoftAssemblies = true; // Default: hide Microsoft assemblies
 let selectedNodeId = null; // Currently selected node for detail panel
+let currentSolutionId = ''; // Selected solution for filtering (empty = All Solutions)
+let solutionMemberships = {}; // solutionId -> objectId[] for client-side filtering
 
 // Cache for entities per message (messageId -> entity logical names array)
 const entityCacheByMessage = new Map();
@@ -72,8 +74,13 @@ function handleTreeUpdate(data) {
 	const treeEmpty = document.getElementById('treeEmpty');
 	const treeToolbar = document.getElementById('treeToolbar');
 
-	const { treeItems, isEmpty } = data;
+	const { treeItems, isEmpty, solutionMemberships: memberships } = data;
 	treeData = treeItems || [];
+
+	// Store solution memberships for client-side filtering
+	if (memberships) {
+		solutionMemberships = memberships;
+	}
 
 	// Hide loading, show appropriate content
 	if (loadingProgress) {
@@ -809,10 +816,51 @@ function filterMicrosoftAssemblies(items) {
 }
 
 /**
+ * Filter tree to only show nodes that belong to the selected solution.
+ * A node belongs to a solution if its ID is in the solution's membership set,
+ * OR if any of its descendants belong to the solution.
+ *
+ * @param {Array} items - Tree items to filter
+ * @param {Set<string>} memberIds - Set of object IDs in the selected solution
+ * @returns {Array} Filtered tree with only members and their ancestors
+ */
+function filterBySolution(items, memberIds) {
+	return items
+		.map(item => {
+			// Deep clone the item
+			const clone = { ...item };
+
+			// Track if this item is directly a member
+			const isDirectMember = memberIds.has(item.id);
+
+			if (clone.children && clone.children.length > 0) {
+				// Recursively filter children
+				clone.children = filterBySolution(clone.children, memberIds);
+			}
+
+			// Store membership flags
+			clone._isDirectMember = isDirectMember;
+			clone._hasChildMembers = clone.children && clone.children.length > 0;
+
+			return clone;
+		})
+		.filter(item => {
+			// Keep if: directly a member OR has child members (ancestor path)
+			return item._isDirectMember || item._hasChildMembers;
+		});
+}
+
+/**
  * Get the effective tree data (filtered based on active filters)
  */
 function getEffectiveTreeData() {
 	let data = treeData;
+
+	// Apply solution filter first (most restrictive)
+	if (currentSolutionId && solutionMemberships[currentSolutionId]) {
+		const memberIds = new Set(solutionMemberships[currentSolutionId]);
+		data = filterBySolution(data, memberIds);
+	}
 
 	if (hideHiddenSteps) {
 		data = filterHiddenSteps(data);
@@ -1041,9 +1089,62 @@ window.createBehavior({
 			case 'showNodeDetails':
 				handleShowNodeDetails(message.data);
 				break;
+			case 'solutionFilterChanged':
+				handleSolutionFilterChanged(message.data);
+				break;
+			case 'showAttributePickerModal':
+				handleShowAttributePickerModal(message.data);
+				break;
 		}
 	}
 });
+
+/**
+ * Handle solution filter change from the solution selector dropdown.
+ * Uses client-side filtering instead of server reload.
+ * @param {Object} data - { solutionId }
+ */
+function handleSolutionFilterChanged(data) {
+	const { solutionId } = data;
+
+	// Update current solution filter (empty string = All Solutions)
+	currentSolutionId = solutionId || '';
+
+	// Re-render tree with new filter
+	renderTree();
+
+	// Re-apply text search filter if active
+	if (currentFilter) {
+		filterTree(currentFilter);
+	}
+}
+
+/**
+ * Handle showing the attribute picker modal.
+ * @param {Object} data - { entityLogicalName, fieldId, attributes, currentSelection }
+ */
+function handleShowAttributePickerModal(data) {
+	const { entityLogicalName, fieldId, attributes, currentSelection } = data;
+
+	if (!window.showAttributePickerModal) {
+		console.error('AttributePickerModal component not loaded');
+		return;
+	}
+
+	window.showAttributePickerModal({
+		entityLogicalName,
+		fieldId,
+		attributes: attributes || [],
+		currentSelection: currentSelection || [],
+		onSubmit: (selected) => {
+			// Update the form field directly via stored callback
+			if (window._activeAttributePicker && window._activeAttributePicker.fieldId === fieldId) {
+				window._activeAttributePicker.updateField(selected.join(','));
+				window._activeAttributePicker = null;
+			}
+		}
+	});
+}
 
 /**
  * Show the Register Package modal with pre-filled metadata.
@@ -1705,9 +1806,10 @@ function handleShowRegisterStepModal(data) {
 			{
 				id: 'filteringAttributes',
 				label: 'Filtering Attributes',
-				type: 'text',
+				type: 'attributeInput',
 				value: '',
-				placeholder: 'Comma-separated (only for Create/Update messages)'
+				placeholder: 'Comma-separated (only for Create/Update messages)',
+				entityField: 'primaryEntity'
 			},
 			{
 				id: 'name',
@@ -1961,9 +2063,10 @@ function handleShowEditStepModal(data) {
 			{
 				id: 'filteringAttributes',
 				label: 'Filtering Attributes',
-				type: 'text',
+				type: 'attributeInput',
 				value: filteringAttributes || '',
-				placeholder: 'Comma-separated attribute names'
+				placeholder: 'Comma-separated attribute names',
+				entityField: 'primaryEntityDisplay'
 			},
 			{
 				id: 'name',

@@ -18,9 +18,9 @@
 - [x] Step form UX polish
 
 ### Remaining
-- [ ] **Attribute Picker** - Modal with searchable checkboxes
-- [ ] **Solution Filtering** - Filter tree by solution membership
-- [ ] **Unit Tests** - Domain 80%+, Mappers 70%+
+- [x] **Attribute Picker** - Modal with searchable checkboxes ✅
+- [x] **Solution Filtering** - Filter tree by solution membership ✅
+- [x] **Unit Tests** - 242 tests across 15 files (domain 80%+, mappers 70%+) ✅
 
 ---
 

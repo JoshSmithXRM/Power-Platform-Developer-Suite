@@ -271,6 +271,130 @@ window.showFormModal = function(options) {
 			fieldContainer.appendChild(combobox.element);
 			body.appendChild(fieldContainer);
 			return; // Skip the rest of input setup
+		} else if (field.type === 'attributeInput') {
+			// Attribute input with picker button
+			const wrapper = document.createElement('div');
+			wrapper.className = 'form-modal-attribute-input-wrapper';
+			wrapper.style.display = 'flex';
+			wrapper.style.gap = '4px';
+
+			input = document.createElement('input');
+			input.type = 'text';
+			input.id = `form-modal-${field.id}`;
+			input.className = 'form-modal-input';
+			input.style.flex = '1';
+			input.value = field.value || '';
+			input.placeholder = field.placeholder || 'Select attributes...';
+
+			const pickerBtn = document.createElement('button');
+			pickerBtn.type = 'button';
+			pickerBtn.className = 'form-modal-button form-modal-button-secondary';
+			pickerBtn.textContent = '...';
+			pickerBtn.title = 'Select attributes';
+			pickerBtn.style.padding = '4px 8px';
+			pickerBtn.style.minWidth = 'auto';
+			pickerBtn.disabled = !field.entityField; // Disable if no entity field specified
+
+			pickerBtn.onclick = () => {
+				// Get current entity from another field
+				const entityFieldId = field.entityField;
+				let entityLogicalName = '';
+				if (entityFieldId) {
+					const entityElement = inputElements[entityFieldId];
+					if (entityElement) {
+						if (entityElement.type === 'combobox') {
+							entityLogicalName = entityElement.instance.getValue();
+						} else if (entityElement.value !== undefined) {
+							entityLogicalName = entityElement.value;
+						}
+					}
+				}
+
+				if (!entityLogicalName) {
+					return; // No entity selected yet
+				}
+
+				// Store reference to update field when picker returns
+				window._activeAttributePicker = {
+					fieldId: field.id,
+					updateField: (value) => {
+						input.value = value;
+						if (onFieldChange) {
+							onFieldChange(field.id, value, () => {});
+						}
+					}
+				};
+
+				// Send message to panel to show attribute picker
+				if (window.vscode) {
+					window.vscode.postMessage({
+						command: 'showAttributePicker',
+						data: {
+							entityLogicalName: entityLogicalName,
+							currentAttributes: input.value,
+							fieldId: field.id
+						}
+					});
+				}
+			};
+
+			// Update picker button enabled state when entity field changes
+			if (field.entityField && onFieldChange) {
+				const entityFieldId = field.entityField;
+				// We'll check after all fields are created
+				setTimeout(() => {
+					const entityElement = inputElements[entityFieldId];
+					if (entityElement) {
+						const checkEntity = () => {
+							let value = '';
+							if (entityElement.type === 'combobox') {
+								value = entityElement.instance.getValue();
+							} else if (entityElement.value !== undefined) {
+								value = entityElement.value;
+							}
+							pickerBtn.disabled = !value;
+						};
+						// Initial check
+						checkEntity();
+						// Listen for changes via mutation observer on the parent
+						if (entityElement.type === 'combobox') {
+							entityElement.instance.element.addEventListener('input', checkEntity);
+						}
+					}
+				}, 0);
+			}
+
+			wrapper.appendChild(input);
+			wrapper.appendChild(pickerBtn);
+
+			inputElements[field.id] = input;
+			fieldContainers[field.id] = fieldContainer;
+			initialValues[field.id] = input.value;
+
+			if (onFieldChange) {
+				input.addEventListener('input', () => {
+					const updateField = (targetFieldId, newValue, targetOptions, visibility) => {
+						if (visibility !== undefined) {
+							const container = fieldContainers[targetFieldId];
+							if (container) {
+								container.style.display = visibility ? '' : 'none';
+							}
+						}
+						const target = inputElements[targetFieldId];
+						if (target && newValue !== undefined) {
+							if (target.value !== undefined) {
+								target.value = newValue;
+							}
+						}
+					};
+					onFieldChange(field.id, input.value, updateField);
+				});
+			}
+
+			fieldContainer.appendChild(label);
+			fieldContainer.appendChild(wrapper);
+			body.appendChild(fieldContainer);
+			return; // Skip the rest of input setup
 		} else {
 			input = document.createElement('input');
 			input.type = field.type || 'text';
