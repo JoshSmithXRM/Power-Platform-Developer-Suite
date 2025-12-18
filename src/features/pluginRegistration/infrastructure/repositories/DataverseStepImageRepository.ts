@@ -195,8 +195,10 @@ export class DataverseStepImageRepository implements IStepImageRepository {
 
 		const endpoint = `/api/data/v9.2/${DataverseStepImageRepository.ENTITY_SET}(${imageId})`;
 
-		// Build payload with only provided fields
-		const payload: Record<string, unknown> = {};
+		// Build payload - always include step reference (required by Dataverse, observed from PRT SOAP trace)
+		const payload: Record<string, unknown> = {
+			'sdkmessageprocessingstepid@odata.bind': `/sdkmessageprocessingsteps(${input.stepId})`,
+		};
 
 		if (input.name !== undefined) {
 			payload['name'] = input.name;

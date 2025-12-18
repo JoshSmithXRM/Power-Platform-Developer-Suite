@@ -425,9 +425,10 @@
 }
 
 .detail-value.truncated {
-	max-height: 60px;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	max-height: 120px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	word-break: break-all;
 }
 
 .detail-section-title {

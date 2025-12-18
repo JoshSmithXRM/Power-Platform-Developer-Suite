@@ -103,7 +103,7 @@ function handleTreeUpdate(data) {
 		}
 		if (pluginTree) {
 			pluginTree.style.display = 'block';
-			renderTree();
+			expandAll(); // Show tree fully expanded by default
 		}
 		if (treeToolbar) {
 			treeToolbar.style.display = 'flex';
@@ -1186,10 +1186,12 @@ function handleShowAttributePickerModal(data) {
 		onSubmit: (selected) => {
 			// Update the form field directly via stored callback
 			if (window._activeAttributePicker && window._activeAttributePicker.fieldId === fieldId) {
-				// If all attributes are selected, convert to blank (which means "all" in Dataverse)
-				// This avoids potential issues with invalid attributes and matches the UX hint
+				// If all attributes selected (or none), show "All Attributes"
+				// This is converted to undefined on form submit (means capture all in Dataverse)
 				const effectiveValue =
-					selected.length === attributeList.length ? '' : selected.join(',');
+					selected.length === 0 || selected.length === attributeList.length
+						? 'All Attributes'
+						: selected.join(',');
 				window._activeAttributePicker.updateField(effectiveValue);
 				window._activeAttributePicker = null;
 			}
@@ -2331,8 +2333,7 @@ function handleShowRegisterImageModal(data) {
 			id: 'attributes',
 			label: 'Attributes',
 			type: 'attributeInput',
-			value: '',
-			placeholder: 'Comma-separated (leave empty for all)',
+			value: 'All Attributes',
 			entityField: 'primaryEntity'
 		});
 	} else {
@@ -2341,8 +2342,7 @@ function handleShowRegisterImageModal(data) {
 			id: 'attributes',
 			label: 'Attributes',
 			type: 'text',
-			value: '',
-			placeholder: 'Comma-separated (leave empty for all)'
+			value: 'All Attributes'
 		});
 	}
 
@@ -2352,6 +2352,8 @@ function handleShowRegisterImageModal(data) {
 		submitLabel: 'Register',
 		cancelLabel: 'Cancel',
 		onSubmit: (values) => {
+			// Convert "All Attributes" back to undefined (means capture all)
+			const attrs = values.attributes === 'All Attributes' ? undefined : values.attributes || undefined;
 			vscode.postMessage({
 				command: 'confirmRegisterImage',
 				data: {
@@ -2360,7 +2362,7 @@ function handleShowRegisterImageModal(data) {
 					imageType: parseInt(values.imageType, 10),
 					messagePropertyName,
 					entityAlias: values.entityAlias,
-					attributes: values.attributes || undefined
+					attributes: attrs
 				}
 			});
 		}
@@ -2425,8 +2427,7 @@ function handleShowEditImageModal(data) {
 			id: 'attributes',
 			label: 'Attributes',
 			type: 'attributeInput',
-			value: attributes || '',
-			placeholder: 'Comma-separated (leave empty for all)',
+			value: attributes || 'All Attributes',
 			entityField: 'primaryEntity'
 		});
 	} else {
@@ -2435,8 +2436,7 @@ function handleShowEditImageModal(data) {
 			id: 'attributes',
 			label: 'Attributes',
 			type: 'text',
-			value: attributes || '',
-			placeholder: 'Comma-separated (leave empty for all)'
+			value: attributes || 'All Attributes'
 		});
 	}
 
@@ -2446,6 +2446,8 @@ function handleShowEditImageModal(data) {
 		submitLabel: 'Update',
 		cancelLabel: 'Cancel',
 		onSubmit: (values) => {
+			// Convert "All Attributes" back to undefined (means capture all)
+			const attrs = values.attributes === 'All Attributes' ? undefined : values.attributes || undefined;
 			vscode.postMessage({
 				command: 'confirmEditImage',
 				data: {
@@ -2453,7 +2455,7 @@ function handleShowEditImageModal(data) {
 					name: values.name,
 					imageType: parseInt(values.imageType, 10),
 					entityAlias: values.entityAlias,
-					attributes: values.attributes || undefined
+					attributes: attrs
 				}
 			});
 		}

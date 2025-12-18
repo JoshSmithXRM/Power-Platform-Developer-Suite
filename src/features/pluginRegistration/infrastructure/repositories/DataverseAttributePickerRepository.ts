@@ -17,25 +17,43 @@ interface AttributeMetadataDto {
 		};
 	};
 	AttributeType: string;
+	AttributeTypeName?: {
+		Value?: string;
+	};
+	'@odata.type'?: string;
 	AttributeOf?: string | null;
-	IsLogical?: boolean;
-	IsValidForRead?: boolean;
+	IsPrimaryId?: boolean;
 }
 
 /**
- * Attribute types that cannot be used in plugin step images.
- * These are either virtual/computed or contain complex data types
- * that cannot be captured in a pre/post entity snapshot.
+ * Attribute types that are ALWAYS included in plugin image attribute picker.
+ * Based on Plugin Registration Tool (PRT) decompiled logic.
  */
-const INVALID_IMAGE_ATTRIBUTE_TYPES = new Set([
-	'Virtual', // Virtual/computed attributes
-	'EntityName', // Internal entity name references
-	'PartyList', // Complex activity party lists (e.g., to/from/cc on emails)
-	'CalendarRules', // Calendar rules (complex type)
-	'ManagedProperty', // System managed properties
-	'File', // Binary file data
-	'Image', // Binary image data
+const ALWAYS_INCLUDE_ATTRIBUTE_TYPES = new Set([
+	'Boolean',
+	'Customer',
+	'DateTime',
+	'Decimal',
+	'Double',
+	'Integer',
+	'Lookup',
+	'Memo',
+	'Money',
+	'Owner',
+	'PartyList',
+	'Picklist',
+	'State',
+	'Status',
+	'String',
 ]);
+
+/**
+ * Attribute types that are CONDITIONALLY included based on specific rules.
+ * - Uniqueidentifier: only if it's the entity's primary ID attribute
+ * - CalendarRules: only if it's the entity's primary ID attribute
+ * - Virtual: only if it's primary ID OR if it's a MultiSelectPicklist
+ */
+const CONDITIONAL_ATTRIBUTE_TYPES = new Set(['Uniqueidentifier', 'CalendarRules', 'Virtual']);
 
 /**
  * Response from Dataverse EntityDefinitions/Attributes endpoint.
@@ -63,25 +81,20 @@ export class DataverseAttributePickerRepository implements IAttributePickerRepos
 	): Promise<readonly AttributePickerItem[]> {
 		this.logger.debug('Fetching attributes for picker', { environmentId, entityLogicalName });
 
+		// Fetch attributes with properties needed for PRT-compatible filtering
 		const endpoint =
 			`/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes` +
-			`?$select=LogicalName,DisplayName,AttributeType,AttributeOf,IsLogical,IsValidForRead` +
+			`?$select=LogicalName,DisplayName,AttributeType,AttributeTypeName,AttributeOf,IsPrimaryId` +
 			`&$filter=IsValidForRead eq true`;
 
 		try {
 			const response = await this.apiService.get<AttributesResponse>(environmentId, endpoint);
 
 			const attributes = response.value
-				// Filter out:
-				// 1. Virtual fields (AttributeOf is set - these are supporting attributes)
-				// 2. Logical fields (computed/virtual)
-				// 3. Invalid attribute types (can't be captured in plugin images)
-				.filter(
-					(attr) =>
-						!attr.AttributeOf &&
-						!attr.IsLogical &&
-						!INVALID_IMAGE_ATTRIBUTE_TYPES.has(attr.AttributeType)
-				)
+				// PRT-compatible filter logic (from decompiled Plugin Registration Tool):
+				// Pre-filter: IsValidForRead (API filter) AND AttributeOf === null
+				// Type filter: whitelist of allowed types + conditional rules
+				.filter((attr) => this.shouldIncludeAttribute(attr, entityLogicalName))
 				// Map to picker items
 				.map((attr): AttributePickerItem => ({
 					logicalName: attr.LogicalName,
@@ -110,5 +123,70 @@ export class DataverseAttributePickerRepository implements IAttributePickerRepos
 	private getDisplayName(attr: AttributeMetadataDto): string {
 		const label = attr.DisplayName?.UserLocalizedLabel?.Label;
 		return label && label.trim().length > 0 ? label : attr.LogicalName;
+	}
+
+	/**
+	 * Determines if an attribute should be included in the picker.
+	 * Based on Plugin Registration Tool (PRT) decompiled logic.
+	 *
+	 * @param attr - Attribute metadata from Dataverse
+	 * @param entityLogicalName - The entity's logical name (e.g., 'account')
+	 * @returns true if the attribute should be included
+	 */
+	private shouldIncludeAttribute(attr: AttributeMetadataDto, entityLogicalName: string): boolean {
+		// Pre-filter: AttributeOf must be null (excludes "shadow" columns for calculated fields)
+		if (attr.AttributeOf !== null && attr.AttributeOf !== undefined) {
+			return false;
+		}
+
+		const attrType = attr.AttributeType;
+		const logicalName = attr.LogicalName.toLowerCase();
+
+		// Always include these types
+		if (ALWAYS_INCLUDE_ATTRIBUTE_TYPES.has(attrType)) {
+			return true;
+		}
+
+		// Conditional types: Uniqueidentifier, CalendarRules, Virtual
+		if (CONDITIONAL_ATTRIBUTE_TYPES.has(attrType)) {
+			// Include if it's the entity's actual primary ID attribute
+			// The primary ID follows the pattern: {entitylogicalname}id (e.g., accountid for account)
+			// This excludes foreign key Uniqueidentifiers like address1_addressid, address2_addressid
+			const expectedPrimaryId = `${entityLogicalName.toLowerCase()}id`;
+			if (attr.IsPrimaryId === true && logicalName === expectedPrimaryId) {
+				return true;
+			}
+
+			// For Virtual type: also include if it's a MultiSelectPicklist
+			if (attrType === 'Virtual' && this.isMultiSelectPicklist(attr)) {
+				return true;
+			}
+
+			// Otherwise exclude these conditional types
+			return false;
+		}
+
+		// Exclude everything else (BigInt, Binary, File, Image, EntityName, ManagedProperty, etc.)
+		return false;
+	}
+
+	/**
+	 * Checks if a Virtual attribute is a MultiSelectPicklist.
+	 * PRT checks @odata.type or AttributeTypeName.Value for this.
+	 */
+	private isMultiSelectPicklist(attr: AttributeMetadataDto): boolean {
+		// Check @odata.type contains MultiSelectPicklistAttributeMetadata
+		const odataType = attr['@odata.type'];
+		if (odataType && odataType.includes('MultiSelectPicklistAttributeMetadata')) {
+			return true;
+		}
+
+		// Check AttributeTypeName.Value === 'MultiSelectPicklistType'
+		const typeName = attr.AttributeTypeName?.Value;
+		if (typeName === 'MultiSelectPicklistType') {
+			return true;
+		}
+
+		return false;
 	}
 }

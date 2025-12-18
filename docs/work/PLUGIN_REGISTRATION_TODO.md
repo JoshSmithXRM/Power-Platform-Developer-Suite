@@ -1716,21 +1716,74 @@ Dataverse requires the actual unique name string, not the ID.
 
 | Attribute picker for images | ✅ Fixed | Uses same attribute picker as steps |
 
-**9. Invalid Attributes in Image Picker (✅ FIXED)**
-- **Problem:** When user selected all attributes via "Select All", Dataverse returned error 0x80040216 "An unexpected error occurred" - some attributes in the list cannot be used in plugin images
-- **Root Cause:** `DataverseAttributePickerRepository` wasn't filtering out invalid attribute types
-- **Solution (two parts):**
-  1. **Filter invalid attribute types** - Added exclusion list for types that can't be captured in images:
-     - `Virtual` - Virtual/computed attributes
-     - `EntityName` - Internal entity name references
-     - `PartyList` - Complex activity party lists
-     - `CalendarRules` - Complex calendar rules
-     - `ManagedProperty` - System managed properties
-     - `File` / `Image` - Binary data types
-  2. **Select All = Blank conversion** - If user selects ALL attributes, convert to blank on submit:
-     - Blank means "all" in Dataverse (matches the UX hint "leave blank for all")
-     - Avoids edge cases where invalid attributes might sneak through
-     - "Select All" is still useful for "select all then deselect a few" workflow
-- **Files:** `DataverseAttributePickerRepository.ts`, `plugin-registration.js`
+**9. PRT-Compatible Attribute Filtering (✅ FIXED)**
+- **Problem:** Attribute picker showed invalid attributes (versionnumber, stageid, processid, importsequencenumber, address IDs) that Dataverse rejects for plugin images
+- **Root Cause:** Original blacklist approach couldn't identify all invalid attributes by metadata properties
+- **Solution:** Implemented PRT's whitelist approach (decompiled from Plugin Registration Tool):
+  - **Always include:** Boolean, Customer, DateTime, Decimal, Double, Integer, Lookup, Memo, Money, Owner, PartyList, Picklist, State, Status, String
+  - **Conditionally include:**
+    - `Uniqueidentifier` - only if it's the entity's actual primary ID (`{entityLogicalName}id`)
+    - `CalendarRules` - only if primary ID
+    - `Virtual` - only if primary ID OR MultiSelectPicklist
+  - **Exclude everything else:** BigInt, Binary, File, Image, EntityName, ManagedProperty, etc.
+- **Key insight:** Address ID fields (`address1_addressid`, `address2_addressid`) have `IsPrimaryId=true` but are foreign keys - fixed by checking logical name matches `{entity}id` pattern
+- **File:** `DataverseAttributePickerRepository.ts`
 
-| Invalid attributes in picker | ✅ Fixed | Filters invalid types + Select All converts to blank |
+| PRT-compatible attribute filter | ✅ Fixed | Whitelist approach matches PRT exactly |
+
+**10. "All Attributes" UX Improvement (✅ FIXED)**
+- **Problem:** Empty attributes field showed placeholder "Comma-separated (leave empty for all)" - confusing UX
+- **Solution:**
+  - Display "All Attributes" as actual value (not grayed placeholder) when empty
+  - On form submit, "All Attributes" converts to `undefined` (Dataverse treats as capture all)
+  - When attribute picker returns all selected or none, shows "All Attributes"
+- **File:** `plugin-registration.js` - Register/Edit image modal handlers
+
+| "All Attributes" UX | ✅ Fixed | Shows actual value instead of placeholder |
+
+**11. Details Panel Attribute Scrolling (✅ FIXED)**
+- **Problem:** When image has many attributes, the details panel truncated them without scroll
+- **Solution:** Changed `.detail-value.truncated` CSS from `overflow: hidden` to `overflow-y: auto` with `max-height: 120px`
+- **File:** `plugin-registration.css`
+
+| Details panel scrolling | ✅ Fixed | Long attribute lists now scrollable |
+
+### Session 21 (2025-12-18)
+**Image Update Fix - Step Reference Required**
+
+**Problem:** When updating step images via Web API, certain attribute combinations would fail while the same attributes worked in PRT.
+
+**Investigation:**
+- Captured Fiddler trace of PRT updating step images
+- PRT uses SOAP/Organization Service (`/XRMServices/2011/Organization.svc/web`)
+- Key discovery: PRT's UpdateRequest includes ALL fields, notably `sdkmessageprocessingstepid` (parent step reference)
+
+**Root Cause Analysis:**
+| Aspect | PRT (SOAP - works) | Our Implementation (Web API - fails) |
+|--------|-------------------|--------------------------------------|
+| API | Organization Service | Web API |
+| Fields sent | ALL fields | Only changed fields |
+| Step reference | Always included as EntityReference | Not included in PATCH |
+
+**Solution:**
+1. Added `stepId` to `UpdateImageInput` interface (required for Dataverse)
+2. Updated `DataverseStepImageRepository.update()` to always include `sdkmessageprocessingstepid@odata.bind` in PATCH
+3. Modified `UpdateStepImageUseCase` to fetch the image first (for stepId) then merge into the update input
+
+**Key Insight:** Dataverse's Web API for step image updates requires the parent step navigation property, even though it's not changing. This matches PRT's behavior of always sending all fields in updates.
+
+**Files Modified:**
+- `src/.../domain/interfaces/IStepImageRepository.ts` - Added `stepId` to `UpdateImageInput`
+- `src/.../infrastructure/repositories/DataverseStepImageRepository.ts` - Include step reference in PATCH
+- `src/.../application/useCases/UpdateStepImageUseCase.ts` - Get stepId from fetched image
+
+**Cleanup:**
+- Removed debug logging from `DataverseAttributePickerRepository.ts` (PRT comparison logging)
+
+**F5 Testing Results:**
+- [x] Test updating image attributes (same set that failed before) - **WORKING**
+- [x] Test updating other image fields (name, entityAlias, imageType) - **WORKING**
+
+**Additional UX Improvement:**
+- [x] Changed tree default to expanded instead of collapsed for better discoverability
+- Reused existing `expandAll()` function in `handleTreeUpdate()` (no new code needed)

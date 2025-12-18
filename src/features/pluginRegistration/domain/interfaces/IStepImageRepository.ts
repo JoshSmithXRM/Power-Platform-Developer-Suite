@@ -14,8 +14,11 @@ export interface RegisterImageInput {
 
 /**
  * Input for updating an existing step image.
+ * Note: stepId is required because Dataverse requires the parent step reference
+ * in update requests (observed from PRT SOAP trace analysis).
  */
 export interface UpdateImageInput {
+	readonly stepId: string;
 	readonly name?: string | undefined;
 	readonly imageType?: number | undefined;
 	readonly entityAlias?: string | undefined;
