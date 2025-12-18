@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-12-17
+
+### Added
+
+- **Plugin Registration Panel** - New panel for managing Dataverse plugin registrations
+  - **Tree Browser** - Hierarchical view of packages, assemblies, types, steps, and images
+    - Expandable/collapsible tree nodes with icons
+    - Text search filter across all nodes
+    - Toggle filters: Hide Microsoft assemblies, Hide hidden steps
+    - Solution filter dropdown for filtering by solution membership
+  - **Package Management** - Register, update, and unregister plugin packages (.nupkg)
+    - Drag-and-drop or file picker for .nupkg files
+    - Automatic metadata extraction (name, version)
+    - Solution assignment during registration
+  - **Assembly Management** - Register, update, and unregister plugin assemblies (.dll)
+    - Plugin Inspector tool extracts types from assemblies
+    - Type selection during registration (choose which plugin types to register)
+    - Isolation mode and source type configuration
+  - **Step Management** - Full CRUD for SDK message processing steps
+    - Message and entity selection with dynamic filtering
+    - Execution stage, mode, and rank configuration
+    - Filtering attributes with searchable attribute picker modal
+    - Enable/disable steps, async auto-delete configuration
+    - Secure and unsecure configuration support
+  - **Image Management** - Full CRUD for step images (pre/post images)
+    - Pre-image, post-image, or both
+    - Entity alias and attribute selection
+  - **Detail Panel** - Shows properties of selected tree node
+    - Displays all relevant metadata for packages, assemblies, types, steps, and images
+  - **Solution Filtering** - Client-side tree filtering by solution
+    - Pre-fetches solution memberships in parallel with tree load (no UX impact)
+    - Instant filtering when switching solutions (no server round-trip)
+  - **Attribute Picker** - Modal for selecting entity attributes
+    - Searchable checkbox list
+    - Select All / Deselect All actions
+    - Shows attribute type and logical name
+
 ### Fixed
 
 - **Notebooks - Boolean Column Formatting** - Boolean columns now display correctly
