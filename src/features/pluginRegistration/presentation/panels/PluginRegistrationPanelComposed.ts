@@ -155,6 +155,8 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
+	/** Generation counter for load operations - used to discard stale results after environment change */
+	private currentLoadId = 0;
 	private pendingPackageContent: string | null = null;
 	private pendingAssemblyContent: string | null = null;
 	private pendingAssemblyTypes: PluginTypeToRegister[] = [];
@@ -767,9 +769,14 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	}
 
 	private async handleRefresh(): Promise<void> {
+		// Increment load ID to invalidate any in-flight requests from previous loads
+		// This prevents stale data from overwriting the UI after environment change
+		const thisLoadId = ++this.currentLoadId;
+
 		this.logger.debug('Refreshing plugin registration tree', {
 			environmentId: this.currentEnvironmentId,
 			solutionId: this.currentSolutionId,
+			loadId: thisLoadId,
 		});
 
 		await this.loadingBehavior.setLoading(true);
@@ -777,6 +784,8 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		try {
 			// Progress callback updates webview only (no status bar notification - panel UI is sufficient)
 			const onProgress = (step: string, percent: number): void => {
+				// Don't send progress if this load has been superseded
+				if (thisLoadId !== this.currentLoadId) return;
 				void this.panel.postMessage({
 					command: 'updateLoadingProgress',
 					data: { step, percent },
@@ -792,6 +801,15 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				),
 				this.loadSolutionMemberships(),
 			]);
+
+			// Check if this load has been superseded by a newer one (e.g., environment changed)
+			if (thisLoadId !== this.currentLoadId) {
+				this.logger.debug('Discarding stale load result', {
+					thisLoadId,
+					currentLoadId: this.currentLoadId,
+				});
+				return;
+			}
 
 			const treeItems = this.treeMapper.toTreeItems(treeResult.packages, treeResult.standaloneAssemblies);
 
@@ -810,13 +828,19 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				},
 			});
 		} catch (error: unknown) {
+			// Don't show error if this load has been superseded
+			if (thisLoadId !== this.currentLoadId) return;
+
 			this.logger.error('Error loading plugin registration tree', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			void vscode.window.showErrorMessage(
 				`Failed to load plugin registration: ${errorMessage}`
 			);
 		} finally {
-			await this.loadingBehavior.setLoading(false);
+			// Only clear loading state if this is still the current load
+			if (thisLoadId === this.currentLoadId) {
+				await this.loadingBehavior.setLoading(false);
+			}
 		}
 	}
 
