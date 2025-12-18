@@ -486,8 +486,11 @@ function toggleExpansion(node, id) {
 		expandedNodes.add(id);
 	}
 
+	// Get filtered tree data (respects solution filter, hide Microsoft, etc.)
+	const effectiveData = getEffectiveTreeData();
+
 	// Check if we need to use virtual scrolling after this toggle
-	flattenedNodes = flattenTree(treeData);
+	flattenedNodes = flattenTree(effectiveData);
 	const shouldUseVirtualScroll = flattenedNodes.length > VIRTUAL_SCROLL_THRESHOLD;
 
 	// If switching modes or staying in virtual scroll, do full re-render
@@ -499,7 +502,7 @@ function toggleExpansion(node, id) {
 				renderVirtualTree(pluginTree);
 				setupScrollHandler(pluginTree);
 			} else {
-				renderFullTree(pluginTree, treeData);
+				renderFullTree(pluginTree, effectiveData);
 			}
 			if (currentFilter) {
 				filterTree(currentFilter);
@@ -518,7 +521,7 @@ function toggleExpansion(node, id) {
 		updateToggleIcon(node, false);
 	} else {
 		// Was collapsed, now expanded: render just this node's children
-		const item = findNodeInTree(treeData, id);
+		const item = findNodeInTree(effectiveData, id);
 		if (item && item.children && item.children.length > 0) {
 			const depth = getNodeDepth(node);
 			const childrenHtml = renderChildrenContainer(item.children, depth + 1);
@@ -641,11 +644,14 @@ function filterTree(searchTerm) {
 
 	const term = searchTerm.toLowerCase().trim();
 
-	// If no filter, show all nodes
+	// Get filtered tree data (respects solution filter, hide Microsoft, etc.)
+	const effectiveData = getEffectiveTreeData();
+
+	// If no filter, show all nodes (still respects other filters via effectiveData)
 	if (term === '') {
 		if (useVirtualScroll) {
-			// Virtual scroll: re-render with all nodes
-			flattenedNodes = flattenTree(treeData);
+			// Virtual scroll: re-render with all nodes from effective data
+			flattenedNodes = flattenTree(effectiveData);
 			renderVirtualTree(pluginTree);
 		} else {
 			pluginTree.querySelectorAll('.tree-node').forEach(node => {
@@ -663,7 +669,7 @@ function filterTree(searchTerm) {
 
 	if (useVirtualScroll) {
 		// Virtual scroll: filter the flattened nodes and re-render
-		flattenedNodes = flattenTree(treeData).filter(({ item }) => visibleNodeIds.has(item.id));
+		flattenedNodes = flattenTree(effectiveData).filter(({ item }) => visibleNodeIds.has(item.id));
 		renderVirtualTree(pluginTree);
 	} else {
 		// Regular DOM: apply visibility styles
