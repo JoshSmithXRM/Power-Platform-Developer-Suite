@@ -177,3 +177,37 @@ Run `npm run compile:fast` after each test file to verify.
 | Solution filter strategy | Background pre-fetch | No UX regression, instant filtering |
 | Test coverage target | Domain 80%+, Mappers 70%+ | Per CLAUDE.md standards, non-negotiable |
 | Parallel execution | Tests parallel, features sequential | Safe parallelism, avoids merge conflicts |
+
+---
+
+## F5 Testing Bugs Found (2025-12-17)
+
+### Bug 1: Solution Selection Not Persisting
+**Status:** ✅ Fixed
+**Symptom:** When selecting a solution from dropdown, it reverts to default
+**Root cause:** `updateSolutionSelector` in messaging.js updated dropdown but didn't sync with `plugin-registration.js` filtering state
+**Fix:** Added `handleSolutionSelectorUpdate` handler in plugin-registration.js to sync `currentSolutionId`
+
+### Bug 2: Detail Panel Never Opens
+**Status:** ✅ Fixed
+**Symptom:** Clicking tree nodes doesn't open detail panel
+**Root cause:** `selectNode` message was missing `data` wrapper - sent `{command, nodeId, nodeType}` instead of `{command, data: {nodeId, nodeType}}`
+**Fix:** Wrapped nodeId and nodeType in data object in plugin-registration.js
+
+### Bug 3: Attribute Picker Fails for "(none)" Entity
+**Status:** ✅ Fixed
+**Symptom:** `Entity With Id = LogicalName='(none)' does not exist`
+**Root cause:** Picker button allowed click when entity was "(none)" placeholder
+**Fix:** Added validation to check for "(none)" and "(" prefix in FormModal.js attributeInput type
+
+### Bug 4: Solution List Loads Slowly
+**Status:** ✅ Fixed
+**Symptom:** Solution dropdown takes long to populate
+**Root cause:** `loadSolutions()` was awaited before tree load (sequential)
+**Fix:** Changed to parallel loading with `Promise.all()` so dropdown populates immediately
+
+### Bug 5: Error Logging Shows [object Object]
+**Status:** ✅ Fixed
+**Symptom:** Logs show `Error handling message: [object Object]`
+**Root cause:** Error object passed directly to logger didn't serialize properly
+**Fix:** Extract errorMessage and errorStack from error object in PanelCoordinator.ts

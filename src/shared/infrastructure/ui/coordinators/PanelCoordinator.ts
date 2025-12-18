@@ -190,7 +190,10 @@ export class PanelCoordinator<TCommands extends string = string>
 
 			await handler(data);
 		} catch (error: unknown) {
-			this.logger.error('Error handling message', { command, error });
+			// Extract error details for better logging
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorStack = error instanceof Error ? error.stack : undefined;
+			this.logger.error('Error handling message', { command, errorMessage, errorStack });
 			// Don't rethrow - log and continue
 		} finally {
 			// Restore button state

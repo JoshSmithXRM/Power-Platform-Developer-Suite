@@ -337,20 +337,25 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		await this.loadingBehavior.setLoading(true);
 
 		try {
-			// Load solutions for dropdown
-			const solutions = await this.loadSolutions();
-
-			// Update solutions dropdown
-			await this.panel.postMessage({
-				command: 'updateSolutionSelector',
-				data: {
-					solutions,
-					currentSolutionId: this.currentSolutionId,
-				},
+			// Load solutions and tree in parallel for faster UX
+			// Solutions typically load in ~1s, tree takes ~48s
+			// By loading in parallel, dropdown populates immediately
+			const solutionsPromise = this.loadSolutions().then(async (solutions) => {
+				// Update dropdown as soon as solutions are ready
+				await this.panel.postMessage({
+					command: 'updateSolutionSelector',
+					data: {
+						solutions,
+						currentSolutionId: this.currentSolutionId,
+					},
+				});
 			});
 
-			// Load tree data
-			await this.handleRefresh();
+			// Load tree data (this takes the longest)
+			const treePromise = this.handleRefresh();
+
+			// Wait for both to complete
+			await Promise.all([solutionsPromise, treePromise]);
 		} finally {
 			await this.loadingBehavior.setLoading(false);
 		}

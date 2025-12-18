@@ -442,8 +442,10 @@ function handleNodeClick(event) {
 	if (window.vscode) {
 		window.vscode.postMessage({
 			command: 'selectNode',
-			nodeId: id,
-			nodeType: nodeType
+			data: {
+				nodeId: id,
+				nodeType: nodeType
+			}
 		});
 	}
 }
@@ -1098,12 +1100,31 @@ window.createBehavior({
 			case 'solutionFilterChanged':
 				handleSolutionFilterChanged(message.data);
 				break;
+			case 'updateSolutionSelector':
+				// Sync our filtering state when solution selector is updated (environment change, init)
+				handleSolutionSelectorUpdate(message.data);
+				break;
 			case 'showAttributePickerModal':
 				handleShowAttributePickerModal(message.data);
 				break;
 		}
 	}
 });
+
+/**
+ * Handle solution selector update (sent during initialization and environment change).
+ * Syncs our filtering state with the dropdown state.
+ * @param {Object} data - { solutions, currentSolutionId }
+ */
+function handleSolutionSelectorUpdate(data) {
+	const { currentSolutionId: newSolutionId } = data || {};
+
+	// Update our filtering state to match the dropdown
+	currentSolutionId = newSolutionId || '';
+
+	// Note: We don't re-render here because the tree will be loaded/refreshed separately
+	// This just ensures our filter state is in sync when tree data arrives
+}
 
 /**
  * Handle solution filter change from the solution selector dropdown.

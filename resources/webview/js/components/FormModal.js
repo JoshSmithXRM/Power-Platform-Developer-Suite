@@ -310,8 +310,9 @@ window.showFormModal = function(options) {
 					}
 				}
 
-				if (!entityLogicalName) {
-					return; // No entity selected yet
+				// Check for empty or placeholder values like "(none)"
+				if (!entityLogicalName || entityLogicalName === '(none)' || entityLogicalName.startsWith('(')) {
+					return; // No valid entity selected yet
 				}
 
 				// Store reference to update field when picker returns
@@ -352,7 +353,9 @@ window.showFormModal = function(options) {
 							} else if (entityElement.value !== undefined) {
 								value = entityElement.value;
 							}
-							pickerBtn.disabled = !value;
+							// Disable if empty or placeholder like "(none)"
+							const isValidEntity = value && value !== '(none)' && !value.startsWith('(');
+							pickerBtn.disabled = !isValidEntity;
 						};
 						// Initial check
 						checkEntity();
