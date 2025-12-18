@@ -4,11 +4,13 @@ import type { PluginPackage } from '../../domain/entities/PluginPackage';
 import type { PluginStep } from '../../domain/entities/PluginStep';
 import type { PluginType } from '../../domain/entities/PluginType';
 import type { StepImage } from '../../domain/entities/StepImage';
+import type { WebHook } from '../../domain/entities/WebHook';
 import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
 import type { IPluginPackageRepository } from '../../domain/interfaces/IPluginPackageRepository';
 import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
 import type { IPluginTypeRepository } from '../../domain/interfaces/IPluginTypeRepository';
 import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRepository';
+import type { IWebHookRepository } from '../../domain/interfaces/IWebHookRepository';
 import type { AssemblyTreeNode, PackageTreeNode } from '../mappers/PluginRegistrationTreeMapper';
 
 /**
@@ -17,6 +19,7 @@ import type { AssemblyTreeNode, PackageTreeNode } from '../mappers/PluginRegistr
 export interface PluginRegistrationTreeResult {
 	readonly packages: ReadonlyArray<PackageTreeNode>;
 	readonly standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>;
+	readonly webHooks: ReadonlyArray<WebHook>;
 	readonly totalNodeCount: number;
 }
 
@@ -34,6 +37,7 @@ interface BulkFetchResult {
 	readonly pluginTypes: readonly PluginType[];
 	readonly steps: readonly PluginStep[];
 	readonly images: readonly StepImage[];
+	readonly webHooks: readonly WebHook[];
 }
 
 /**
@@ -64,6 +68,7 @@ export class LoadPluginRegistrationTreeUseCase {
 		private readonly pluginTypeRepository: IPluginTypeRepository,
 		private readonly stepRepository: IPluginStepRepository,
 		private readonly imageRepository: IStepImageRepository,
+		private readonly webHookRepository: IWebHookRepository,
 		private readonly logger: ILogger
 	) {}
 
@@ -108,7 +113,7 @@ export class LoadPluginRegistrationTreeUseCase {
 	 * Creates a progress tracker for parallel repository fetches.
 	 */
 	private createProgressTracker(reportProgress: LoadingProgressCallback): (name: string) => void {
-		const repoNames = ['packages', 'assemblies', 'plugin types', 'steps', 'images'];
+		const repoNames = ['packages', 'assemblies', 'plugin types', 'steps', 'images', 'webhooks'];
 		const completedNames: string[] = [];
 
 		return (repoName: string): void => {
@@ -138,7 +143,7 @@ export class LoadPluginRegistrationTreeUseCase {
 		reportProgress('Fetching data from Dataverse...', 10);
 
 		// Parallel fetch all data with progress tracking per repository
-		const [packages, assemblies, pluginTypes, steps, images] = await Promise.all([
+		const [packages, assemblies, pluginTypes, steps, images, webHooks] = await Promise.all([
 			this.packageRepository.findAll(environmentId, solutionId).then((r) => {
 				trackProgress('packages');
 				return r;
@@ -159,6 +164,10 @@ export class LoadPluginRegistrationTreeUseCase {
 				trackProgress('images');
 				return r;
 			}),
+			this.webHookRepository.findAll(environmentId).then((r) => {
+				trackProgress('webhooks');
+				return r;
+			}),
 		]);
 
 		this.logger.debug('LoadPluginRegistrationTreeUseCase: Bulk fetch complete', {
@@ -167,10 +176,11 @@ export class LoadPluginRegistrationTreeUseCase {
 			pluginTypes: pluginTypes.length,
 			steps: steps.length,
 			images: images.length,
+			webHooks: webHooks.length,
 			totalMs: Date.now() - startTime,
 		});
 
-		return { packages, assemblies, pluginTypes, steps, images };
+		return { packages, assemblies, pluginTypes, steps, images, webHooks };
 	}
 
 	/**
@@ -212,11 +222,16 @@ export class LoadPluginRegistrationTreeUseCase {
 			imagesByStepId
 		);
 
-		const totalNodeCount = this.countTotalNodes(packageTrees, standaloneAssemblyTrees);
+		const totalNodeCount = this.countTotalNodes(packageTrees, standaloneAssemblyTrees, data.webHooks);
 
 		reportProgress('Complete!', 100);
 
-		return { packages: packageTrees, standaloneAssemblies: standaloneAssemblyTrees, totalNodeCount };
+		return {
+			packages: packageTrees,
+			standaloneAssemblies: standaloneAssemblyTrees,
+			webHooks: data.webHooks,
+			totalNodeCount,
+		};
 	}
 
 	/**
@@ -288,9 +303,10 @@ export class LoadPluginRegistrationTreeUseCase {
 	 */
 	private countTotalNodes(
 		packages: ReadonlyArray<PackageTreeNode>,
-		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>
+		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>,
+		webHooks: ReadonlyArray<WebHook>
 	): number {
-		let count = packages.length + standaloneAssemblies.length;
+		let count = packages.length + standaloneAssemblies.length + webHooks.length;
 
 		for (const packageNode of packages) {
 			count += this.countAssemblyTreeNodes(packageNode.assemblies);

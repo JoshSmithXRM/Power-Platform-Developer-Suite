@@ -49,6 +49,9 @@ export async function initializePluginRegistration(
 	const { DataverseStepImageRepository } = await import(
 		'../../infrastructure/repositories/DataverseStepImageRepository.js'
 	);
+	const { DataverseWebHookRepository } = await import(
+		'../../infrastructure/repositories/DataverseWebHookRepository.js'
+	);
 	const { PluginInspectorService } = await import(
 		'../../infrastructure/services/PluginInspectorService.js'
 	);
@@ -109,6 +112,15 @@ export async function initializePluginRegistration(
 	const { LoadAttributesForPickerUseCase } = await import(
 		'../../application/useCases/LoadAttributesForPickerUseCase.js'
 	);
+	const { RegisterWebHookUseCase } = await import(
+		'../../application/useCases/RegisterWebHookUseCase.js'
+	);
+	const { UpdateWebHookUseCase } = await import(
+		'../../application/useCases/UpdateWebHookUseCase.js'
+	);
+	const { UnregisterWebHookUseCase } = await import(
+		'../../application/useCases/UnregisterWebHookUseCase.js'
+	);
 	const { DataverseSdkMessageRepository } = await import(
 		'../../infrastructure/repositories/DataverseSdkMessageRepository.js'
 	);
@@ -134,6 +146,7 @@ export async function initializePluginRegistration(
 	const pluginTypeRepository = new DataversePluginTypeRepository(dataverseApiService, logger);
 	const stepRepository = new DataversePluginStepRepository(dataverseApiService, logger);
 	const imageRepository = new DataverseStepImageRepository(dataverseApiService, logger);
+	const webHookRepository = new DataverseWebHookRepository(dataverseApiService, logger);
 	const sdkMessageRepository = new DataverseSdkMessageRepository(dataverseApiService, logger);
 	const sdkMessageFilterRepository = new DataverseSdkMessageFilterRepository(
 		dataverseApiService,
@@ -155,6 +168,7 @@ export async function initializePluginRegistration(
 		pluginTypeRepository,
 		stepRepository,
 		imageRepository,
+		webHookRepository,
 		logger
 	);
 
@@ -184,6 +198,9 @@ export async function initializePluginRegistration(
 		attributePickerRepository,
 		logger
 	);
+	const registerWebHookUseCase = new RegisterWebHookUseCase(webHookRepository, logger);
+	const updateWebHookUseCase = new UpdateWebHookUseCase(webHookRepository, logger);
+	const unregisterWebHookUseCase = new UnregisterWebHookUseCase(webHookRepository, logger);
 
 	// Bundle use cases and repositories for cleaner panel constructor
 	const useCases = {
@@ -204,6 +221,9 @@ export async function initializePluginRegistration(
 		updateImage: updateImageUseCase,
 		loadMemberships: loadMembershipsUseCase,
 		loadAttributesForPicker: loadAttributesForPickerUseCase,
+		registerWebHook: registerWebHookUseCase,
+		updateWebHook: updateWebHookUseCase,
+		unregisterWebHook: unregisterWebHookUseCase,
 	};
 
 	const repositories = {
@@ -212,6 +232,7 @@ export async function initializePluginRegistration(
 		package: packageRepository,
 		pluginType: pluginTypeRepository,
 		image: imageRepository,
+		webHook: webHookRepository,
 		solution: solutionRepository,
 		sdkMessage: sdkMessageRepository,
 		sdkMessageFilter: sdkMessageFilterRepository,

@@ -1787,3 +1787,112 @@ Dataverse requires the actual unique name string, not the ID.
 **Additional UX Improvement:**
 - [x] Changed tree default to expanded instead of collapsed for better discoverability
 - Reused existing `expandAll()` function in `handleTreeUpdate()` (no new code needed)
+
+### Session 22 (2025-12-18)
+**WebHook Registration - PRESENTATION LAYER COMPLETE**
+
+**Context:** WebHook support for Plugin Registration Panel. WebHooks are service endpoints (serviceendpoint with contract=8) that can receive step registrations for event-driven integrations.
+
+**Previous Work (Slices 1-3 - Done before this session):**
+- Domain: `WebHook.ts` entity, `WebHookAuthType.ts` value object, `IWebHookRepository.ts` interface
+- Infrastructure: `DataverseWebHookRepository.ts` (queries serviceendpoint with contract=8)
+- Application: `LoadWebHooksUseCase`, `RegisterWebHookUseCase`, `UpdateWebHookUseCase`, `UnregisterWebHookUseCase`
+- Application: `WebHookViewModelMapper.ts`, updated `TreeItemViewModel.ts` with webhook type
+- Application: Updated `LoadPluginRegistrationTreeUseCase` to fetch webhooks in parallel
+- Application: Updated `PluginRegistrationTreeMapper` to include webhooks at root level
+
+**This Session - Presentation Layer Fixes:**
+
+**1. Compile Errors Fixed:**
+- Added `registerWebHook` and `confirmRegisterWebHook` to `PluginRegistrationCommands` type
+- Fixed `loadTreeData()` → `handleRefresh()` in the confirmation handler
+- Added `IWebHookRepository` to `PluginRegistrationRepositories` interface
+- Added `webHook: webHookRepository` to initialization repositories bundle
+
+**2. Panel Methods Added (`PluginRegistrationPanelComposed.ts`):**
+- `handleRegisterWebHook()` - Shows register modal with auth types and solutions
+- `handleConfirmRegisterWebHook()` - Processes registration via use case
+- `handleConfirmUpdateWebHook()` - Processes update via use case
+- `editWebHook(webhookId)` - Public method for context menu command
+- `unregisterWebHook(webhookId)` - Public method for context menu command (with confirmation dialog)
+
+**3. Extension Commands (`extension.ts`):**
+- `power-platform-dev-suite.editWebHook` - Context menu edit command
+- `power-platform-dev-suite.unregisterWebHook` - Context menu delete command
+
+**4. Package.json Updates:**
+- Command definitions for editWebHook and unregisterWebHook
+- Context menu items with when clauses: `webviewSection == 'webHook' && canUpdate/canDelete`
+
+**5. Webview JS Updates (`plugin-registration.js`):**
+- Added `'webHook': '🪝'` icon mapping
+- Added `handleShowRegisterWebHookModal()` with form fields (Name, URL, Auth Type, Auth Value, Description, Solution)
+- Added `handleShowEditWebHookModal()` for editing existing webhooks
+- Added `renderWebHookDetails()` for the detail panel
+- Added context data for webHook nodes (canUpdate, canDelete)
+- Added message handler cases for `showRegisterWebHookModal` and `showEditWebHookModal`
+
+**6. Dropdown Mapping Fixed (`DropdownComponent.js`):**
+- **Bug:** "Register New WebHook" button didn't do anything
+- **Root Cause:** Missing `'webHook': 'registerWebHook'` mapping in registerDropdown command map
+- **Fix:** Added the mapping to wire up the dropdown item to the command
+
+**7. AADSASKey Auth Type Support (`WebHookAuthType.ts`):**
+- **Bug:** Error "Invalid WebHookAuthType value: 5" when loading webhooks created in PRT
+- **Root Cause:** Value object only supported values 1-4, missing AADSASKey (5)
+- **Fix:**
+  - Added `AADSASKey` static instance with value 5
+  - Added case 5 to `fromValue()` method
+  - Added AADSASKey to `all()` method
+  - Updated auth type dropdowns in panel to include AADSASKey option
+  - Updated tests (4 new tests, 288 total passing)
+
+**Files Created/Modified:**
+- `src/.../domain/valueObjects/WebHookAuthType.ts` - Added AADSASKey support
+- `src/.../domain/valueObjects/WebHookAuthType.test.ts` - New tests for AADSASKey
+- `src/.../presentation/panels/PluginRegistrationPanelComposed.ts` - Webhook handlers and methods
+- `src/.../presentation/initialization/initializePluginRegistration.ts` - WebHook repository wiring
+- `src/extension.ts` - WebHook context menu commands
+- `package.json` - Command definitions and context menu entries
+- `resources/webview/js/features/plugin-registration.js` - Modal handlers and detail rendering
+- `resources/webview/js/components/DropdownComponent.js` - Dropdown command mapping
+
+**Testing:**
+- All 288 plugin registration tests pass
+- Compile succeeds (pre-existing lint warnings only)
+
+**Ready for F5 Testing:**
+- [ ] Register new webhook via dropdown button
+- [ ] Edit webhook via context menu
+- [ ] Unregister webhook via context menu
+- [ ] Verify webhook with AADSASKey auth loads correctly
+- [ ] Verify webhook appears at root level in tree
+
+---
+
+## WebHook Feature Status
+
+### COMPLETED ✅
+| Feature | Status |
+|---------|--------|
+| WebHook entity and value object | ✅ Domain |
+| WebHook repository interface | ✅ Domain |
+| DataverseWebHookRepository | ✅ Infrastructure |
+| LoadWebHooksUseCase | ✅ Application |
+| RegisterWebHookUseCase | ✅ Application |
+| UpdateWebHookUseCase | ✅ Application |
+| UnregisterWebHookUseCase | ✅ Application |
+| WebHookViewModelMapper | ✅ Application |
+| Tree displays webhooks at root | ✅ Presentation |
+| Register WebHook modal | ✅ Presentation |
+| Edit WebHook modal | ✅ Presentation |
+| Unregister WebHook (with confirm) | ✅ Presentation |
+| Context menu commands | ✅ Presentation |
+| Detail panel for webhooks | ✅ Presentation |
+| AADSASKey auth type support | ✅ Domain |
+
+### REMAINING - WebHook Step Registration (Slice 5)
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| Register step targeting webhook | HIGH | Modify step registration to support webhooks |
+| Edit step to change target | MEDIUM | Allow switching between plugin type and webhook |

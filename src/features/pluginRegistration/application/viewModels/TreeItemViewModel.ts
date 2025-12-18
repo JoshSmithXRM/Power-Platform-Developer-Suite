@@ -1,17 +1,17 @@
 /**
  * Unified view model for tree nodes.
- * Supports all 5 node types (Package, Assembly, PluginType, Step, Image).
+ * Supports all 6 node types (Package, Assembly, PluginType, Step, Image, WebHook).
  *
  * Flat structure for client-side tree rendering.
  */
 export interface TreeItemViewModel {
 	readonly id: string;
 	readonly parentId: string | null;
-	readonly type: 'package' | 'assembly' | 'pluginType' | 'step' | 'image';
+	readonly type: 'package' | 'assembly' | 'pluginType' | 'step' | 'image' | 'webHook';
 	readonly name: string;
 	readonly displayName: string;
 	readonly icon: string;
-	readonly metadata: PackageMetadata | AssemblyMetadata | PluginTypeMetadata | StepMetadata | ImageMetadata;
+	readonly metadata: PackageMetadata | AssemblyMetadata | PluginTypeMetadata | StepMetadata | ImageMetadata | WebHookMetadata;
 	readonly isManaged: boolean;
 	readonly children: TreeItemViewModel[];
 }
@@ -86,5 +86,19 @@ export interface ImageMetadata {
 	readonly entityAlias: string;
 	readonly attributes: string[];
 	readonly createdOn: string;
+	readonly canDelete: boolean;
+}
+
+/**
+ * WebHook-specific metadata.
+ */
+export interface WebHookMetadata {
+	readonly type: 'webHook';
+	readonly url: string;
+	readonly authType: string;
+	readonly description: string | null;
+	readonly createdOn: string;
+	readonly modifiedOn: string;
+	readonly canUpdate: boolean;
 	readonly canDelete: boolean;
 }

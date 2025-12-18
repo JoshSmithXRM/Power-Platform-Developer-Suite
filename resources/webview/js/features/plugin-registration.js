@@ -328,6 +328,9 @@ function buildVscodeContext(item) {
 		context.canUpdate = item.metadata.canUpdate === true;
 	} else if (item.type === 'image' && item.metadata) {
 		context.canDelete = item.metadata.canDelete === true;
+	} else if (item.type === 'webHook' && item.metadata) {
+		context.canUpdate = item.metadata.canUpdate === true;
+		context.canDelete = item.metadata.canDelete === true;
 	}
 
 	return JSON.stringify(context);
@@ -395,7 +398,8 @@ function getIcon(type, iconHint) {
 		'assembly': '⚙️',
 		'pluginType': '🔌',
 		'step': '⚡',
-		'image': '🖼️'
+		'image': '🖼️',
+		'webHook': '🪝'
 	};
 
 	return icons[type] || '📄';
@@ -1126,6 +1130,12 @@ window.createBehavior({
 			case 'showAttributePickerModal':
 				handleShowAttributePickerModal(message.data);
 				break;
+			case 'showRegisterWebHookModal':
+				handleShowRegisterWebHookModal(message.data);
+				break;
+			case 'showEditWebHookModal':
+				handleShowEditWebHookModal(message.data);
+				break;
 		}
 	}
 });
@@ -1195,6 +1205,215 @@ function handleShowAttributePickerModal(data) {
 				window._activeAttributePicker.updateField(effectiveValue);
 				window._activeAttributePicker = null;
 			}
+		}
+	});
+}
+
+/**
+ * Show the Register WebHook modal.
+ * @param {Object} data - { authTypes, solutions }
+ */
+function handleShowRegisterWebHookModal(data) {
+	const { authTypes, solutions } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build solution options for dropdown (optional for webhooks)
+	const solutionOptions = [
+		{ value: '', label: 'None (do not add to solution)' },
+		...(solutions || []).map(s => ({
+			value: s.uniqueName,
+			label: s.name
+		}))
+	];
+
+	// Build auth type options
+	const authTypeOptions = (authTypes || []).map(a => ({
+		value: a.value.toString(),
+		label: a.label
+	}));
+
+	window.showFormModal({
+		title: 'Register WebHook',
+		fields: [
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'e.g., MyWebHook'
+			},
+			{
+				id: 'url',
+				label: 'Endpoint URL',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'https://example.com/webhook'
+			},
+			{
+				id: 'authType',
+				label: 'Authentication',
+				type: 'select',
+				value: '1', // Default to None
+				options: authTypeOptions,
+				required: true
+			},
+			{
+				id: 'authValue',
+				label: 'Auth Value',
+				type: 'password',
+				value: '',
+				placeholder: 'API key or secret (optional)',
+				hint: 'Required for HttpHeader, WebhookKey, or HttpQueryString auth types'
+			},
+			{
+				id: 'description',
+				label: 'Description',
+				type: 'textarea',
+				value: '',
+				placeholder: 'Optional description'
+			},
+			{
+				id: 'solution',
+				label: 'Solution',
+				type: 'select',
+				value: '',
+				options: solutionOptions
+			}
+		],
+		submitLabel: 'Register',
+		cancelLabel: 'Cancel',
+		onSubmit: (values) => {
+			// Validate URL is HTTPS
+			if (values.url && !values.url.toLowerCase().startsWith('https://')) {
+				window.showNotification?.('WebHook URL must use HTTPS', 'error');
+				return;
+			}
+
+			// Validate auth value when auth type requires it
+			const authType = parseInt(values.authType, 10);
+			if (authType !== 1 && !values.authValue) {
+				window.showNotification?.('Auth value is required for the selected authentication type', 'error');
+				return;
+			}
+
+			// Send confirmation to extension
+			vscode.postMessage({
+				command: 'confirmRegisterWebHook',
+				data: {
+					name: values.name,
+					url: values.url,
+					authType: authType,
+					authValue: values.authValue || undefined,
+					description: values.description || undefined,
+					solutionUniqueName: values.solution || undefined
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Edit WebHook modal with pre-populated values.
+ * @param {Object} data - { webhookId, name, url, authType, description, authTypes, solutions }
+ */
+function handleShowEditWebHookModal(data) {
+	const { webhookId, name, url, authType, description, authTypes, solutions } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build solution options for dropdown (optional for webhooks)
+	const solutionOptions = [
+		{ value: '', label: 'None (do not add to solution)' },
+		...(solutions || []).map(s => ({
+			value: s.uniqueName,
+			label: s.name
+		}))
+	];
+
+	// Build auth type options
+	const authTypeOptions = (authTypes || []).map(a => ({
+		value: a.value.toString(),
+		label: a.label
+	}));
+
+	window.showFormModal({
+		title: 'Edit WebHook',
+		fields: [
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: name || '',
+				required: true,
+				placeholder: 'e.g., MyWebHook'
+			},
+			{
+				id: 'url',
+				label: 'Endpoint URL',
+				type: 'text',
+				value: url || '',
+				required: true,
+				placeholder: 'https://example.com/webhook'
+			},
+			{
+				id: 'authType',
+				label: 'Authentication',
+				type: 'select',
+				value: (authType || 1).toString(),
+				options: authTypeOptions,
+				required: true
+			},
+			{
+				id: 'authValue',
+				label: 'Auth Value',
+				type: 'password',
+				value: '', // Don't pre-fill password for security
+				placeholder: 'Leave empty to keep existing value',
+				hint: 'Required for HttpHeader, WebhookKey, or HttpQueryString auth types'
+			},
+			{
+				id: 'description',
+				label: 'Description',
+				type: 'textarea',
+				value: description || '',
+				placeholder: 'Optional description'
+			}
+		],
+		submitLabel: 'Update',
+		cancelLabel: 'Cancel',
+		onSubmit: (values) => {
+			// Validate URL is HTTPS
+			if (values.url && !values.url.toLowerCase().startsWith('https://')) {
+				window.showNotification?.('WebHook URL must use HTTPS', 'error');
+				return;
+			}
+
+			// Validate auth value when auth type requires it (only if changing from None)
+			const newAuthType = parseInt(values.authType, 10);
+			// If auth type changed to something other than None and no value provided, that's a problem
+			// But we allow empty authValue if they're keeping the same auth type (preserves existing value)
+
+			// Send confirmation to extension
+			vscode.postMessage({
+				command: 'confirmUpdateWebHook',
+				data: {
+					webhookId: webhookId,
+					name: values.name,
+					url: values.url,
+					authType: newAuthType,
+					authValue: values.authValue || undefined,
+					description: values.description || undefined
+				}
+			});
 		}
 	});
 }
@@ -2598,6 +2817,9 @@ function handleShowNodeDetails(data) {
 		case 'image':
 			html += renderImageDetails(data);
 			break;
+		case 'webHook':
+			html += renderWebHookDetails(data);
+			break;
 		default:
 			html = '<p class="detail-placeholder">Unknown node type</p>';
 	}
@@ -2668,6 +2890,28 @@ function renderPluginTypeDetails(data) {
 		<span class="detail-value">${escapeHtml(data.assemblyName || '')}</span>
 		<span class="detail-label">Step Count:</span>
 		<span class="detail-value">${data.stepCount ?? '-'}</span>
+	`;
+}
+
+/**
+ * Render webhook details.
+ */
+function renderWebHookDetails(data) {
+	return `
+		<span class="detail-label">Name:</span>
+		<span class="detail-value">${escapeHtml(data.name || '')}</span>
+		<span class="detail-label">Endpoint URL:</span>
+		<span class="detail-value monospace">${escapeHtml(data.url || '')}</span>
+		<span class="detail-label">Authentication:</span>
+		<span class="detail-value">${escapeHtml(data.authType || '')}</span>
+		<span class="detail-label">Managed:</span>
+		<span class="detail-value">${renderManagedStatus(data.isManaged)}</span>
+		<span class="detail-label">Description:</span>
+		<span class="detail-value">${escapeHtml(data.description || '-')}</span>
+		<span class="detail-label">Created:</span>
+		<span class="detail-value">${formatDate(data.createdOn)}</span>
+		<span class="detail-label">Modified:</span>
+		<span class="detail-value">${formatDate(data.modifiedOn)}</span>
 	`;
 }
 

@@ -724,6 +724,40 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	);
 
+	const editWebHookCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.editWebHook',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const webhookId = contextMenuContext?.nodeId;
+			if (!webhookId) {
+				vscode.window.showWarningMessage('No webhook selected.');
+				return;
+			}
+			await panel.editWebHook(webhookId);
+		}
+	);
+
+	const unregisterWebHookCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.unregisterWebHook',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const webhookId = contextMenuContext?.nodeId;
+			if (!webhookId) {
+				vscode.window.showWarningMessage('No webhook selected.');
+				return;
+			}
+			await panel.unregisterWebHook(webhookId);
+		}
+	);
+
 	const metadataBrowserCommand = vscode.commands.registerCommand('power-platform-dev-suite.metadataBrowser', async (environmentItem?: { envId: string }) => {
 		try {
 			void initializeMetadataBrowser(context, factories.getEnvironments, factories.dataverseApiServiceFactory, container.environmentRepository, container.logger, environmentItem?.envId);
@@ -899,6 +933,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		editPluginStepCommand,
 		registerStepImageCommand,
 		editStepImageCommand,
+		editWebHookCommand,
+		unregisterWebHookCommand,
 		metadataBrowserCommand,
 		metadataBrowserPickEnvironmentCommand,
 		dataExplorerCommand,

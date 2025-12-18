@@ -45,6 +45,9 @@ import {
 	type SolutionMembershipsDto,
 } from '../../application/useCases/LoadSolutionMembershipsUseCase';
 import type { LoadAttributesForPickerUseCase } from '../../application/useCases/LoadAttributesForPickerUseCase';
+import type { RegisterWebHookUseCase } from '../../application/useCases/RegisterWebHookUseCase';
+import type { UpdateWebHookUseCase } from '../../application/useCases/UpdateWebHookUseCase';
+import type { UnregisterWebHookUseCase } from '../../application/useCases/UnregisterWebHookUseCase';
 import type { ISdkMessageRepository } from '../../domain/interfaces/ISdkMessageRepository';
 import type { ISdkMessageFilterRepository } from '../../domain/interfaces/ISdkMessageFilterRepository';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
@@ -60,6 +63,7 @@ import { PluginPackageViewModelMapper } from '../../application/mappers/PluginPa
 import { PluginTypeViewModelMapper } from '../../application/mappers/PluginTypeViewModelMapper';
 import type { IPluginTypeRepository } from '../../domain/interfaces/IPluginTypeRepository';
 import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRepository';
+import type { IWebHookRepository } from '../../domain/interfaces/IWebHookRepository';
 import { StepImageViewModelMapper } from '../../application/mappers/StepImageViewModelMapper';
 import type { PluginInspectorService } from '../../infrastructure/services/PluginInspectorService';
 import type { PluginTypeToRegister } from '../../application/useCases/RegisterPluginAssemblyUseCase';
@@ -85,6 +89,9 @@ export interface PluginRegistrationUseCases {
 	readonly updateImage: UpdateStepImageUseCase;
 	readonly loadMemberships: LoadSolutionMembershipsUseCase;
 	readonly loadAttributesForPicker: LoadAttributesForPickerUseCase;
+	readonly registerWebHook: RegisterWebHookUseCase;
+	readonly updateWebHook: UpdateWebHookUseCase;
+	readonly unregisterWebHook: UnregisterWebHookUseCase;
 }
 
 /**
@@ -96,6 +103,7 @@ export interface PluginRegistrationRepositories {
 	readonly package: IPluginPackageRepository;
 	readonly pluginType: IPluginTypeRepository;
 	readonly image: IStepImageRepository;
+	readonly webHook: IWebHookRepository;
 	readonly solution: ISolutionRepository;
 	readonly sdkMessage: ISdkMessageRepository;
 	readonly sdkMessageFilter: ISdkMessageFilterRepository;
@@ -132,7 +140,10 @@ type PluginRegistrationCommands =
 	| 'confirmRegisterImage'
 	| 'confirmEditImage'
 	| 'getEntitiesForMessage'
-	| 'showAttributePicker';
+	| 'showAttributePicker'
+	| 'registerWebHook'
+	| 'confirmRegisterWebHook'
+	| 'confirmUpdateWebHook';
 
 /**
  * Plugin Registration panel using PanelCoordinator architecture.
@@ -542,6 +553,10 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			await this.handleRegisterPackage();
 		});
 
+		this.coordinator.registerHandler('registerWebHook', async () => {
+			await this.handleRegisterWebHook();
+		});
+
 		this.coordinator.registerHandler('registerStep', async () => {
 			await this.handleRegisterStepFromDropdown();
 		});
@@ -566,6 +581,41 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			};
 			if (name && version && prefix && solutionUniqueName) {
 				await this.handleConfirmRegisterPackage(name, version, prefix, solutionUniqueName);
+			}
+		});
+
+		this.coordinator.registerHandler('confirmRegisterWebHook', async (data) => {
+			const { name, url, authType, authValue, description, solutionUniqueName } = data as {
+				name?: string;
+				url?: string;
+				authType?: number;
+				authValue?: string;
+				description?: string;
+				solutionUniqueName?: string;
+			};
+			if (name && url && authType !== undefined) {
+				await this.handleConfirmRegisterWebHook(
+					name,
+					url,
+					authType,
+					authValue,
+					description,
+					solutionUniqueName
+				);
+			}
+		});
+
+		this.coordinator.registerHandler('confirmUpdateWebHook', async (data) => {
+			const { webhookId, name, url, authType, authValue, description } = data as {
+				webhookId?: string;
+				name?: string;
+				url?: string;
+				authType?: number;
+				authValue?: string;
+				description?: string;
+			};
+			if (webhookId && name && url && authType !== undefined) {
+				await this.handleConfirmUpdateWebHook(webhookId, name, url, authType, authValue, description);
 			}
 		});
 
@@ -816,7 +866,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				return;
 			}
 
-			const treeItems = this.treeMapper.toTreeItems(treeResult.packages, treeResult.standaloneAssemblies);
+			const treeItems = this.treeMapper.toTreeItems(
+				treeResult.packages,
+				treeResult.standaloneAssemblies,
+				treeResult.webHooks
+			);
 
 			this.logger.info('Plugin registration tree loaded', {
 				totalNodeCount: treeResult.totalNodeCount,
@@ -1366,6 +1420,138 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			void vscode.window.showErrorMessage(`Failed to read package file: ${errorMessage}`);
 			this.pendingPackageContent = null;
+		}
+	}
+
+	/**
+	 * Handle Register WebHook action from dropdown.
+	 * Shows modal with empty form for webhook registration.
+	 */
+	private async handleRegisterWebHook(): Promise<void> {
+		this.logger.info('Register WebHook requested');
+
+		try {
+			// Load unmanaged solutions for the dropdown
+			this.unmanagedSolutionsWithPrefix =
+				await this.repositories.solution.findUnmanagedWithPublisherPrefix(
+					this.currentEnvironmentId
+				);
+
+			// Send message to webview to show modal
+			await this.panel.postMessage({
+				command: 'showRegisterWebHookModal',
+				data: {
+					authTypes: [
+						{ value: 1, label: 'None' },
+						{ value: 2, label: 'HttpHeader' },
+						{ value: 3, label: 'WebhookKey' },
+						{ value: 4, label: 'HttpQueryString' },
+						{ value: 5, label: 'AADSASKey' },
+					],
+					solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
+						id: s.id,
+						uniqueName: s.uniqueName,
+						name: s.name,
+					})),
+				},
+			});
+		} catch (error) {
+			this.logger.error('Failed to load solutions for webhook registration', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(`Failed to prepare webhook registration: ${errorMessage}`);
+		}
+	}
+
+	/**
+	 * Handle confirmed webhook registration.
+	 */
+	private async handleConfirmRegisterWebHook(
+		name: string,
+		url: string,
+		authType: number,
+		authValue: string | undefined,
+		description: string | undefined,
+		solutionUniqueName: string | undefined
+	): Promise<void> {
+		this.logger.info('Registering webhook', { name, url, authType });
+
+		try {
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Registering WebHook: ${name}`,
+					cancellable: false,
+				},
+				async () => {
+					await this.useCases.registerWebHook.execute(this.currentEnvironmentId, {
+						name,
+						url,
+						authType,
+						authValue,
+						description,
+						solutionUniqueName,
+					});
+				}
+			);
+
+			void vscode.window.showInformationMessage(`WebHook "${name}" registered successfully.`);
+			await this.handleRefresh();
+		} catch (error) {
+			this.logger.error('Failed to register webhook', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(`Failed to register WebHook: ${errorMessage}`);
+		}
+	}
+
+	/**
+	 * Handle confirmed webhook update.
+	 */
+	private async handleConfirmUpdateWebHook(
+		webhookId: string,
+		name: string,
+		url: string,
+		authType: number,
+		authValue: string | undefined,
+		description: string | undefined
+	): Promise<void> {
+		this.logger.info('Updating webhook', { webhookId, name, url, authType });
+
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		try {
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Updating WebHook: ${name}`,
+					cancellable: false,
+				},
+				async () => {
+					await this.useCases.updateWebHook.execute(
+						this.currentEnvironmentId,
+						webhookId,
+						name,
+						{
+							name,
+							url,
+							authType,
+							authValue,
+							description,
+						}
+					);
+				}
+			);
+
+			void vscode.window.showInformationMessage(
+				`WebHook "${name}" updated successfully in ${environmentName}.`
+			);
+			await this.handleRefresh();
+		} catch (error) {
+			this.logger.error('Failed to update webhook', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(
+				`Failed to update WebHook in ${environmentName}: ${errorMessage}`
+			);
 		}
 	}
 
@@ -2176,6 +2362,110 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				primaryEntity,
 			},
 		});
+	}
+
+	/**
+	 * Edit a webhook. Called from context menu command.
+	 * Shows modal with pre-populated values.
+	 */
+	public async editWebHook(webhookId: string): Promise<void> {
+		this.logger.info('Editing webhook', { webhookId });
+
+		const webhook = await this.repositories.webHook.findById(this.currentEnvironmentId, webhookId);
+
+		if (webhook === null) {
+			void vscode.window.showErrorMessage('WebHook not found.');
+			return;
+		}
+
+		// Load unmanaged solutions for the dropdown
+		this.unmanagedSolutionsWithPrefix =
+			await this.repositories.solution.findUnmanagedWithPublisherPrefix(this.currentEnvironmentId);
+
+		// Send modal data to webview with pre-populated values
+		await this.panel.postMessage({
+			command: 'showEditWebHookModal',
+			data: {
+				webhookId,
+				name: webhook.getName(),
+				url: webhook.getUrl(),
+				authType: webhook.getAuthType().getValue(),
+				description: webhook.getDescription(),
+				authTypes: [
+					{ value: 1, label: 'None' },
+					{ value: 2, label: 'HttpHeader' },
+					{ value: 3, label: 'WebhookKey' },
+					{ value: 4, label: 'HttpQueryString' },
+					{ value: 5, label: 'AADSASKey' },
+				],
+				solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
+					id: s.id,
+					uniqueName: s.uniqueName,
+					name: s.name,
+				})),
+			},
+		});
+	}
+
+	/**
+	 * Unregister (delete) a webhook. Called from context menu command.
+	 * Shows confirmation dialog, then deletes the webhook.
+	 */
+	public async unregisterWebHook(webhookId: string): Promise<void> {
+		this.logger.info('Unregistering webhook', { webhookId });
+
+		// Fetch webhook and environment info for better messaging
+		const [webhook, environment] = await Promise.all([
+			this.repositories.webHook.findById(this.currentEnvironmentId, webhookId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+
+		const webhookName = webhook?.getName() ?? 'Unknown WebHook';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		// Confirm deletion with user
+		const confirmation = await vscode.window.showWarningMessage(
+			`Are you sure you want to unregister "${webhookName}" from ${environmentName}? This will delete the webhook and cannot be undone.`,
+			{ modal: true },
+			'Unregister'
+		);
+
+		if (confirmation !== 'Unregister') {
+			return; // User cancelled
+		}
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Unregistering ${webhookName} from ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.unregisterWebHook.execute(
+						this.currentEnvironmentId,
+						webhookId,
+						webhookName
+					);
+
+					// Send delta update to webview (instant, no full refresh)
+					await this.panel.postMessage({
+						command: 'removeNode',
+						data: { nodeId: webhookId },
+					});
+
+					void vscode.window.showInformationMessage(
+						`${webhookName} unregistered successfully from ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to unregister webhook', error);
+					void vscode.window.showErrorMessage(
+						`Failed to unregister ${webhookName} from ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
 	}
 
 	/**

@@ -3,6 +3,7 @@ import type { PluginPackage } from '../../domain/entities/PluginPackage';
 import type { PluginStep } from '../../domain/entities/PluginStep';
 import type { PluginType } from '../../domain/entities/PluginType';
 import type { StepImage } from '../../domain/entities/StepImage';
+import type { WebHook } from '../../domain/entities/WebHook';
 import type { TreeItemViewModel } from '../viewModels/TreeItemViewModel';
 
 import { PluginAssemblyViewModelMapper } from './PluginAssemblyViewModelMapper';
@@ -10,6 +11,7 @@ import { PluginPackageViewModelMapper } from './PluginPackageViewModelMapper';
 import { PluginStepViewModelMapper } from './PluginStepViewModelMapper';
 import { PluginTypeViewModelMapper } from './PluginTypeViewModelMapper';
 import { StepImageViewModelMapper } from './StepImageViewModelMapper';
+import { WebHookViewModelMapper } from './WebHookViewModelMapper';
 
 /**
  * Helper interface for assembly tree nodes (reused in packages and standalone).
@@ -42,6 +44,7 @@ export class PluginRegistrationTreeMapper {
 	private readonly pluginTypeMapper: PluginTypeViewModelMapper;
 	private readonly stepMapper: PluginStepViewModelMapper;
 	private readonly imageMapper: StepImageViewModelMapper;
+	private readonly webHookMapper: WebHookViewModelMapper;
 
 	constructor() {
 		this.packageMapper = new PluginPackageViewModelMapper();
@@ -49,15 +52,17 @@ export class PluginRegistrationTreeMapper {
 		this.pluginTypeMapper = new PluginTypeViewModelMapper();
 		this.stepMapper = new PluginStepViewModelMapper();
 		this.imageMapper = new StepImageViewModelMapper();
+		this.webHookMapper = new WebHookViewModelMapper();
 	}
 
 	/**
 	 * Converts domain tree to ViewModels.
-	 * Returns array with packages first, then standalone assemblies.
+	 * Returns array with packages first, then standalone assemblies, then webhooks.
 	 */
 	public toTreeItems(
 		packages: ReadonlyArray<PackageTreeNode>,
-		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>
+		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>,
+		webHooks: ReadonlyArray<WebHook> = []
 	): TreeItemViewModel[] {
 		const items: TreeItemViewModel[] = [];
 
@@ -80,6 +85,11 @@ export class PluginRegistrationTreeMapper {
 		// 2. Map standalone assemblies (no parent)
 		const standaloneItems = this.mapAssemblyNodes(standaloneAssemblies, null);
 		items.push(...standaloneItems);
+
+		// 3. Map webhooks (root-level, no children initially)
+		for (const webHook of webHooks) {
+			items.push(this.webHookMapper.toTreeItem(webHook));
+		}
 
 		return items;
 	}
