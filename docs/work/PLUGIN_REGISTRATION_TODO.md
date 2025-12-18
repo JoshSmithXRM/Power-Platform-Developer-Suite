@@ -1715,3 +1715,22 @@ Dataverse requires the actual unique name string, not the ID.
 - **File:** `plugin-registration.js` - Both image modal handlers
 
 | Attribute picker for images | ✅ Fixed | Uses same attribute picker as steps |
+
+**9. Invalid Attributes in Image Picker (✅ FIXED)**
+- **Problem:** When user selected all attributes via "Select All", Dataverse returned error 0x80040216 "An unexpected error occurred" - some attributes in the list cannot be used in plugin images
+- **Root Cause:** `DataverseAttributePickerRepository` wasn't filtering out invalid attribute types
+- **Solution (two parts):**
+  1. **Filter invalid attribute types** - Added exclusion list for types that can't be captured in images:
+     - `Virtual` - Virtual/computed attributes
+     - `EntityName` - Internal entity name references
+     - `PartyList` - Complex activity party lists
+     - `CalendarRules` - Complex calendar rules
+     - `ManagedProperty` - System managed properties
+     - `File` / `Image` - Binary data types
+  2. **Select All = Blank conversion** - If user selects ALL attributes, convert to blank on submit:
+     - Blank means "all" in Dataverse (matches the UX hint "leave blank for all")
+     - Avoids edge cases where invalid attributes might sneak through
+     - "Select All" is still useful for "select all then deselect a few" workflow
+- **Files:** `DataverseAttributePickerRepository.ts`, `plugin-registration.js`
+
+| Invalid attributes in picker | ✅ Fixed | Filters invalid types + Select All converts to blank |

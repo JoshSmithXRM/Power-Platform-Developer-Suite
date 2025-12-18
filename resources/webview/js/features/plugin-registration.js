@@ -1177,15 +1177,20 @@ function handleShowAttributePickerModal(data) {
 		return;
 	}
 
+	const attributeList = attributes || [];
 	window.showAttributePickerModal({
 		entityLogicalName,
 		fieldId,
-		attributes: attributes || [],
+		attributes: attributeList,
 		currentSelection: currentSelection || [],
 		onSubmit: (selected) => {
 			// Update the form field directly via stored callback
 			if (window._activeAttributePicker && window._activeAttributePicker.fieldId === fieldId) {
-				window._activeAttributePicker.updateField(selected.join(','));
+				// If all attributes are selected, convert to blank (which means "all" in Dataverse)
+				// This avoids potential issues with invalid attributes and matches the UX hint
+				const effectiveValue =
+					selected.length === attributeList.length ? '' : selected.join(',');
+				window._activeAttributePicker.updateField(effectiveValue);
 				window._activeAttributePicker = null;
 			}
 		}

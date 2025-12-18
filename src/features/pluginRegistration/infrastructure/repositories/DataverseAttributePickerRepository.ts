@@ -23,6 +23,21 @@ interface AttributeMetadataDto {
 }
 
 /**
+ * Attribute types that cannot be used in plugin step images.
+ * These are either virtual/computed or contain complex data types
+ * that cannot be captured in a pre/post entity snapshot.
+ */
+const INVALID_IMAGE_ATTRIBUTE_TYPES = new Set([
+	'Virtual', // Virtual/computed attributes
+	'EntityName', // Internal entity name references
+	'PartyList', // Complex activity party lists (e.g., to/from/cc on emails)
+	'CalendarRules', // Calendar rules (complex type)
+	'ManagedProperty', // System managed properties
+	'File', // Binary file data
+	'Image', // Binary image data
+]);
+
+/**
  * Response from Dataverse EntityDefinitions/Attributes endpoint.
  */
 interface AttributesResponse {
@@ -57,8 +72,16 @@ export class DataverseAttributePickerRepository implements IAttributePickerRepos
 			const response = await this.apiService.get<AttributesResponse>(environmentId, endpoint);
 
 			const attributes = response.value
-				// Filter out virtual fields (AttributeOf is set) and logical fields
-				.filter((attr) => !attr.AttributeOf && !attr.IsLogical)
+				// Filter out:
+				// 1. Virtual fields (AttributeOf is set - these are supporting attributes)
+				// 2. Logical fields (computed/virtual)
+				// 3. Invalid attribute types (can't be captured in plugin images)
+				.filter(
+					(attr) =>
+						!attr.AttributeOf &&
+						!attr.IsLogical &&
+						!INVALID_IMAGE_ATTRIBUTE_TYPES.has(attr.AttributeType)
+				)
 				// Map to picker items
 				.map((attr): AttributePickerItem => ({
 					logicalName: attr.LogicalName,
