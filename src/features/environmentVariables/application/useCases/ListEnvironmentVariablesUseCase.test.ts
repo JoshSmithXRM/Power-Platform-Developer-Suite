@@ -22,7 +22,8 @@ describe('ListEnvironmentVariablesUseCase', () => {
 
 		mockSolutionComponentRepository = {
 			findComponentIdsBySolution: jest.fn(),
-			getObjectTypeCode: jest.fn()
+			getObjectTypeCode: jest.fn(),
+			findAllByComponentTypes: jest.fn()
 		};
 
 		factory = new EnvironmentVariableFactory();

@@ -16,7 +16,7 @@ describe('WebHook', () => {
 			id: 'webhook-123',
 			name: 'Test WebHook',
 			url: 'https://example.com/webhook',
-			authType: WebHookAuthType.None,
+			authType: WebHookAuthType.HttpHeader,
 			description: null,
 			createdOn: new Date('2024-01-01'),
 			modifiedOn: new Date('2024-01-02'),
