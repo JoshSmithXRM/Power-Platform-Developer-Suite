@@ -7,7 +7,7 @@
 			"request": "launch",
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}",
-				"--log", "JoshSmithXRM.power-platform-developer-suite:debug"
+				"--log", "joshsmithxrm.power-platform-developer-suite:debug"
 			],
 			"outFiles": [
 				"${workspaceFolder}/dist/**/*.js"
