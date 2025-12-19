@@ -1643,6 +1643,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 							node: webhookViewModel,
 						},
 					});
+
+					// Select the new webhook and show details
+					await this.panel.postMessage({
+						command: 'selectAndShowDetails',
+						data: { nodeId: webhookId, nodeType: 'webHook' },
+					});
 				}
 			}
 		} catch (error) {
@@ -1695,6 +1701,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				`WebHook "${name}" updated successfully in ${environmentName}.`
 			);
 			await this.handleRefresh();
+
+			// Select the updated webhook and show details
+			await this.panel.postMessage({
+				command: 'selectAndShowDetails',
+				data: { nodeId: webhookId, nodeType: 'webHook' },
+			});
 		} catch (error) {
 			this.logger.error('Failed to update webhook', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1840,6 +1852,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 							node: endpointViewModel,
 						},
 					});
+
+					// Select the new service endpoint and show details
+					await this.panel.postMessage({
+						command: 'selectAndShowDetails',
+						data: { nodeId: serviceEndpointId, nodeType: 'serviceEndpoint' },
+					});
 				}
 			}
 		} catch (error) {
@@ -1904,6 +1922,14 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				`Service Endpoint "${name ?? serviceEndpointId}" updated successfully in ${environmentName}.`
 			);
 			await this.handleRefresh();
+
+			// Select the updated service endpoint and show details
+			if (serviceEndpointId) {
+				await this.panel.postMessage({
+					command: 'selectAndShowDetails',
+					data: { nodeId: serviceEndpointId, nodeType: 'serviceEndpoint' },
+				});
+			}
 		} catch (error) {
 			this.logger.error('Failed to update service endpoint', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -2049,6 +2075,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					command: 'updateNode',
 					data: { nodeId: stepId, updatedNode },
 				});
+
+				// Select the updated step and show details
+				await this.panel.postMessage({
+					command: 'selectAndShowDetails',
+					data: { nodeId: stepId, nodeType: 'step' },
+				});
 			}
 
 			void vscode.window.showInformationMessage('Plugin step enabled.');
@@ -2086,6 +2118,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				await this.panel.postMessage({
 					command: 'updateNode',
 					data: { nodeId: stepId, updatedNode },
+				});
+
+				// Select the updated step and show details
+				await this.panel.postMessage({
+					command: 'selectAndShowDetails',
+					data: { nodeId: stepId, nodeType: 'step' },
 				});
 			}
 
@@ -3039,6 +3077,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 								node: stepViewModel,
 							},
 						});
+
+						// Select the new step and show details
+						await this.panel.postMessage({
+							command: 'selectAndShowDetails',
+							data: { nodeId: stepId, nodeType: 'step' },
+						});
 					}
 
 					void vscode.window.showInformationMessage(
@@ -3139,7 +3183,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 						await this.panel.postMessage({
 							command: 'updateNode',
-							data: { node: stepViewModel },
+							data: { nodeId: data.stepId, updatedNode: stepViewModel },
+						});
+
+						// Select the updated step and show details
+						await this.panel.postMessage({
+							command: 'selectAndShowDetails',
+							data: { nodeId: data.stepId, nodeType: 'step' },
 						});
 					}
 
@@ -3217,6 +3267,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 								node: imageViewModel,
 							},
 						});
+
+						// Select the new image and show details
+						await this.panel.postMessage({
+							command: 'selectAndShowDetails',
+							data: { nodeId: imageId, nodeType: 'image' },
+						});
 					}
 
 					void vscode.window.showInformationMessage(
@@ -3289,7 +3345,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 						await this.panel.postMessage({
 							command: 'updateNode',
-							data: { node: imageViewModel },
+							data: { nodeId: data.imageId, updatedNode: imageViewModel },
+						});
+
+						// Select the updated image and show details
+						await this.panel.postMessage({
+							command: 'selectAndShowDetails',
+							data: { nodeId: data.imageId, nodeType: 'image' },
 						});
 					}
 
@@ -3529,6 +3591,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			data: { assemblyNode },
 		});
 
+		// Select the new assembly and show details
+		await this.panel.postMessage({
+			command: 'selectAndShowDetails',
+			data: { nodeId: assemblyId, nodeType: 'assembly' },
+		});
+
 		this.logger.debug('Assembly delta update sent', {
 			assemblyId,
 			pluginTypeCount: pluginTypeItems.length,
@@ -3659,6 +3727,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			command: 'updateSubtree',
 			data: { nodeId: assemblyId, updatedSubtree },
 		});
+
+		// Select the updated assembly and show details
+		await this.panel.postMessage({
+			command: 'selectAndShowDetails',
+			data: { nodeId: assemblyId, nodeType: 'assembly' },
+		});
 	}
 
 	private async refreshPackageSubtree(packageId: string): Promise<void> {
@@ -3717,6 +3791,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		await this.panel.postMessage({
 			command: 'updateSubtree',
 			data: { nodeId: packageId, updatedSubtree },
+		});
+
+		// Select the updated package and show details
+		await this.panel.postMessage({
+			command: 'selectAndShowDetails',
+			data: { nodeId: packageId, nodeType: 'package' },
 		});
 	}
 }

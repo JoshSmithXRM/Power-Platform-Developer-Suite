@@ -1146,6 +1146,9 @@ window.createBehavior({
 			case 'showEditServiceEndpointModal':
 				handleShowEditServiceEndpointModal(message.data);
 				break;
+			case 'selectAndShowDetails':
+				handleSelectAndShowDetails(message.data);
+				break;
 		}
 	}
 });
@@ -2194,6 +2197,45 @@ function handleSubtreeUpdate(data) {
 	if (currentFilter) {
 		filterTree(currentFilter);
 	}
+}
+
+/**
+ * Select a node, expand ancestors, scroll into view, and trigger detail loading.
+ * Called after create/update operations for consistent UX.
+ * @param {Object} data - { nodeId, nodeType }
+ */
+function handleSelectAndShowDetails(data) {
+	const { nodeId, nodeType } = data;
+	if (!nodeId) return;
+
+	// 1. Expand ancestors so node is visible
+	expandAncestors(nodeId, treeData);
+
+	// 2. Re-render tree with expanded ancestors
+	renderTree();
+
+	// 3. Re-apply filter if active
+	if (currentFilter) {
+		filterTree(currentFilter);
+	}
+
+	// 4. Find the node element and select it
+	requestAnimationFrame(() => {
+		const nodeElement = document.querySelector(`[data-id="${nodeId}"]`);
+		if (nodeElement) {
+			updateNodeSelection(nodeElement, nodeId);
+			nodeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		}
+
+		// 5. Post selectNode message to trigger detail loading
+		if (window.vscode) {
+			window.vscode.postMessage({
+				command: 'selectNode',
+				nodeId: nodeId,
+				nodeType: nodeType
+			});
+		}
+	});
 }
 
 /**
