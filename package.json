@@ -86,8 +86,13 @@
         "languages": [
             {
                 "id": "fetchxml",
-                "aliases": ["FetchXML", "fetchxml"],
-                "extensions": [".fetchxml"]
+                "aliases": [
+                    "FetchXML",
+                    "fetchxml"
+                ],
+                "extensions": [
+                    ".fetchxml"
+                ]
             }
         ],
         "grammars": [
@@ -718,17 +723,16 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run package",
-        "compile": "npm run build:tools && npm run lint:all && npm test && npm run build:extension && npm run build:webview",
-        "compile:no-lint": "npm run build:tools && npm test && npm run build:extension && npm run build:webview",
-        "compile:no-test": "npm run build:tools && npm run lint:all && npm run build:extension && npm run build:webview",
-        "compile:fast": "npm run build:tools && npm run build:extension && npm run build:webview",
-        "build:tools": "dotnet publish tools/PluginInspector -c Release -o resources/tools --nologo -v q",
+        "compile": "npm run build:tools:force && npm run lint:all && npm test && npm run build:extension && npm run build:webview",
+        "compile:fast": "concurrently -n tools,ext,web -c blue,green,yellow \"npm:build:tools\" \"npm:build:extension\" \"npm:build:webview\"",
+        "build:tools": "node scripts/build-tools-if-needed.js",
+        "build:tools:force": "dotnet publish tools/PluginInspector -c Release -o resources/tools --nologo -v q",
         "build:extension": "webpack --config webpack.config.js",
         "build:webview": "webpack --mode development --config webpack.webview.config.js",
         "watch": "npm run watch:extension & npm run watch:webview",
         "watch:extension": "webpack --config webpack.config.js --watch",
         "watch:webview": "webpack --mode development --config webpack.webview.config.js --watch",
-        "package": "npm run build:tools && npm run lint:all && webpack --config webpack.config.js --mode production --devtool hidden-source-map && webpack --config webpack.webview.config.js --mode production --devtool hidden-source-map",
+        "package": "npm run build:tools:force && npm run lint:all && webpack --config webpack.config.js --mode production --devtool hidden-source-map && webpack --config webpack.webview.config.js --mode production --devtool hidden-source-map",
         "package:no-lint": "webpack --config webpack.config.js --mode production --devtool hidden-source-map && webpack --config webpack.webview.config.js --mode production --devtool hidden-source-map",
         "lint": "eslint src",
         "lint:fix": "eslint src --fix",
@@ -737,14 +741,12 @@
         "test:coverage": "jest --coverage",
         "lint:all": "eslint src resources/webview/js",
         "lint:webview": "eslint resources/webview/js",
-        "lint:architecture": "eslint src",
         "vsce-package": "vsce package",
         "test-release": "npm run package && npm run vsce-package && npm run install-local",
         "install-local": "node scripts/install-local.js",
         "uninstall-local": "code --uninstall-extension JoshSmithXRM.power-platform-developer-suite",
         "revert-to-marketplace": "npm run uninstall-local && code --install-extension JoshSmithXRM.power-platform-developer-suite && echo Successfully reverted to marketplace version",
         "local": "node scripts/build-local.js",
-        "marketplace": "npm run revert-to-marketplace",
         "cleanup-extensions": "node scripts/cleanup-extensions.js",
         "clean-install": "npm run uninstall-local && npm run test-release",
         "test-fresh": "npm run clean-install && code --new-window",
@@ -756,7 +758,6 @@
         "call-graph:orphans": "madge --orphans --extensions ts src/",
         "maintenance:weekly": "npm run dead-code:check && npm run comment-audit && npm run call-graph",
         "maintenance:monthly": "npm run maintenance:weekly && npm run dead-code:deps && npm run type-coverage",
-        "maintenance:full": "npm run maintenance:monthly",
         "e2e:smoke": "npx playwright test --project=smoke",
         "e2e:integration": "npx playwright test --project=integration",
         "e2e:all": "npx playwright test",
@@ -778,6 +779,7 @@
         "@typescript-eslint/parser": "^8.49.0",
         "@vscode/test-electron": "^2.5.2",
         "@vscode/vsce": "^3.7.1",
+        "concurrently": "^9.2.1",
         "dotenv": "^17.2.3",
         "eslint-plugin-import": "^2.32.0",
         "eslint-plugin-local-rules": "^3.0.2",

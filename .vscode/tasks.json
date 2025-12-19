@@ -16,13 +16,6 @@
 		},
 		{
 			"type": "npm",
-			"script": "compile:no-lint",
-			"problemMatcher": [],
-			"label": "npm: compile:no-lint",
-			"detail": "webpack"
-		},
-		{
-			"type": "npm",
 			"script": "compile:fast",
 			"label": "npm: compile:fast",
 			"problemMatcher": [],
