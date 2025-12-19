@@ -104,6 +104,34 @@ export class WebHookAuthType {
 		return !this.isServiceBusType;
 	}
 
+	/**
+	 * Returns all valid authentication types for Service Bus endpoints.
+	 * Excludes WebHook types (WebhookKey, HttpHeader, HttpQueryString).
+	 */
+	public static allForServiceBus(): readonly WebHookAuthType[] {
+		return [
+			WebHookAuthType.ACS,
+			WebHookAuthType.SASKey,
+			WebHookAuthType.SASToken,
+		];
+	}
+
+	/**
+	 * Returns true if this auth type requires SAS key name + key.
+	 * Only SASKey (2) requires these fields.
+	 */
+	public requiresSasKey(): boolean {
+		return this.value === 2;
+	}
+
+	/**
+	 * Returns true if this auth type requires SAS token.
+	 * Only SASToken (3) requires this field.
+	 */
+	public requiresSasToken(): boolean {
+		return this.value === 3;
+	}
+
 	public equals(other: WebHookAuthType): boolean {
 		return this.value === other.value;
 	}
