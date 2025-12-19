@@ -1059,6 +1059,9 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				case 'image':
 					details = await this.fetchImageDetails(nodeId);
 					break;
+				case 'webHook':
+					details = await this.fetchWebHookDetails(nodeId);
+					break;
 				default:
 					this.logger.warn('Unknown node type', { nodeType });
 					return;
@@ -1171,6 +1174,22 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			entityAlias: image.getEntityAlias(),
 			messagePropertyName: image.getMessagePropertyName(),
 			attributes: image.getAttributes(),
+		};
+	}
+
+	private async fetchWebHookDetails(webhookId: string): Promise<Record<string, unknown> | null> {
+		const webhook = await this.repositories.webHook.findById(this.currentEnvironmentId, webhookId);
+		if (!webhook) return null;
+
+		return {
+			nodeType: 'webHook',
+			name: webhook.getName(),
+			url: webhook.getUrl(),
+			authType: webhook.getAuthType().getName(),
+			description: webhook.getDescription(),
+			isManaged: webhook.isInManagedState(),
+			createdOn: webhook.getCreatedOn().toISOString(),
+			modifiedOn: webhook.getModifiedOn().toISOString(),
 		};
 	}
 
@@ -1455,10 +1474,9 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				command: 'showRegisterWebHookModal',
 				data: {
 					authTypes: [
-						{ value: 2, label: 'HttpHeader' },
-						{ value: 3, label: 'WebhookKey' },
-						{ value: 4, label: 'HttpQueryString' },
-						{ value: 5, label: 'AADSASKey' },
+						{ value: 4, label: 'WebhookKey' },
+						{ value: 5, label: 'HttpHeader' },
+						{ value: 6, label: 'HttpQueryString' },
 					],
 					solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
 						id: s.id,
@@ -2430,10 +2448,9 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				authType: webhook.getAuthType().getValue(),
 				description: webhook.getDescription(),
 				authTypes: [
-					{ value: 2, label: 'HttpHeader' },
-					{ value: 3, label: 'WebhookKey' },
-					{ value: 4, label: 'HttpQueryString' },
-					{ value: 5, label: 'AADSASKey' },
+					{ value: 4, label: 'WebhookKey' },
+					{ value: 5, label: 'HttpHeader' },
+					{ value: 6, label: 'HttpQueryString' },
 				],
 				solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
 					id: s.id,
