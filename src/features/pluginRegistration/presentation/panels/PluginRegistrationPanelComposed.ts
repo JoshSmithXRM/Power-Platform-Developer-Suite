@@ -48,6 +48,9 @@ import type { LoadAttributesForPickerUseCase } from '../../application/useCases/
 import type { RegisterWebHookUseCase } from '../../application/useCases/RegisterWebHookUseCase';
 import type { UpdateWebHookUseCase } from '../../application/useCases/UpdateWebHookUseCase';
 import type { UnregisterWebHookUseCase } from '../../application/useCases/UnregisterWebHookUseCase';
+import type { RegisterServiceEndpointUseCase } from '../../application/useCases/RegisterServiceEndpointUseCase';
+import type { UpdateServiceEndpointUseCase } from '../../application/useCases/UpdateServiceEndpointUseCase';
+import type { UnregisterServiceEndpointUseCase } from '../../application/useCases/UnregisterServiceEndpointUseCase';
 import type { ISdkMessageRepository } from '../../domain/interfaces/ISdkMessageRepository';
 import type { ISdkMessageFilterRepository } from '../../domain/interfaces/ISdkMessageFilterRepository';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
@@ -64,6 +67,7 @@ import { PluginTypeViewModelMapper } from '../../application/mappers/PluginTypeV
 import type { IPluginTypeRepository } from '../../domain/interfaces/IPluginTypeRepository';
 import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRepository';
 import type { IWebHookRepository } from '../../domain/interfaces/IWebHookRepository';
+import type { IServiceEndpointRepository } from '../../domain/interfaces/IServiceEndpointRepository';
 import { StepImageViewModelMapper } from '../../application/mappers/StepImageViewModelMapper';
 import type { PluginInspectorService } from '../../infrastructure/services/PluginInspectorService';
 import type { PluginTypeToRegister } from '../../application/useCases/RegisterPluginAssemblyUseCase';
@@ -92,6 +96,9 @@ export interface PluginRegistrationUseCases {
 	readonly registerWebHook: RegisterWebHookUseCase;
 	readonly updateWebHook: UpdateWebHookUseCase;
 	readonly unregisterWebHook: UnregisterWebHookUseCase;
+	readonly registerServiceEndpoint: RegisterServiceEndpointUseCase;
+	readonly updateServiceEndpoint: UpdateServiceEndpointUseCase;
+	readonly unregisterServiceEndpoint: UnregisterServiceEndpointUseCase;
 }
 
 /**
@@ -104,6 +111,7 @@ export interface PluginRegistrationRepositories {
 	readonly pluginType: IPluginTypeRepository;
 	readonly image: IStepImageRepository;
 	readonly webHook: IWebHookRepository;
+	readonly serviceEndpoint: IServiceEndpointRepository;
 	readonly solution: ISolutionRepository;
 	readonly sdkMessage: ISdkMessageRepository;
 	readonly sdkMessageFilter: ISdkMessageFilterRepository;
@@ -144,6 +152,9 @@ type PluginRegistrationCommands =
 	| 'registerWebHook'
 	| 'confirmRegisterWebHook'
 	| 'confirmUpdateWebHook'
+	| 'registerServiceEndpoint'
+	| 'confirmRegisterServiceEndpoint'
+	| 'confirmUpdateServiceEndpoint'
 	| 'showValidationError';
 
 /**
@@ -558,6 +569,10 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			await this.handleRegisterWebHook();
 		});
 
+		this.coordinator.registerHandler('registerServiceEndpoint', async () => {
+			await this.handleRegisterServiceEndpoint();
+		});
+
 		this.coordinator.registerHandler('registerStep', async () => {
 			await this.handleRegisterStepFromDropdown();
 		});
@@ -617,6 +632,48 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			};
 			if (webhookId && name && url && authType !== undefined) {
 				await this.handleConfirmUpdateWebHook(webhookId, name, url, authType, authValue, description);
+			}
+		});
+
+		this.coordinator.registerHandler('confirmRegisterServiceEndpoint', async (data) => {
+			const endpointData = data as {
+				name?: string;
+				description?: string;
+				contract?: number;
+				connectionMode?: number;
+				authType?: number;
+				solutionNamespace?: string;
+				namespaceAddress?: string;
+				path?: string;
+				sasKeyName?: string;
+				sasKey?: string;
+				sasToken?: string;
+				messageFormat?: number;
+				userClaim?: number;
+				solutionUniqueName?: string;
+			};
+			if (endpointData.name && endpointData.solutionNamespace && endpointData.contract !== undefined) {
+				await this.handleConfirmRegisterServiceEndpoint(endpointData);
+			}
+		});
+
+		this.coordinator.registerHandler('confirmUpdateServiceEndpoint', async (data) => {
+			const endpointData = data as {
+				serviceEndpointId?: string;
+				name?: string;
+				description?: string;
+				solutionNamespace?: string;
+				namespaceAddress?: string;
+				path?: string;
+				authType?: number;
+				sasKeyName?: string;
+				sasKey?: string;
+				sasToken?: string;
+				messageFormat?: number;
+				userClaim?: number;
+			};
+			if (endpointData.serviceEndpointId) {
+				await this.handleConfirmUpdateServiceEndpoint(endpointData);
 			}
 		});
 
@@ -877,16 +934,20 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			const treeItems = this.treeMapper.toTreeItems(
 				treeResult.packages,
 				treeResult.standaloneAssemblies,
-				treeResult.webHooks
+				treeResult.webHooks,
+				treeResult.serviceEndpoints
 			);
 
-			// Count webhooks in the mapped tree items
+			// Count webhooks and service endpoints in the mapped tree items
 			const webhookTreeItems = treeItems.filter((item) => item.type === 'webHook');
+			const serviceEndpointTreeItems = treeItems.filter((item) => item.type === 'serviceEndpoint');
 
 			this.logger.info('Plugin registration tree loaded', {
 				totalNodeCount: treeResult.totalNodeCount,
 				webHooksFromUseCase: treeResult.webHooks.length,
 				webHooksInTreeItems: webhookTreeItems.length,
+				serviceEndpointsFromUseCase: treeResult.serviceEndpoints.length,
+				serviceEndpointsInTreeItems: serviceEndpointTreeItems.length,
 				solutionMembershipCount: Object.keys(membershipsResult).length,
 			});
 
@@ -1062,6 +1123,9 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				case 'webHook':
 					details = await this.fetchWebHookDetails(nodeId);
 					break;
+				case 'serviceEndpoint':
+					details = await this.fetchServiceEndpointDetails(nodeId);
+					break;
 				default:
 					this.logger.warn('Unknown node type', { nodeType });
 					return;
@@ -1190,6 +1254,35 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			isManaged: webhook.isInManagedState(),
 			createdOn: webhook.getCreatedOn().toISOString(),
 			modifiedOn: webhook.getModifiedOn().toISOString(),
+		};
+	}
+
+	private async fetchServiceEndpointDetails(
+		serviceEndpointId: string
+	): Promise<Record<string, unknown> | null> {
+		const endpoint = await this.repositories.serviceEndpoint.findById(
+			this.currentEnvironmentId,
+			serviceEndpointId
+		);
+		if (!endpoint) return null;
+
+		return {
+			nodeType: 'serviceEndpoint',
+			name: endpoint.getName(),
+			description: endpoint.getDescription(),
+			contract: endpoint.getContract().getName(),
+			connectionMode: endpoint.getConnectionMode().getName(),
+			authType: endpoint.getAuthType().getName(),
+			messageFormat: endpoint.getMessageFormat().getName(),
+			userClaim: endpoint.getUserClaim().getName(),
+			namespace: endpoint.isEventHub()
+				? endpoint.getNamespaceAddress()
+				: endpoint.getSolutionNamespace(),
+			path: endpoint.getPath(),
+			sasKeyName: endpoint.getSasKeyName(),
+			isManaged: endpoint.isInManagedState(),
+			createdOn: endpoint.getCreatedOn().toISOString(),
+			modifiedOn: endpoint.getModifiedOn().toISOString(),
 		};
 	}
 
@@ -1607,6 +1700,215 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			void vscode.window.showErrorMessage(
 				`Failed to update WebHook in ${environmentName}: ${errorMessage}`
+			);
+		}
+	}
+
+	/**
+	 * Handle Register Service Endpoint action from dropdown.
+	 * Shows modal with form for service endpoint registration.
+	 */
+	private async handleRegisterServiceEndpoint(): Promise<void> {
+		this.logger.info('Register Service Endpoint requested');
+
+		try {
+			// Load unmanaged solutions for the dropdown
+			this.unmanagedSolutionsWithPrefix =
+				await this.repositories.solution.findUnmanagedWithPublisherPrefix(
+					this.currentEnvironmentId
+				);
+
+			// Send message to webview to show modal
+			await this.panel.postMessage({
+				command: 'showRegisterServiceEndpointModal',
+				data: {
+					contractTypes: [
+						{ value: 6, label: 'Queue' },
+						{ value: 5, label: 'Topic' },
+						{ value: 7, label: 'EventHub' },
+						{ value: 1, label: 'OneWay (Legacy)' },
+						{ value: 4, label: 'TwoWay (Legacy)' },
+						{ value: 3, label: 'Rest' },
+					],
+					authTypes: [
+						{ value: 2, label: 'SASKey' },
+						{ value: 3, label: 'SASToken' },
+						{ value: 1, label: 'ACS (Legacy)' },
+					],
+					messageFormats: [
+						{ value: 2, label: 'JSON' },
+						{ value: 1, label: '.NET Binary' },
+						{ value: 3, label: 'XML' },
+					],
+					userClaims: [
+						{ value: 1, label: 'None' },
+						{ value: 2, label: 'UserId' },
+						{ value: 3, label: 'UserInfo' },
+					],
+					solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
+						id: s.id,
+						uniqueName: s.uniqueName,
+						name: s.name,
+					})),
+				},
+			});
+		} catch (error) {
+			this.logger.error('Failed to load solutions for service endpoint registration', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(
+				`Failed to prepare service endpoint registration: ${errorMessage}`
+			);
+		}
+	}
+
+	/**
+	 * Handle confirmed service endpoint registration.
+	 */
+	private async handleConfirmRegisterServiceEndpoint(endpointData: {
+		name?: string;
+		description?: string;
+		contract?: number;
+		connectionMode?: number;
+		authType?: number;
+		solutionNamespace?: string;
+		namespaceAddress?: string;
+		path?: string;
+		sasKeyName?: string;
+		sasKey?: string;
+		sasToken?: string;
+		messageFormat?: number;
+		userClaim?: number;
+		solutionUniqueName?: string;
+	}): Promise<void> {
+		const { name, contract } = endpointData;
+		this.logger.info('Registering service endpoint', { name, contract });
+
+		try {
+			let serviceEndpointId: string | undefined;
+
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Registering Service Endpoint: ${name}`,
+					cancellable: false,
+				},
+				async () => {
+					serviceEndpointId = await this.useCases.registerServiceEndpoint.execute(
+						this.currentEnvironmentId,
+						{
+							name: endpointData.name!,
+							description: endpointData.description,
+							contract: endpointData.contract!,
+							connectionMode: endpointData.connectionMode ?? 1,
+							authType: endpointData.authType ?? 2,
+							solutionNamespace: endpointData.solutionNamespace!,
+							namespaceAddress: endpointData.namespaceAddress ?? '',
+							path: endpointData.path,
+							sasKeyName: endpointData.sasKeyName,
+							sasKey: endpointData.sasKey,
+							sasToken: endpointData.sasToken,
+							messageFormat: endpointData.messageFormat ?? 2,
+							userClaim: endpointData.userClaim ?? 1,
+							solutionUniqueName: endpointData.solutionUniqueName,
+						}
+					);
+				}
+			);
+
+			void vscode.window.showInformationMessage(
+				`Service Endpoint "${name}" registered successfully.`
+			);
+
+			// Delta update: fetch the new endpoint and add to tree
+			if (serviceEndpointId) {
+				const newEndpoint = await this.repositories.serviceEndpoint.findById(
+					this.currentEnvironmentId,
+					serviceEndpointId
+				);
+
+				if (newEndpoint) {
+					const { ServiceEndpointViewModelMapper } = await import(
+						'../../application/mappers/ServiceEndpointViewModelMapper.js'
+					);
+					const mapper = new ServiceEndpointViewModelMapper();
+					const endpointViewModel = mapper.toTreeItem(newEndpoint);
+
+					await this.panel.postMessage({
+						command: 'addNode',
+						data: {
+							parentId: null,
+							node: endpointViewModel,
+						},
+					});
+				}
+			}
+		} catch (error) {
+			this.logger.error('Failed to register service endpoint', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(`Failed to register Service Endpoint: ${errorMessage}`);
+		}
+	}
+
+	/**
+	 * Handle confirmed service endpoint update.
+	 */
+	private async handleConfirmUpdateServiceEndpoint(endpointData: {
+		serviceEndpointId?: string;
+		name?: string;
+		description?: string;
+		solutionNamespace?: string;
+		namespaceAddress?: string;
+		path?: string;
+		authType?: number;
+		sasKeyName?: string;
+		sasKey?: string;
+		sasToken?: string;
+		messageFormat?: number;
+		userClaim?: number;
+	}): Promise<void> {
+		const { serviceEndpointId, name } = endpointData;
+		this.logger.info('Updating service endpoint', { serviceEndpointId, name });
+
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		try {
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Updating Service Endpoint: ${name ?? serviceEndpointId}`,
+					cancellable: false,
+				},
+				async () => {
+					await this.useCases.updateServiceEndpoint.execute(
+						this.currentEnvironmentId,
+						serviceEndpointId!,
+						{
+							name: endpointData.name,
+							description: endpointData.description,
+							solutionNamespace: endpointData.solutionNamespace,
+							namespaceAddress: endpointData.namespaceAddress,
+							path: endpointData.path,
+							authType: endpointData.authType,
+							sasKeyName: endpointData.sasKeyName,
+							sasKey: endpointData.sasKey,
+							sasToken: endpointData.sasToken,
+							messageFormat: endpointData.messageFormat,
+							userClaim: endpointData.userClaim,
+						}
+					);
+				}
+			);
+
+			void vscode.window.showInformationMessage(
+				`Service Endpoint "${name ?? serviceEndpointId}" updated successfully in ${environmentName}.`
+			);
+			await this.handleRefresh();
+		} catch (error) {
+			this.logger.error('Failed to update service endpoint', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(
+				`Failed to update Service Endpoint in ${environmentName}: ${errorMessage}`
 			);
 		}
 	}
@@ -2516,6 +2818,129 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					this.logger.error('Failed to unregister webhook', error);
 					void vscode.window.showErrorMessage(
 						`Failed to unregister ${webhookName} from ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
+	}
+
+	/**
+	 * Edit a service endpoint. Called from context menu command.
+	 * Shows modal with pre-populated values.
+	 */
+	public async editServiceEndpoint(serviceEndpointId: string): Promise<void> {
+		this.logger.info('Editing service endpoint', { serviceEndpointId });
+
+		const endpoint = await this.repositories.serviceEndpoint.findById(
+			this.currentEnvironmentId,
+			serviceEndpointId
+		);
+
+		if (endpoint === null) {
+			void vscode.window.showErrorMessage('Service Endpoint not found.');
+			return;
+		}
+
+		// Send modal data to webview with pre-populated values
+		await this.panel.postMessage({
+			command: 'showEditServiceEndpointModal',
+			data: {
+				serviceEndpointId,
+				name: endpoint.getName(),
+				description: endpoint.getDescription(),
+				contract: endpoint.getContract().getName(),
+				contractValue: endpoint.getContract().getValue(),
+				solutionNamespace: endpoint.getSolutionNamespace(),
+				namespaceAddress: endpoint.getNamespaceAddress(),
+				path: endpoint.getPath(),
+				authType: endpoint.getAuthType().getName(),
+				authTypeValue: endpoint.getAuthType().getValue(),
+				sasKeyName: endpoint.getSasKeyName(),
+				messageFormat: endpoint.getMessageFormat().getName(),
+				messageFormatValue: endpoint.getMessageFormat().getValue(),
+				userClaim: endpoint.getUserClaim().getName(),
+				userClaimValue: endpoint.getUserClaim().getValue(),
+				authTypes: [
+					{ value: 2, label: 'SASKey' },
+					{ value: 3, label: 'SASToken' },
+					{ value: 1, label: 'ACS (Legacy)' },
+				],
+				messageFormats: [
+					{ value: 2, label: 'JSON' },
+					{ value: 1, label: '.NET Binary' },
+					{ value: 3, label: 'XML' },
+				],
+				userClaims: [
+					{ value: 1, label: 'None' },
+					{ value: 2, label: 'UserId' },
+					{ value: 3, label: 'UserInfo' },
+				],
+			},
+		});
+	}
+
+	/**
+	 * Unregister (delete) a service endpoint. Called from context menu command.
+	 * Shows confirmation dialog, then deletes the endpoint.
+	 */
+	public async unregisterServiceEndpoint(serviceEndpointId: string): Promise<void> {
+		this.logger.info('Unregistering service endpoint', { serviceEndpointId });
+
+		// Fetch endpoint and environment info for better messaging
+		const [endpoint, environment] = await Promise.all([
+			this.repositories.serviceEndpoint.findById(this.currentEnvironmentId, serviceEndpointId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+
+		const endpointName = endpoint?.getName() ?? 'Unknown Service Endpoint';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		// Check if endpoint is managed (cannot be deleted)
+		if (endpoint?.isInManagedState()) {
+			void vscode.window.showWarningMessage(
+				`Cannot unregister "${endpointName}": This service endpoint is part of a managed solution and cannot be deleted.`
+			);
+			return;
+		}
+
+		// Confirm deletion with user
+		const confirmation = await vscode.window.showWarningMessage(
+			`Are you sure you want to unregister "${endpointName}" from ${environmentName}? This will delete the service endpoint and cannot be undone.`,
+			{ modal: true },
+			'Unregister'
+		);
+
+		if (confirmation !== 'Unregister') {
+			return; // User cancelled
+		}
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Unregistering ${endpointName} from ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.unregisterServiceEndpoint.execute(
+						this.currentEnvironmentId,
+						serviceEndpointId
+					);
+
+					// Send delta update to webview (instant, no full refresh)
+					await this.panel.postMessage({
+						command: 'removeNode',
+						data: { nodeId: serviceEndpointId },
+					});
+
+					void vscode.window.showInformationMessage(
+						`${endpointName} unregistered successfully from ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to unregister service endpoint', error);
+					void vscode.window.showErrorMessage(
+						`Failed to unregister ${endpointName} from ${environmentName}: ${errorMessage}`
 					);
 				}
 			}

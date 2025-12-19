@@ -52,6 +52,9 @@ export async function initializePluginRegistration(
 	const { DataverseWebHookRepository } = await import(
 		'../../infrastructure/repositories/DataverseWebHookRepository.js'
 	);
+	const { DataverseServiceEndpointRepository } = await import(
+		'../../infrastructure/repositories/DataverseServiceEndpointRepository.js'
+	);
 	const { PluginInspectorService } = await import(
 		'../../infrastructure/services/PluginInspectorService.js'
 	);
@@ -121,6 +124,15 @@ export async function initializePluginRegistration(
 	const { UnregisterWebHookUseCase } = await import(
 		'../../application/useCases/UnregisterWebHookUseCase.js'
 	);
+	const { RegisterServiceEndpointUseCase } = await import(
+		'../../application/useCases/RegisterServiceEndpointUseCase.js'
+	);
+	const { UpdateServiceEndpointUseCase } = await import(
+		'../../application/useCases/UpdateServiceEndpointUseCase.js'
+	);
+	const { UnregisterServiceEndpointUseCase } = await import(
+		'../../application/useCases/UnregisterServiceEndpointUseCase.js'
+	);
 	const { DataverseSdkMessageRepository } = await import(
 		'../../infrastructure/repositories/DataverseSdkMessageRepository.js'
 	);
@@ -147,6 +159,7 @@ export async function initializePluginRegistration(
 	const stepRepository = new DataversePluginStepRepository(dataverseApiService, logger);
 	const imageRepository = new DataverseStepImageRepository(dataverseApiService, logger);
 	const webHookRepository = new DataverseWebHookRepository(dataverseApiService, logger);
+	const serviceEndpointRepository = new DataverseServiceEndpointRepository(dataverseApiService, logger);
 	const sdkMessageRepository = new DataverseSdkMessageRepository(dataverseApiService, logger);
 	const sdkMessageFilterRepository = new DataverseSdkMessageFilterRepository(
 		dataverseApiService,
@@ -169,6 +182,7 @@ export async function initializePluginRegistration(
 		stepRepository,
 		imageRepository,
 		webHookRepository,
+		serviceEndpointRepository,
 		logger
 	);
 
@@ -201,6 +215,18 @@ export async function initializePluginRegistration(
 	const registerWebHookUseCase = new RegisterWebHookUseCase(webHookRepository, logger);
 	const updateWebHookUseCase = new UpdateWebHookUseCase(webHookRepository, logger);
 	const unregisterWebHookUseCase = new UnregisterWebHookUseCase(webHookRepository, logger);
+	const registerServiceEndpointUseCase = new RegisterServiceEndpointUseCase(
+		serviceEndpointRepository,
+		logger
+	);
+	const updateServiceEndpointUseCase = new UpdateServiceEndpointUseCase(
+		serviceEndpointRepository,
+		logger
+	);
+	const unregisterServiceEndpointUseCase = new UnregisterServiceEndpointUseCase(
+		serviceEndpointRepository,
+		logger
+	);
 
 	// Bundle use cases and repositories for cleaner panel constructor
 	const useCases = {
@@ -224,6 +250,9 @@ export async function initializePluginRegistration(
 		registerWebHook: registerWebHookUseCase,
 		updateWebHook: updateWebHookUseCase,
 		unregisterWebHook: unregisterWebHookUseCase,
+		registerServiceEndpoint: registerServiceEndpointUseCase,
+		updateServiceEndpoint: updateServiceEndpointUseCase,
+		unregisterServiceEndpoint: unregisterServiceEndpointUseCase,
 	};
 
 	const repositories = {
@@ -233,6 +262,7 @@ export async function initializePluginRegistration(
 		pluginType: pluginTypeRepository,
 		image: imageRepository,
 		webHook: webHookRepository,
+		serviceEndpoint: serviceEndpointRepository,
 		solution: solutionRepository,
 		sdkMessage: sdkMessageRepository,
 		sdkMessageFilter: sdkMessageFilterRepository,

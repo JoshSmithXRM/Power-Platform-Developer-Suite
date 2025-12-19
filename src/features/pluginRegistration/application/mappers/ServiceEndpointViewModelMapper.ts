@@ -1,5 +1,6 @@
 import type { ServiceEndpoint } from '../../domain/entities/ServiceEndpoint';
 import type { ServiceEndpointViewModel } from '../viewModels/ServiceEndpointViewModel';
+import type { ServiceEndpointMetadata, TreeItemViewModel } from '../viewModels/TreeItemViewModel';
 
 /**
  * Maps ServiceEndpoint domain entities to ViewModels.
@@ -47,5 +48,44 @@ export class ServiceEndpointViewModelMapper {
 		endpoints: readonly ServiceEndpoint[]
 	): readonly ServiceEndpointViewModel[] {
 		return endpoints.map((endpoint) => ServiceEndpointViewModelMapper.toViewModel(endpoint));
+	}
+
+	/**
+	 * Maps a ServiceEndpoint entity to a tree item.
+	 *
+	 * @param endpoint - The ServiceEndpoint domain entity
+	 * @param steps - Child step tree items (steps registered to this endpoint)
+	 * @returns TreeItemViewModel for the service endpoint
+	 */
+	public toTreeItem(endpoint: ServiceEndpoint, steps: TreeItemViewModel[] = []): TreeItemViewModel {
+		const metadata: ServiceEndpointMetadata = {
+			type: 'serviceEndpoint',
+			contract: endpoint.getContract().getName(),
+			contractValue: endpoint.getContract().getValue(),
+			authType: endpoint.getAuthType().getName(),
+			messageFormat: endpoint.getMessageFormat().getName(),
+			userClaim: endpoint.getUserClaim().getName(),
+			namespace: endpoint.isEventHub()
+				? endpoint.getNamespaceAddress()
+				: endpoint.getSolutionNamespace(),
+			path: endpoint.getPath(),
+			description: endpoint.getDescription(),
+			createdOn: endpoint.getCreatedOn().toISOString(),
+			modifiedOn: endpoint.getModifiedOn().toISOString(),
+			canUpdate: endpoint.canUpdate(),
+			canDelete: endpoint.canDelete(),
+		};
+
+		return {
+			id: endpoint.getId(),
+			parentId: null,
+			type: 'serviceEndpoint',
+			name: endpoint.getName(),
+			displayName: `${endpoint.getName()} (${endpoint.getContract().getName()})`,
+			icon: '$(broadcast)',
+			metadata,
+			isManaged: endpoint.isInManagedState(),
+			children: steps,
+		};
 	}
 }

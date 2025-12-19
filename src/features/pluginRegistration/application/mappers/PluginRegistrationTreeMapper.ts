@@ -4,6 +4,7 @@ import type { PluginStep } from '../../domain/entities/PluginStep';
 import type { PluginType } from '../../domain/entities/PluginType';
 import type { StepImage } from '../../domain/entities/StepImage';
 import type { WebHook } from '../../domain/entities/WebHook';
+import type { ServiceEndpoint } from '../../domain/entities/ServiceEndpoint';
 import type { TreeItemViewModel } from '../viewModels/TreeItemViewModel';
 
 import { PluginAssemblyViewModelMapper } from './PluginAssemblyViewModelMapper';
@@ -12,6 +13,7 @@ import { PluginStepViewModelMapper } from './PluginStepViewModelMapper';
 import { PluginTypeViewModelMapper } from './PluginTypeViewModelMapper';
 import { StepImageViewModelMapper } from './StepImageViewModelMapper';
 import { WebHookViewModelMapper } from './WebHookViewModelMapper';
+import { ServiceEndpointViewModelMapper } from './ServiceEndpointViewModelMapper';
 
 /**
  * Helper interface for assembly tree nodes (reused in packages and standalone).
@@ -45,6 +47,7 @@ export class PluginRegistrationTreeMapper {
 	private readonly stepMapper: PluginStepViewModelMapper;
 	private readonly imageMapper: StepImageViewModelMapper;
 	private readonly webHookMapper: WebHookViewModelMapper;
+	private readonly serviceEndpointMapper: ServiceEndpointViewModelMapper;
 
 	constructor() {
 		this.packageMapper = new PluginPackageViewModelMapper();
@@ -53,16 +56,18 @@ export class PluginRegistrationTreeMapper {
 		this.stepMapper = new PluginStepViewModelMapper();
 		this.imageMapper = new StepImageViewModelMapper();
 		this.webHookMapper = new WebHookViewModelMapper();
+		this.serviceEndpointMapper = new ServiceEndpointViewModelMapper();
 	}
 
 	/**
 	 * Converts domain tree to ViewModels.
-	 * Returns array with packages first, then standalone assemblies, then webhooks.
+	 * Returns array with packages first, then standalone assemblies, then webhooks, then service endpoints.
 	 */
 	public toTreeItems(
 		packages: ReadonlyArray<PackageTreeNode>,
 		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>,
-		webHooks: ReadonlyArray<WebHook> = []
+		webHooks: ReadonlyArray<WebHook> = [],
+		serviceEndpoints: ReadonlyArray<ServiceEndpoint> = []
 	): TreeItemViewModel[] {
 		const items: TreeItemViewModel[] = [];
 
@@ -89,6 +94,11 @@ export class PluginRegistrationTreeMapper {
 		// 3. Map webhooks (root-level, no children initially)
 		for (const webHook of webHooks) {
 			items.push(this.webHookMapper.toTreeItem(webHook));
+		}
+
+		// 4. Map service endpoints (root-level, no children initially)
+		for (const endpoint of serviceEndpoints) {
+			items.push(this.serviceEndpointMapper.toTreeItem(endpoint));
 		}
 
 		return items;

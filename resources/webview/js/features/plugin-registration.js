@@ -331,6 +331,9 @@ function buildVscodeContext(item) {
 	} else if (item.type === 'webHook' && item.metadata) {
 		context.canUpdate = item.metadata.canUpdate === true;
 		context.canDelete = item.metadata.canDelete === true;
+	} else if (item.type === 'serviceEndpoint' && item.metadata) {
+		context.canUpdate = item.metadata.canUpdate === true;
+		context.canDelete = item.metadata.canDelete === true;
 	}
 
 	return JSON.stringify(context);
@@ -399,7 +402,8 @@ function getIcon(type, iconHint) {
 		'pluginType': '🔌',
 		'step': '⚡',
 		'image': '🖼️',
-		'webHook': '🪝'
+		'webHook': '🪝',
+		'serviceEndpoint': '📡'
 	};
 
 	return icons[type] || '📄';
@@ -1136,6 +1140,12 @@ window.createBehavior({
 			case 'showEditWebHookModal':
 				handleShowEditWebHookModal(message.data);
 				break;
+			case 'showRegisterServiceEndpointModal':
+				handleShowRegisterServiceEndpointModal(message.data);
+				break;
+			case 'showEditServiceEndpointModal':
+				handleShowEditServiceEndpointModal(message.data);
+				break;
 		}
 	}
 });
@@ -1554,6 +1564,376 @@ function handleShowEditWebHookModal(data) {
 					authType: newAuthType,
 					authValue: authValue,
 					description: values.description || undefined
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Register Service Endpoint modal.
+ * @param {Object} data - { contractTypes, authTypes, messageFormats, userClaims, solutions }
+ */
+function handleShowRegisterServiceEndpointModal(data) {
+	const { contractTypes, authTypes, messageFormats, userClaims, solutions } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build options for dropdowns
+	const contractOptions = (contractTypes || []).map(c => ({
+		value: c.value.toString(),
+		label: c.label
+	}));
+
+	const authTypeOptions = (authTypes || []).map(a => ({
+		value: a.value.toString(),
+		label: a.label
+	}));
+
+	const messageFormatOptions = (messageFormats || []).map(m => ({
+		value: m.value.toString(),
+		label: m.label
+	}));
+
+	const userClaimOptions = (userClaims || []).map(u => ({
+		value: u.value.toString(),
+		label: u.label
+	}));
+
+	const solutionOptions = [
+		{ value: '', label: 'None (do not add to solution)' },
+		...(solutions || []).map(s => ({
+			value: s.uniqueName,
+			label: s.name
+		}))
+	];
+
+	window.showFormModal({
+		title: 'Register Service Endpoint',
+		fields: [
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'e.g., MyServiceBusQueue'
+			},
+			{
+				id: 'description',
+				label: 'Description',
+				type: 'textarea',
+				value: '',
+				placeholder: 'Optional description'
+			},
+			{
+				id: 'contract',
+				label: 'Contract Type',
+				type: 'select',
+				value: '6', // Default: Queue
+				options: contractOptions,
+				required: true
+			},
+			{
+				id: 'solutionNamespace',
+				label: 'Service Bus Namespace',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'e.g., my-namespace'
+			},
+			{
+				id: 'namespaceAddress',
+				label: 'Namespace Address',
+				type: 'text',
+				value: '',
+				placeholder: 'Full URL for EventHub, leave empty for Queue/Topic',
+				hidden: true // Shown when contract is EventHub
+			},
+			{
+				id: 'path',
+				label: 'Queue/Topic Name',
+				type: 'text',
+				value: '',
+				placeholder: 'e.g., my-queue'
+			},
+			{
+				id: 'authType',
+				label: 'Authentication',
+				type: 'select',
+				value: '2', // Default: SASKey
+				options: authTypeOptions,
+				required: true
+			},
+			{
+				id: 'sasKeyName',
+				label: 'SAS Key Name',
+				type: 'text',
+				value: '',
+				placeholder: 'e.g., RootManageSharedAccessKey'
+			},
+			{
+				id: 'sasKey',
+				label: 'SAS Key',
+				type: 'password',
+				value: '',
+				placeholder: 'Enter SAS Key'
+			},
+			{
+				id: 'sasToken',
+				label: 'SAS Token',
+				type: 'password',
+				value: '',
+				placeholder: 'Enter SAS Token',
+				hidden: true // Shown when authType is SASToken
+			},
+			{
+				id: 'messageFormat',
+				label: 'Message Format',
+				type: 'select',
+				value: '2', // Default: JSON
+				options: messageFormatOptions
+			},
+			{
+				id: 'userClaim',
+				label: 'User Information Sent',
+				type: 'select',
+				value: '1', // Default: None
+				options: userClaimOptions
+			},
+			{
+				id: 'solution',
+				label: 'Solution',
+				type: 'select',
+				value: '',
+				options: solutionOptions
+			}
+		],
+		submitLabel: 'Register',
+		cancelLabel: 'Cancel',
+		onFieldChange: (fieldId, value, updateField) => {
+			if (fieldId === 'contract') {
+				const contractValue = parseInt(value, 10);
+				// EventHub (7) uses namespaceAddress instead of solutionNamespace
+				const isEventHub = contractValue === 7;
+				updateField('solutionNamespace', undefined, undefined, !isEventHub);
+				updateField('namespaceAddress', undefined, undefined, isEventHub);
+				updateField('path', undefined, undefined, !isEventHub);
+			}
+			if (fieldId === 'authType') {
+				const authTypeValue = parseInt(value, 10);
+				// SASKey (2) shows sasKeyName and sasKey
+				// SASToken (3) shows sasToken
+				const isSASKey = authTypeValue === 2;
+				const isSASToken = authTypeValue === 3;
+				updateField('sasKeyName', undefined, undefined, isSASKey);
+				updateField('sasKey', undefined, undefined, isSASKey);
+				updateField('sasToken', undefined, undefined, isSASToken);
+			}
+		},
+		onSubmit: (values) => {
+			const contract = parseInt(values.contract, 10);
+			const authType = parseInt(values.authType, 10);
+			const messageFormat = parseInt(values.messageFormat, 10);
+			const userClaim = parseInt(values.userClaim, 10);
+
+			vscode.postMessage({
+				command: 'confirmRegisterServiceEndpoint',
+				data: {
+					name: values.name,
+					description: values.description || undefined,
+					contract: contract,
+					connectionMode: 1, // Normal
+					authType: authType,
+					solutionNamespace: values.solutionNamespace,
+					namespaceAddress: values.namespaceAddress || undefined,
+					path: values.path || undefined,
+					sasKeyName: values.sasKeyName || undefined,
+					sasKey: values.sasKey || undefined,
+					sasToken: values.sasToken || undefined,
+					messageFormat: messageFormat,
+					userClaim: userClaim,
+					solutionUniqueName: values.solution || undefined
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Edit Service Endpoint modal with pre-populated values.
+ * @param {Object} data - Current endpoint data + dropdown options
+ */
+function handleShowEditServiceEndpointModal(data) {
+	const {
+		serviceEndpointId,
+		name,
+		description,
+		contract,
+		contractValue,
+		solutionNamespace,
+		namespaceAddress,
+		path,
+		authType,
+		authTypeValue,
+		sasKeyName,
+		messageFormat,
+		messageFormatValue,
+		userClaim,
+		userClaimValue,
+		authTypes,
+		messageFormats,
+		userClaims
+	} = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	const authTypeOptions = (authTypes || []).map(a => ({
+		value: a.value.toString(),
+		label: a.label
+	}));
+
+	const messageFormatOptions = (messageFormats || []).map(m => ({
+		value: m.value.toString(),
+		label: m.label
+	}));
+
+	const userClaimOptions = (userClaims || []).map(u => ({
+		value: u.value.toString(),
+		label: u.label
+	}));
+
+	const isSASKey = authTypeValue === 2;
+	const isSASToken = authTypeValue === 3;
+	const isEventHub = contractValue === 7;
+
+	window.showFormModal({
+		title: 'Edit Service Endpoint',
+		fields: [
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: name || '',
+				required: true
+			},
+			{
+				id: 'description',
+				label: 'Description',
+				type: 'textarea',
+				value: description || ''
+			},
+			{
+				id: 'contract',
+				label: 'Contract Type',
+				type: 'text',
+				value: contract || '',
+				disabled: true // Cannot change contract type
+			},
+			{
+				id: 'solutionNamespace',
+				label: 'Service Bus Namespace',
+				type: 'text',
+				value: solutionNamespace || '',
+				hidden: isEventHub
+			},
+			{
+				id: 'namespaceAddress',
+				label: 'Namespace Address',
+				type: 'text',
+				value: namespaceAddress || '',
+				hidden: !isEventHub
+			},
+			{
+				id: 'path',
+				label: 'Queue/Topic Name',
+				type: 'text',
+				value: path || '',
+				hidden: isEventHub
+			},
+			{
+				id: 'authType',
+				label: 'Authentication',
+				type: 'select',
+				value: authTypeValue?.toString() || '2',
+				options: authTypeOptions
+			},
+			{
+				id: 'sasKeyName',
+				label: 'SAS Key Name',
+				type: 'text',
+				value: sasKeyName || '',
+				hidden: !isSASKey
+			},
+			{
+				id: 'sasKey',
+				label: 'SAS Key (leave empty to keep current)',
+				type: 'password',
+				value: '',
+				placeholder: 'Leave empty to keep current key',
+				hidden: !isSASKey
+			},
+			{
+				id: 'sasToken',
+				label: 'SAS Token (leave empty to keep current)',
+				type: 'password',
+				value: '',
+				placeholder: 'Leave empty to keep current token',
+				hidden: !isSASToken
+			},
+			{
+				id: 'messageFormat',
+				label: 'Message Format',
+				type: 'select',
+				value: messageFormatValue?.toString() || '2',
+				options: messageFormatOptions
+			},
+			{
+				id: 'userClaim',
+				label: 'User Information Sent',
+				type: 'select',
+				value: userClaimValue?.toString() || '1',
+				options: userClaimOptions
+			}
+		],
+		submitLabel: 'Update',
+		cancelLabel: 'Cancel',
+		onFieldChange: (fieldId, value, updateField) => {
+			if (fieldId === 'authType') {
+				const newAuthType = parseInt(value, 10);
+				const newIsSASKey = newAuthType === 2;
+				const newIsSASToken = newAuthType === 3;
+				updateField('sasKeyName', undefined, undefined, newIsSASKey);
+				updateField('sasKey', undefined, undefined, newIsSASKey);
+				updateField('sasToken', undefined, undefined, newIsSASToken);
+			}
+		},
+		onSubmit: (values) => {
+			const newAuthType = parseInt(values.authType, 10);
+			const newMessageFormat = parseInt(values.messageFormat, 10);
+			const newUserClaim = parseInt(values.userClaim, 10);
+
+			vscode.postMessage({
+				command: 'confirmUpdateServiceEndpoint',
+				data: {
+					serviceEndpointId: serviceEndpointId,
+					name: values.name,
+					description: values.description || undefined,
+					solutionNamespace: values.solutionNamespace || undefined,
+					namespaceAddress: values.namespaceAddress || undefined,
+					path: values.path || undefined,
+					authType: newAuthType,
+					sasKeyName: values.sasKeyName || undefined,
+					sasKey: values.sasKey || undefined,
+					sasToken: values.sasToken || undefined,
+					messageFormat: newMessageFormat,
+					userClaim: newUserClaim
 				}
 			});
 		}
@@ -2967,6 +3347,9 @@ function handleShowNodeDetails(data) {
 		case 'webHook':
 			html += renderWebHookDetails(data);
 			break;
+		case 'serviceEndpoint':
+			html += renderServiceEndpointDetails(data);
+			break;
 		default:
 			html = '<p class="detail-placeholder">Unknown node type</p>';
 	}
@@ -3060,6 +3443,64 @@ function renderWebHookDetails(data) {
 		<span class="detail-label">Modified:</span>
 		<span class="detail-value">${formatDate(data.modifiedOn)}</span>
 	`;
+}
+
+/**
+ * Render service endpoint details.
+ */
+function renderServiceEndpointDetails(data) {
+	let html = `
+		<span class="detail-section-title">General</span>
+		<span class="detail-label">Name:</span>
+		<span class="detail-value">${escapeHtml(data.name || '')}</span>
+		<span class="detail-label">Description:</span>
+		<span class="detail-value">${escapeHtml(data.description || '-')}</span>
+		<span class="detail-label">Contract:</span>
+		<span class="detail-value">${escapeHtml(data.contract || '')}</span>
+		<span class="detail-label">Connection Mode:</span>
+		<span class="detail-value">${escapeHtml(data.connectionMode || '')}</span>
+
+		<span class="detail-section-title">Configuration</span>
+		<span class="detail-label">Namespace:</span>
+		<span class="detail-value monospace">${escapeHtml(data.namespace || '')}</span>
+	`;
+
+	if (data.path) {
+		html += `
+		<span class="detail-label">Path (Queue/Topic):</span>
+		<span class="detail-value monospace">${escapeHtml(data.path)}</span>
+		`;
+	}
+
+	html += `
+		<span class="detail-label">Authentication:</span>
+		<span class="detail-value">${escapeHtml(data.authType || '')}</span>
+	`;
+
+	if (data.sasKeyName) {
+		html += `
+		<span class="detail-label">SAS Key Name:</span>
+		<span class="detail-value">${escapeHtml(data.sasKeyName)}</span>
+		`;
+	}
+
+	html += `
+		<span class="detail-section-title">Message Options</span>
+		<span class="detail-label">Message Format:</span>
+		<span class="detail-value">${escapeHtml(data.messageFormat || '')}</span>
+		<span class="detail-label">User Information:</span>
+		<span class="detail-value">${escapeHtml(data.userClaim || '')}</span>
+
+		<span class="detail-section-title">System</span>
+		<span class="detail-label">Managed:</span>
+		<span class="detail-value">${renderManagedStatus(data.isManaged)}</span>
+		<span class="detail-label">Created:</span>
+		<span class="detail-value">${formatDate(data.createdOn)}</span>
+		<span class="detail-label">Modified:</span>
+		<span class="detail-value">${formatDate(data.modifiedOn)}</span>
+	`;
+
+	return html;
 }
 
 /**
