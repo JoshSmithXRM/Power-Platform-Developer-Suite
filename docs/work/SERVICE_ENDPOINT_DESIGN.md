@@ -6,6 +6,22 @@
 
 **Status:** Design Complete, Ready for Implementation
 
+> **IMPORTANT CORRECTIONS (2025-12-18)**
+>
+> This design was updated to fix incorrect enum values based on PRT decompilation:
+>
+> 1. **ServiceEndpointContract values corrected:**
+>    - OneWay=1, Rest=3, TwoWay=4, Topic=5, Queue=6, EventHub=7
+>    - (NOT: Queue=1, Topic=2 as originally written)
+>
+> 2. **ServiceBusAuthType REMOVED - reuse WebHookAuthType:**
+>    - Auth types are a SINGLE shared enum for both WebHook and Service Bus
+>    - Service Bus uses: ACS(1), SASKey(2), SASToken(3)
+>    - WebHook uses: WebhookKey(4), HttpHeader(5), HttpQueryString(6)
+>    - DO NOT create separate ServiceBusAuthType - use existing WebHookAuthType.ts
+>
+> 3. **No "ConnectionString" or "ManagedServiceIdentity" auth types exist in PRT**
+
 ---
 
 ## Business Value
@@ -82,7 +98,7 @@ All features in one deliverable:
 ```typescript
 import { ServiceEndpointContract } from '../valueObjects/ServiceEndpointContract';
 import { ServiceEndpointConnectionMode } from '../valueObjects/ServiceEndpointConnectionMode';
-import { ServiceBusAuthType } from '../valueObjects/ServiceBusAuthType';
+import { WebHookAuthType } from '../valueObjects/WebHookAuthType';  // Shared auth type enum
 import { MessageFormat } from '../valueObjects/MessageFormat';
 import { UserClaimType } from '../valueObjects/UserClaimType';
 
@@ -108,7 +124,7 @@ export class ServiceEndpoint {
 		private readonly path: string | null,            // Queue/Topic/EventHub name
 		private readonly contract: ServiceEndpointContract,
 		private readonly connectionMode: ServiceEndpointConnectionMode,
-		private readonly authType: ServiceBusAuthType,
+		private readonly authType: WebHookAuthType,  // Uses shared auth type enum
 		private readonly sasKeyName: string | null,
 		private readonly messageFormat: MessageFormat,
 		private readonly userClaim: UserClaimType,
@@ -208,7 +224,7 @@ export class ServiceEndpoint {
 		return this.connectionMode;
 	}
 
-	public getAuthType(): ServiceBusAuthType {
+	public getAuthType(): WebHookAuthType {
 		return this.authType;
 	}
 
@@ -247,21 +263,23 @@ export class ServiceEndpoint {
  * Contract type for Service Endpoint.
  * Determines messaging pattern and protocol.
  *
- * Values:
- * - Queue (1): Azure Service Bus Queue (one consumer)
- * - Topic (2): Azure Service Bus Topic (pub/sub)
- * - OneWay (3): One-way messaging
- * - TwoWay (4): Request/response pattern
- * - Rest (5): REST endpoint
+ * Values from PRT (ServiceEndpointContract enum):
+ * - OneWay (1): One-way messaging (legacy Service Bus)
+ * - (2 not used)
+ * - Rest (3): REST endpoint
+ * - TwoWay (4): Request/response pattern (legacy Service Bus)
+ * - Topic (5): Azure Service Bus Topic (pub/sub)
+ * - Queue (6): Azure Service Bus Queue (one consumer)
  * - EventHub (7): Azure Event Hub
- * - WebHook (8): WebHook (handled separately)
+ * - WebHook (8): WebHook (handled by separate WebHook entity)
  */
 export class ServiceEndpointContract {
-	public static readonly Queue = new ServiceEndpointContract(1, 'Queue');
-	public static readonly Topic = new ServiceEndpointContract(2, 'Topic');
-	public static readonly OneWay = new ServiceEndpointContract(3, 'OneWay');
+	public static readonly OneWay = new ServiceEndpointContract(1, 'OneWay');
+	// 2 = not used
+	public static readonly Rest = new ServiceEndpointContract(3, 'Rest');
 	public static readonly TwoWay = new ServiceEndpointContract(4, 'TwoWay');
-	public static readonly Rest = new ServiceEndpointContract(5, 'Rest');
+	public static readonly Topic = new ServiceEndpointContract(5, 'Topic');
+	public static readonly Queue = new ServiceEndpointContract(6, 'Queue');
 	public static readonly EventHub = new ServiceEndpointContract(7, 'EventHub');
 	// WebHook (8) handled by separate WebHook entity
 
@@ -272,11 +290,11 @@ export class ServiceEndpointContract {
 
 	public static fromValue(value: number): ServiceEndpointContract {
 		switch (value) {
-			case 1: return ServiceEndpointContract.Queue;
-			case 2: return ServiceEndpointContract.Topic;
-			case 3: return ServiceEndpointContract.OneWay;
+			case 1: return ServiceEndpointContract.OneWay;
+			case 3: return ServiceEndpointContract.Rest;
 			case 4: return ServiceEndpointContract.TwoWay;
-			case 5: return ServiceEndpointContract.Rest;
+			case 5: return ServiceEndpointContract.Topic;
+			case 6: return ServiceEndpointContract.Queue;
 			case 7: return ServiceEndpointContract.EventHub;
 			default: throw new Error(`Invalid ServiceEndpointContract value: ${value}`);
 		}
@@ -287,11 +305,23 @@ export class ServiceEndpointContract {
 	 */
 	public static all(): readonly ServiceEndpointContract[] {
 		return [
+			ServiceEndpointContract.OneWay,
+			ServiceEndpointContract.Rest,
+			ServiceEndpointContract.TwoWay,
+			ServiceEndpointContract.Topic,
+			ServiceEndpointContract.Queue,
+			ServiceEndpointContract.EventHub,
+		];
+	}
+
+	/**
+	 * Returns contract types commonly used (Queue, Topic, EventHub).
+	 * Excludes legacy types (OneWay, TwoWay, Rest).
+	 */
+	public static common(): readonly ServiceEndpointContract[] {
+		return [
 			ServiceEndpointContract.Queue,
 			ServiceEndpointContract.Topic,
-			ServiceEndpointContract.OneWay,
-			ServiceEndpointContract.TwoWay,
-			ServiceEndpointContract.Rest,
 			ServiceEndpointContract.EventHub,
 		];
 	}
@@ -359,87 +389,79 @@ export class ServiceEndpointConnectionMode {
 }
 ```
 
-**3. ServiceBusAuthType**
+**3. Auth Type - REUSE EXISTING WebHookAuthType**
+
+> **IMPORTANT**: Do NOT create a separate ServiceBusAuthType value object!
+>
+> The `serviceendpoint.authtype` field uses a SINGLE enum shared by both WebHook and Service Bus.
+> The existing `WebHookAuthType.ts` already has all values and should be reused.
+>
+> **Recommended**: Rename `WebHookAuthType` → `ServiceEndpointAuthType` for clarity.
+
+**Existing WebHookAuthType.ts (already correct):**
 
 ```typescript
 /**
- * Authentication type for Service Bus endpoints.
+ * Authentication type for Service Endpoints (both WebHook and Service Bus).
  *
- * Values:
- * - None (1): No authentication
- * - SharedAccessKey (2): SAS key authentication (requires key name + key)
- * - SharedAccessToken (3): SAS token authentication (requires token)
- * - ConnectionString (4): Connection string authentication
- * - ManagedServiceIdentity (5): Azure Managed Identity (no credentials)
+ * Values from PRT (ServiceEndpointAuthType enum):
+ * - ACS (1): Legacy Access Control Service (Service Bus, deprecated)
+ * - SASKey (2): Shared Access Signature Key (Service Bus)
+ * - SASToken (3): Shared Access Signature Token (Service Bus)
+ * - WebhookKey (4): Webhook key parameter (WebHook only)
+ * - HttpHeader (5): HTTP header authentication (WebHook only)
+ * - HttpQueryString (6): Query string authentication (WebHook only)
+ *
+ * Valid for Service Bus: ACS (1), SASKey (2), SASToken (3)
+ * Valid for WebHook: WebhookKey (4), HttpHeader (5), HttpQueryString (6)
  */
-export class ServiceBusAuthType {
-	public static readonly None = new ServiceBusAuthType(1, 'None');
-	public static readonly SharedAccessKey = new ServiceBusAuthType(2, 'SharedAccessKey');
-	public static readonly SharedAccessToken = new ServiceBusAuthType(3, 'SharedAccessToken');
-	public static readonly ConnectionString = new ServiceBusAuthType(4, 'ConnectionString');
-	public static readonly ManagedServiceIdentity = new ServiceBusAuthType(5, 'ManagedServiceIdentity');
+export class WebHookAuthType {
+	// Service Bus auth types
+	public static readonly ACS = new WebHookAuthType(1, 'ACS', true);
+	public static readonly SASKey = new WebHookAuthType(2, 'SASKey', true);
+	public static readonly SASToken = new WebHookAuthType(3, 'SASToken', true);
 
-	private constructor(
-		private readonly value: number,
-		private readonly name: string
-	) {}
+	// WebHook auth types
+	public static readonly WebhookKey = new WebHookAuthType(4, 'WebhookKey', false);
+	public static readonly HttpHeader = new WebHookAuthType(5, 'HttpHeader', false);
+	public static readonly HttpQueryString = new WebHookAuthType(6, 'HttpQueryString', false);
 
-	public static fromValue(value: number): ServiceBusAuthType {
-		switch (value) {
-			case 1: return ServiceBusAuthType.None;
-			case 2: return ServiceBusAuthType.SharedAccessKey;
-			case 3: return ServiceBusAuthType.SharedAccessToken;
-			case 4: return ServiceBusAuthType.ConnectionString;
-			case 5: return ServiceBusAuthType.ManagedServiceIdentity;
-			default: throw new Error(`Invalid ServiceBusAuthType value: ${value}`);
-		}
-	}
+	// ... constructor and methods ...
 
-	/**
-	 * Returns all valid auth types.
-	 */
-	public static all(): readonly ServiceBusAuthType[] {
+	/** Returns true if this is a Service Bus authentication type. */
+	public isForServiceBus(): boolean { return this.isServiceBusType; }
+
+	/** Returns only WebHook auth types (4, 5, 6). */
+	public static allForWebHook(): readonly WebHookAuthType[] { /* ... */ }
+
+	/** ADD THIS: Returns only Service Bus auth types (1, 2, 3). */
+	public static allForServiceBus(): readonly WebHookAuthType[] {
 		return [
-			ServiceBusAuthType.None,
-			ServiceBusAuthType.SharedAccessKey,
-			ServiceBusAuthType.SharedAccessToken,
-			ServiceBusAuthType.ConnectionString,
-			ServiceBusAuthType.ManagedServiceIdentity,
+			WebHookAuthType.ACS,
+			WebHookAuthType.SASKey,
+			WebHookAuthType.SASToken,
 		];
 	}
 
-	/**
-	 * Returns true if this auth type requires SAS key name + key.
-	 */
-	public requiresSasKey(): boolean {
-		return this.value === 2;
-	}
+	/** Returns true if this auth type requires SAS key name + key. */
+	public requiresSasKey(): boolean { return this.value === 2; }
 
-	/**
-	 * Returns true if this auth type requires SAS token.
-	 */
-	public requiresSasToken(): boolean {
-		return this.value === 3;
-	}
+	/** Returns true if this auth type requires SAS token. */
+	public requiresSasToken(): boolean { return this.value === 3; }
+}
+```
 
-	/**
-	 * Returns true if this auth type requires any credentials.
-	 */
-	public requiresCredentials(): boolean {
-		return this.value !== 1 && this.value !== 5; // Not None, not MSI
-	}
+**For Service Endpoint entity**, import and use `WebHookAuthType`:
 
-	public getValue(): number {
-		return this.value;
-	}
+```typescript
+import { WebHookAuthType } from '../valueObjects/WebHookAuthType';
 
-	public getName(): string {
-		return this.name;
-	}
+// In ServiceEndpoint entity:
+private readonly authType: WebHookAuthType,
 
-	public equals(other: ServiceBusAuthType): boolean {
-		return this.value === other.value;
-	}
+// Validation:
+if (this.authType.requiresSasKey() && !this.sasKeyName) {
+	throw new Error('SAS Key Name required for SASKey auth type');
 }
 ```
 
@@ -821,7 +843,7 @@ import type { ServiceEndpoint } from '../../domain/entities/ServiceEndpoint';
 import type { IDataverseApiService } from '../../../../shared/infrastructure/api/IDataverseApiService';
 import { ServiceEndpointContract } from '../../domain/valueObjects/ServiceEndpointContract';
 import { ServiceEndpointConnectionMode } from '../../domain/valueObjects/ServiceEndpointConnectionMode';
-import { ServiceBusAuthType } from '../../domain/valueObjects/ServiceBusAuthType';
+import { WebHookAuthType } from '../../domain/valueObjects/WebHookAuthType';  // Shared auth type
 import { MessageFormat } from '../../domain/valueObjects/MessageFormat';
 import { UserClaimType } from '../../domain/valueObjects/UserClaimType';
 
@@ -975,7 +997,7 @@ export class DataverseServiceEndpointRepository implements IServiceEndpointRepos
 			dto.path,
 			ServiceEndpointContract.fromValue(dto.contract),
 			ServiceEndpointConnectionMode.fromValue(dto.connectionmode),
-			ServiceBusAuthType.fromValue(dto.authtype),
+			WebHookAuthType.fromValue(dto.authtype),  // Uses shared auth type
 			dto.saskeyname,
 			MessageFormat.fromValue(dto.messageformat),
 			UserClaimType.fromValue(dto.userclaim),
@@ -1062,14 +1084,17 @@ function handleShowRegisterServiceEndpointModal(data) {
 				id: 'contract',
 				label: 'Contract Type',
 				type: 'select',
-				value: '1',
+				value: '6',  // Default to Queue
 				required: true,
 				options: [
-					{ value: '1', label: 'Queue' },
-					{ value: '2', label: 'Topic' },
-					{ value: '3', label: 'OneWay' },
-					{ value: '4', label: 'TwoWay' },
-					{ value: '7', label: 'EventHub' }
+					// Common types (show first)
+					{ value: '6', label: 'Queue' },
+					{ value: '5', label: 'Topic' },
+					{ value: '7', label: 'EventHub' },
+					// Legacy types (optional, could hide)
+					{ value: '1', label: 'OneWay (Legacy)' },
+					{ value: '4', label: 'TwoWay (Legacy)' },
+					{ value: '3', label: 'Rest' }
 				]
 			},
 			{
@@ -1117,13 +1142,13 @@ function handleShowRegisterServiceEndpointModal(data) {
 				id: 'authType',
 				label: 'Auth Type',
 				type: 'select',
-				value: '2',
+				value: '2',  // Default to SASKey
 				options: [
-					{ value: '1', label: 'None' },
-					{ value: '2', label: 'SharedAccessKey' },
-					{ value: '3', label: 'SharedAccessToken' },
-					{ value: '4', label: 'ConnectionString' },
-					{ value: '5', label: 'ManagedServiceIdentity' }
+					// Service Bus auth types only (1, 2, 3)
+					{ value: '2', label: 'SASKey' },
+					{ value: '3', label: 'SASToken' },
+					{ value: '1', label: 'ACS (Legacy)' }
+					// Note: 4, 5, 6 are WebHook-only auth types
 				]
 			},
 			{
@@ -1243,7 +1268,8 @@ All types defined in architecture section above.
 
 **Summary:**
 - 1 domain entity (ServiceEndpoint)
-- 5 value objects (Contract, ConnectionMode, AuthType, MessageFormat, UserClaim)
+- 4 NEW value objects (Contract, ConnectionMode, MessageFormat, UserClaim)
+- 1 EXISTING value object modified (WebHookAuthType - add `allForServiceBus()`)
 - 1 repository interface + 1 implementation
 - 3 use cases (Register, Update, Unregister)
 - 2 ViewModels (ServiceEndpointViewModel, ServiceEndpointMetadata)
@@ -1302,7 +1328,8 @@ None. Design is complete and ready for implementation.
 
 ### Domain Layer
 - [ ] ServiceEndpoint entity (`ServiceEndpoint.ts`)
-- [ ] 5 value objects (`ServiceEndpointContract.ts`, `ServiceEndpointConnectionMode.ts`, `ServiceBusAuthType.ts`, `MessageFormat.ts`, `UserClaimType.ts`)
+- [ ] 4 value objects (`ServiceEndpointContract.ts`, `ServiceEndpointConnectionMode.ts`, `MessageFormat.ts`, `UserClaimType.ts`)
+- [ ] Modify existing `WebHookAuthType.ts` - add `allForServiceBus()` method
 - [ ] Repository interface (`IServiceEndpointRepository.ts`)
 - [ ] Unit tests for entity + value objects
 
@@ -1344,7 +1371,7 @@ None. Design is complete and ready for implementation.
 1. `src/features/pluginRegistration/domain/entities/ServiceEndpoint.ts`
 2. `src/features/pluginRegistration/domain/valueObjects/ServiceEndpointContract.ts`
 3. `src/features/pluginRegistration/domain/valueObjects/ServiceEndpointConnectionMode.ts`
-4. `src/features/pluginRegistration/domain/valueObjects/ServiceBusAuthType.ts`
+4. ~~`ServiceBusAuthType.ts`~~ - **DO NOT CREATE** - Reuse existing `WebHookAuthType.ts` (add `allForServiceBus()` method)
 5. `src/features/pluginRegistration/domain/valueObjects/MessageFormat.ts`
 6. `src/features/pluginRegistration/domain/valueObjects/UserClaimType.ts`
 7. `src/features/pluginRegistration/domain/interfaces/IServiceEndpointRepository.ts`
@@ -1363,12 +1390,13 @@ None. Design is complete and ready for implementation.
 14. `src/features/pluginRegistration/domain/entities/ServiceEndpoint.test.ts`
 15. `src/features/pluginRegistration/domain/valueObjects/ServiceEndpointContract.test.ts`
 16. `src/features/pluginRegistration/domain/valueObjects/ServiceEndpointConnectionMode.test.ts`
-17. `src/features/pluginRegistration/domain/valueObjects/ServiceBusAuthType.test.ts`
+17. ~~`ServiceBusAuthType.test.ts`~~ - **NOT NEEDED** - WebHookAuthType.test.ts already exists
 18. `src/features/pluginRegistration/domain/valueObjects/MessageFormat.test.ts`
 19. `src/features/pluginRegistration/domain/valueObjects/UserClaimType.test.ts`
 20. `src/features/pluginRegistration/application/mappers/ServiceEndpointViewModelMapper.test.ts`
 
-**Total:** 20 new files (13 production + 7 test files)
+**Total:** 18 new files (12 production + 6 test files)
+**Plus:** 1 modification to `WebHookAuthType.ts` (add `allForServiceBus()` method)
 
 ---
 
