@@ -53,7 +53,7 @@ export class DataverseWebHookRepository implements IWebHookRepository {
 	) {}
 
 	public async findAll(environmentId: string): Promise<readonly WebHook[]> {
-		this.logger.debug('DataverseWebHookRepository: Fetching webhooks', {
+		this.logger.info('DataverseWebHookRepository: Fetching webhooks', {
 			environmentId,
 		});
 
@@ -91,7 +91,7 @@ export class DataverseWebHookRepository implements IWebHookRepository {
 			}
 		}
 
-		this.logger.debug('DataverseWebHookRepository: Fetched webhooks', {
+		this.logger.info('DataverseWebHookRepository: Fetched webhooks', {
 			count: allWebHooks.length,
 			pages: pageCount,
 			totalMs: Date.now() - startTime,

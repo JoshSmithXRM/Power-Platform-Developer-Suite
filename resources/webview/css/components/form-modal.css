@@ -266,3 +266,82 @@ textarea.form-modal-input {
 	font-size: 13px;
 	color: var(--vscode-foreground);
 }
+
+/* Key-Value Grid */
+.form-modal-keyvalue-container {
+	border: 1px solid var(--vscode-input-border);
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.form-modal-keyvalue-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.form-modal-keyvalue-table th {
+	background: var(--vscode-editor-inactiveSelectionBackground);
+	padding: 6px 8px;
+	text-align: left;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+	border-bottom: 1px solid var(--vscode-input-border);
+}
+
+.form-modal-keyvalue-table td {
+	padding: 4px;
+	border-bottom: 1px solid var(--vscode-input-border);
+}
+
+.form-modal-keyvalue-table tr:last-child td {
+	border-bottom: none;
+}
+
+.form-modal-keyvalue-input {
+	width: 100%;
+	padding: 4px 8px;
+	border: 1px solid var(--vscode-input-border);
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border-radius: 2px;
+	font-size: 13px;
+	box-sizing: border-box;
+}
+
+.form-modal-keyvalue-input:focus {
+	outline: none;
+	border-color: var(--vscode-focusBorder);
+}
+
+.form-modal-keyvalue-remove {
+	background: transparent;
+	border: none;
+	color: var(--vscode-errorForeground);
+	cursor: pointer;
+	font-size: 18px;
+	padding: 0 4px;
+	line-height: 1;
+	opacity: 0.7;
+}
+
+.form-modal-keyvalue-remove:hover {
+	opacity: 1;
+}
+
+.form-modal-keyvalue-add {
+	display: block;
+	width: 100%;
+	padding: 8px;
+	background: transparent;
+	border: none;
+	border-top: 1px solid var(--vscode-input-border);
+	color: var(--vscode-textLink-foreground);
+	cursor: pointer;
+	font-size: 13px;
+	text-align: left;
+}
+
+.form-modal-keyvalue-add:hover {
+	background: var(--vscode-list-hoverBackground);
+}

@@ -59,14 +59,15 @@ export class UpdateWebHookUseCase {
 	private validateUrl(url: string): void {
 		try {
 			const parsed = new URL(url);
-			if (parsed.protocol !== 'https:') {
-				throw new Error('WebHook URL must use HTTPS protocol');
+			// Only allow http and https protocols (matches PRT behavior)
+			if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+				throw new Error('Endpoint URL should be valid.');
 			}
 		} catch (error) {
-			if (error instanceof Error && error.message.includes('HTTPS')) {
+			if (error instanceof Error && error.message === 'Endpoint URL should be valid.') {
 				throw error;
 			}
-			throw new Error(`Invalid WebHook URL: ${url}`);
+			throw new Error('Endpoint URL should be valid.');
 		}
 	}
 }

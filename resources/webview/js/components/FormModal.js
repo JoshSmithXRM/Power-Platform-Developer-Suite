@@ -415,6 +415,121 @@ window.showFormModal = function(options) {
 			fieldContainer.appendChild(wrapper);
 			body.appendChild(fieldContainer);
 			return; // Skip the rest of input setup
+		} else if (field.type === 'keyvalue') {
+			// Key-value grid for multiple key-value pairs
+			const gridContainer = document.createElement('div');
+			gridContainer.className = 'form-modal-keyvalue-container';
+			gridContainer.id = `form-modal-${field.id}`;
+
+			// Create table
+			const table = document.createElement('table');
+			table.className = 'form-modal-keyvalue-table';
+
+			// Create header
+			const thead = document.createElement('thead');
+			const headerRow = document.createElement('tr');
+			const keyHeader = document.createElement('th');
+			keyHeader.textContent = field.keyLabel || 'Keys';
+			const valueHeader = document.createElement('th');
+			valueHeader.textContent = field.valueLabel || 'Values';
+			const actionHeader = document.createElement('th');
+			actionHeader.style.width = '40px';
+			headerRow.appendChild(keyHeader);
+			headerRow.appendChild(valueHeader);
+			headerRow.appendChild(actionHeader);
+			thead.appendChild(headerRow);
+			table.appendChild(thead);
+
+			// Create body
+			const tbody = document.createElement('tbody');
+			table.appendChild(tbody);
+
+			// Function to create a row
+			const createRow = (key = '', value = '') => {
+				const row = document.createElement('tr');
+
+				const keyCell = document.createElement('td');
+				const keyInput = document.createElement('input');
+				keyInput.type = 'text';
+				keyInput.className = 'form-modal-keyvalue-input';
+				keyInput.placeholder = field.keyPlaceholder || 'Key';
+				keyInput.value = key;
+				keyCell.appendChild(keyInput);
+
+				const valueCell = document.createElement('td');
+				const valueInput = document.createElement('input');
+				valueInput.type = field.valueType === 'password' ? 'password' : 'text';
+				valueInput.className = 'form-modal-keyvalue-input';
+				valueInput.placeholder = field.valuePlaceholder || 'Value';
+				valueInput.value = value;
+				valueCell.appendChild(valueInput);
+
+				const actionCell = document.createElement('td');
+				const removeBtn = document.createElement('button');
+				removeBtn.type = 'button';
+				removeBtn.className = 'form-modal-keyvalue-remove';
+				removeBtn.textContent = '×';
+				removeBtn.title = 'Remove';
+				removeBtn.onclick = () => {
+					row.remove();
+				};
+				actionCell.appendChild(removeBtn);
+
+				row.appendChild(keyCell);
+				row.appendChild(valueCell);
+				row.appendChild(actionCell);
+				tbody.appendChild(row);
+
+				return row;
+			};
+
+			// Add initial rows from value
+			const initialKeyValues = field.value || [];
+			if (Array.isArray(initialKeyValues) && initialKeyValues.length > 0) {
+				initialKeyValues.forEach(kv => createRow(kv.key || '', kv.value || ''));
+			} else {
+				// Start with one empty row
+				createRow();
+			}
+
+			// Add button
+			const addBtn = document.createElement('button');
+			addBtn.type = 'button';
+			addBtn.className = 'form-modal-keyvalue-add';
+			addBtn.textContent = '+ Add Property';
+			addBtn.onclick = () => createRow();
+
+			gridContainer.appendChild(table);
+			gridContainer.appendChild(addBtn);
+
+			// Store reference for value retrieval
+			inputElements[field.id] = {
+				type: 'keyvalue',
+				tbody: tbody,
+				getValues: () => {
+					const rows = tbody.querySelectorAll('tr');
+					const values = [];
+					rows.forEach(row => {
+						const inputs = row.querySelectorAll('input');
+						if (inputs.length >= 2) {
+							const key = inputs[0].value.trim();
+							const value = inputs[1].value;
+							// Only include rows with a key
+							if (key) {
+								values.push({ key, value });
+							}
+						}
+					});
+					return values;
+				}
+			};
+			fieldContainers[field.id] = fieldContainer;
+			initialValues[field.id] = JSON.stringify(initialKeyValues);
+
+			fieldContainer.appendChild(label);
+			fieldContainer.appendChild(gridContainer);
+			body.appendChild(fieldContainer);
+			return; // Skip the rest of input setup
 		} else {
 			input = document.createElement('input');
 			input.type = field.type || 'text';
@@ -561,6 +676,12 @@ window.showFormModal = function(options) {
 				} else {
 					input.instance.setError(false);
 				}
+				return;
+			}
+
+			// Handle keyvalue fields
+			if (field.type === 'keyvalue') {
+				values[field.id] = input.getValues();
 				return;
 			}
 

@@ -1891,8 +1891,48 @@ Dataverse requires the actual unique name string, not the ID.
 | Detail panel for webhooks | ✅ Presentation |
 | AADSASKey auth type support | ✅ Domain |
 
+| Solution filtering works for webhooks | ✅ Infrastructure |
+
 ### REMAINING - WebHook Step Registration (Slice 5)
 | Feature | Priority | Notes |
 |---------|----------|-------|
 | Register step targeting webhook | HIGH | Modify step registration to support webhooks |
 | Edit step to change target | MEDIUM | Allow switching between plugin type and webhook |
+
+---
+
+### Session 23 (2025-12-18)
+**WebHook Solution Filtering Fix**
+
+**Problem:** WebHooks existed in Dataverse but didn't appear in the tree view when solution filtering was enabled.
+
+**Investigation:**
+- Verified `DataverseWebHookRepository.findAll()` returns webhooks correctly ✓
+- Verified `LoadPluginRegistrationTreeUseCase` includes webhooks ✓
+- Verified `PluginRegistrationTreeMapper` maps webhooks to tree items ✓
+- Verified panel sends webhooks to webview ✓
+- **Root Cause:** `filterBySolution()` was filtering out webhooks because their IDs weren't in the solution memberships - and solution membership query wasn't fetching ServiceEndpoint (componenttype 95)
+
+**Previous Wrong Fix (Reverted):**
+- Someone added `if (item.type === 'webHook') return true;` to always show webhooks
+- This was incorrect because Service Endpoints ARE solution components (componenttype 95)
+
+**Correct Fix:**
+1. Added `SERVICE_ENDPOINT: 95` to `PLUGIN_COMPONENT_TYPES` constant in `LoadSolutionMembershipsUseCase.ts`
+2. Added `PLUGIN_COMPONENT_TYPES.SERVICE_ENDPOINT` to `ALL_PLUGIN_COMPONENT_TYPES` array
+3. Removed the incorrect webhook bypass from `filterBySolution()` in `plugin-registration.js`
+
+**Microsoft Documentation Reference:**
+- Per [SolutionComponent reference](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/reference/entities/solutioncomponent):
+  - 91 = Plugin Assembly
+  - 92 = SDK Message Processing Step
+  - 93 = SDK Message Processing Step Image
+  - **95 = Service Endpoint** (WebHooks)
+
+**Files Modified:**
+- `src/.../application/useCases/LoadSolutionMembershipsUseCase.ts` - Added SERVICE_ENDPOINT: 95
+- `resources/webview/js/features/plugin-registration.js` - Removed incorrect bypass
+
+**Testing:**
+- [x] WebHooks in selected solution appear correctly
+- [x] WebHooks not in selected solution are hidden (as expected)

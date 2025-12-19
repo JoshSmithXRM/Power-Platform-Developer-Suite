@@ -103,6 +103,7 @@ export class LoadPluginRegistrationTreeUseCase {
 		this.logger.info('LoadPluginRegistrationTreeUseCase: Tree built', {
 			packageCount: fetchResult.packages.length,
 			standaloneAssemblyCount: fetchResult.assemblies.length,
+			webHookCount: fetchResult.webHooks.length,
 			totalNodeCount: result.totalNodeCount,
 		});
 

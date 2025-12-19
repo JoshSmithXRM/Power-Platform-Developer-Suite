@@ -1259,17 +1259,28 @@ function handleShowRegisterWebHookModal(data) {
 				id: 'authType',
 				label: 'Authentication',
 				type: 'select',
-				value: '1', // Default to None
+				value: '2', // Default to HttpHeader
 				options: authTypeOptions,
 				required: true
 			},
 			{
-				id: 'authValue',
-				label: 'Auth Value',
+				id: 'authKeyValues',
+				label: 'Authentication Properties',
+				type: 'keyvalue',
+				keyLabel: 'Keys',
+				valueLabel: 'Values',
+				keyPlaceholder: 'Header name',
+				valuePlaceholder: 'Header value',
+				value: [],
+				hidden: false // Shown by default for HttpHeader(2), also for HttpQueryString(4)
+			},
+			{
+				id: 'webhookKey',
+				label: 'WebHook Key',
 				type: 'password',
 				value: '',
-				placeholder: 'API key or secret (optional)',
-				hint: 'Required for HttpHeader, WebhookKey, or HttpQueryString auth types'
+				placeholder: 'Enter webhook secret key',
+				hidden: true // Initially hidden, shown for WebhookKey(3)
 			},
 			{
 				id: 'description',
@@ -1288,18 +1299,41 @@ function handleShowRegisterWebHookModal(data) {
 		],
 		submitLabel: 'Register',
 		cancelLabel: 'Cancel',
+		onFieldChange: (fieldId, value, updateField) => {
+			if (fieldId === 'authType') {
+				const authTypeValue = parseInt(value, 10);
+				// HttpHeader(2) or HttpQueryString(4) - show key-value grid
+				const showKeyValues = authTypeValue === 2 || authTypeValue === 4;
+				// WebhookKey(3) - show single password field
+				const showWebhookKey = authTypeValue === 3;
+
+				updateField('authKeyValues', undefined, undefined, showKeyValues);
+				updateField('webhookKey', undefined, undefined, showWebhookKey);
+			}
+		},
 		onSubmit: (values) => {
-			// Validate URL is HTTPS
-			if (values.url && !values.url.toLowerCase().startsWith('https://')) {
-				window.showNotification?.('WebHook URL must use HTTPS', 'error');
+			// Validate URL is well-formed absolute URL (matches PRT behavior)
+			if (!isValidAbsoluteUrl(values.url)) {
+				vscode.postMessage({
+					command: 'showValidationError',
+					data: { message: 'Endpoint URL should be valid.' }
+				});
 				return;
 			}
 
-			// Validate auth value when auth type requires it
 			const authType = parseInt(values.authType, 10);
-			if (authType !== 1 && !values.authValue) {
-				window.showNotification?.('Auth value is required for the selected authentication type', 'error');
-				return;
+			let authValue;
+
+			// Serialize auth value based on auth type
+			if (authType === 3) {
+				// WebhookKey - plain string
+				authValue = values.webhookKey || undefined;
+			} else if (authType === 2 || authType === 4) {
+				// HttpHeader or HttpQueryString - XML format
+				const keyValues = values.authKeyValues || [];
+				if (keyValues.length > 0) {
+					authValue = serializeAuthValueToXml(keyValues);
+				}
 			}
 
 			// Send confirmation to extension
@@ -1309,13 +1343,89 @@ function handleShowRegisterWebHookModal(data) {
 					name: values.name,
 					url: values.url,
 					authType: authType,
-					authValue: values.authValue || undefined,
+					authValue: authValue,
 					description: values.description || undefined,
 					solutionUniqueName: values.solution || undefined
 				}
 			});
 		}
 	});
+}
+
+/**
+ * Validates that a URL is a well-formed absolute URL.
+ * Matches PRT behavior: Uri.IsWellFormedUriString(url, UriKind.Absolute)
+ * @param {string} url - URL to validate
+ * @returns {boolean} True if valid absolute URL
+ */
+function isValidAbsoluteUrl(url) {
+	if (!url) return false;
+	try {
+		const parsed = new URL(url);
+		// Must have http or https protocol
+		return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Escapes special XML characters in a string.
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeXml(str) {
+	if (!str) return '';
+	return str
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&apos;');
+}
+
+/**
+ * Serializes key-value pairs to XML format for WebHook auth value.
+ * Format: <settings><setting name="Key" value="Value"/></settings>
+ * @param {Array<{key: string, value: string}>} keyValues - Key-value pairs
+ * @returns {string} XML string
+ */
+function serializeAuthValueToXml(keyValues) {
+	if (!keyValues || keyValues.length === 0) return '';
+
+	const settings = keyValues
+		.filter(kv => kv.key && kv.key.trim() !== '')
+		.map(kv => `<setting name="${escapeXml(kv.key)}" value="${escapeXml(kv.value)}"/>`)
+		.join('');
+
+	return `<settings>${settings}</settings>`;
+}
+
+/**
+ * Deserializes XML auth value to key-value pairs.
+ * @param {string} xml - XML string in format <settings><setting name="..." value="..."/></settings>
+ * @returns {Array<{key: string, value: string}>} Key-value pairs
+ */
+function deserializeAuthValueFromXml(xml) {
+	if (!xml) return [];
+
+	try {
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(xml, 'text/xml');
+		const settings = doc.getElementsByTagName('setting');
+		const keyValues = [];
+
+		for (let i = 0; i < settings.length; i++) {
+			keyValues.push({
+				key: settings[i].getAttribute('name') || '',
+				value: settings[i].getAttribute('value') || ''
+			});
+		}
+
+		return keyValues;
+	} catch {
+		return [];
+	}
 }
 
 /**
@@ -1330,20 +1440,16 @@ function handleShowEditWebHookModal(data) {
 		return;
 	}
 
-	// Build solution options for dropdown (optional for webhooks)
-	const solutionOptions = [
-		{ value: '', label: 'None (do not add to solution)' },
-		...(solutions || []).map(s => ({
-			value: s.uniqueName,
-			label: s.name
-		}))
-	];
-
 	// Build auth type options
 	const authTypeOptions = (authTypes || []).map(a => ({
 		value: a.value.toString(),
 		label: a.label
 	}));
+
+	// Determine initial visibility based on current auth type
+	const currentAuthType = authType || 2; // Default to HttpHeader if not provided
+	const showKeyValues = currentAuthType === 2 || currentAuthType === 4;
+	const showWebhookKey = currentAuthType === 3;
 
 	window.showFormModal({
 		title: 'Edit WebHook',
@@ -1368,17 +1474,28 @@ function handleShowEditWebHookModal(data) {
 				id: 'authType',
 				label: 'Authentication',
 				type: 'select',
-				value: (authType || 1).toString(),
+				value: currentAuthType.toString(),
 				options: authTypeOptions,
 				required: true
 			},
 			{
-				id: 'authValue',
-				label: 'Auth Value',
+				id: 'authKeyValues',
+				label: 'Authentication Properties',
+				type: 'keyvalue',
+				keyLabel: 'Keys',
+				valueLabel: 'Values',
+				keyPlaceholder: 'Header name',
+				valuePlaceholder: 'Header value',
+				value: [], // Auth values not pre-populated for security
+				hidden: !showKeyValues
+			},
+			{
+				id: 'webhookKey',
+				label: 'WebHook Key',
 				type: 'password',
-				value: '', // Don't pre-fill password for security
+				value: '', // Auth values not pre-populated for security
 				placeholder: 'Leave empty to keep existing value',
-				hint: 'Required for HttpHeader, WebhookKey, or HttpQueryString auth types'
+				hidden: !showWebhookKey
 			},
 			{
 				id: 'description',
@@ -1390,17 +1507,42 @@ function handleShowEditWebHookModal(data) {
 		],
 		submitLabel: 'Update',
 		cancelLabel: 'Cancel',
+		onFieldChange: (fieldId, value, updateField) => {
+			if (fieldId === 'authType') {
+				const authTypeValue = parseInt(value, 10);
+				// HttpHeader(2) or HttpQueryString(4) - show key-value grid
+				const showKV = authTypeValue === 2 || authTypeValue === 4;
+				// WebhookKey(3) - show single password field
+				const showWK = authTypeValue === 3;
+
+				updateField('authKeyValues', undefined, undefined, showKV);
+				updateField('webhookKey', undefined, undefined, showWK);
+			}
+		},
 		onSubmit: (values) => {
-			// Validate URL is HTTPS
-			if (values.url && !values.url.toLowerCase().startsWith('https://')) {
-				window.showNotification?.('WebHook URL must use HTTPS', 'error');
+			// Validate URL is well-formed absolute URL (matches PRT behavior)
+			if (!isValidAbsoluteUrl(values.url)) {
+				vscode.postMessage({
+					command: 'showValidationError',
+					data: { message: 'Endpoint URL should be valid.' }
+				});
 				return;
 			}
 
-			// Validate auth value when auth type requires it (only if changing from None)
 			const newAuthType = parseInt(values.authType, 10);
-			// If auth type changed to something other than None and no value provided, that's a problem
-			// But we allow empty authValue if they're keeping the same auth type (preserves existing value)
+			let authValue;
+
+			// Serialize auth value based on auth type
+			if (newAuthType === 3) {
+				// WebhookKey - plain string (only if provided)
+				authValue = values.webhookKey || undefined;
+			} else if (newAuthType === 2 || newAuthType === 4) {
+				// HttpHeader or HttpQueryString - XML format (only if provided)
+				const keyValues = values.authKeyValues || [];
+				if (keyValues.length > 0) {
+					authValue = serializeAuthValueToXml(keyValues);
+				}
+			}
 
 			// Send confirmation to extension
 			vscode.postMessage({
@@ -1410,7 +1552,7 @@ function handleShowEditWebHookModal(data) {
 					name: values.name,
 					url: values.url,
 					authType: newAuthType,
-					authValue: values.authValue || undefined,
+					authValue: authValue,
 					description: values.description || undefined
 				}
 			});
@@ -2683,38 +2825,43 @@ function handleShowEditImageModal(data) {
 
 /**
  * Handle adding a new node to the tree (delta update).
- * @param {Object} data - { parentId, node }
+ * @param {Object} data - { parentId, node } - parentId can be null for root-level nodes
  */
 function handleAddNode(data) {
 	const { parentId, node } = data;
-	if (!parentId || !node || !node.id) return;
+	if (!node || !node.id) return;
 
-	// Find parent node in tree and add child
-	function addToParent(items) {
-		for (const item of items) {
-			if (item.id === parentId) {
-				if (!item.children) {
-					item.children = [];
+	// Root-level node (no parent) - add directly to treeData
+	if (parentId === null || parentId === undefined) {
+		treeData.push(node);
+	} else {
+		// Find parent node in tree and add child
+		function addToParent(items) {
+			for (const item of items) {
+				if (item.id === parentId) {
+					if (!item.children) {
+						item.children = [];
+					}
+					item.children.push(node);
+					return true;
 				}
-				item.children.push(node);
-				return true;
+				if (item.children && addToParent(item.children)) {
+					return true;
+				}
 			}
-			if (item.children && addToParent(item.children)) {
-				return true;
-			}
+			return false;
 		}
-		return false;
+
+		addToParent(treeData);
+
+		// Expand parent so the new node is visible
+		expandedNodes.add(parentId);
+
+		// Also expand any ancestor nodes up to the root
+		expandAncestors(parentId, treeData);
 	}
 
-	addToParent(treeData);
-
-	// Expand parent so the new node is visible
-	expandedNodes.add(parentId);
-
-	// Also expand any ancestor nodes up to the root
-	expandAncestors(parentId, treeData);
-
-	// Render tree with parent expanded
+	// Render tree
 	renderTree();
 
 	// Re-apply filter if active

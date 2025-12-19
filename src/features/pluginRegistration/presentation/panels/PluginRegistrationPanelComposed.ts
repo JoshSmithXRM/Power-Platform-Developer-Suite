@@ -143,7 +143,8 @@ type PluginRegistrationCommands =
 	| 'showAttributePicker'
 	| 'registerWebHook'
 	| 'confirmRegisterWebHook'
-	| 'confirmUpdateWebHook';
+	| 'confirmUpdateWebHook'
+	| 'showValidationError';
 
 /**
  * Plugin Registration panel using PanelCoordinator architecture.
@@ -619,6 +620,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			}
 		});
 
+		this.coordinator.registerHandler('showValidationError', async (data) => {
+			const { message } = data as { message?: string };
+			if (message) {
+				void vscode.window.showErrorMessage(message);
+			}
+		});
+
 		this.coordinator.registerHandler('confirmRegisterAssembly', async (data) => {
 			const { name, solutionUniqueName, selectedTypes } = data as {
 				name?: string;
@@ -872,8 +880,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				treeResult.webHooks
 			);
 
+			// Count webhooks in the mapped tree items
+			const webhookTreeItems = treeItems.filter((item) => item.type === 'webHook');
+
 			this.logger.info('Plugin registration tree loaded', {
 				totalNodeCount: treeResult.totalNodeCount,
+				webHooksFromUseCase: treeResult.webHooks.length,
+				webHooksInTreeItems: webhookTreeItems.length,
 				solutionMembershipCount: Object.keys(membershipsResult).length,
 			});
 
@@ -1442,7 +1455,6 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				command: 'showRegisterWebHookModal',
 				data: {
 					authTypes: [
-						{ value: 1, label: 'None' },
 						{ value: 2, label: 'HttpHeader' },
 						{ value: 3, label: 'WebhookKey' },
 						{ value: 4, label: 'HttpQueryString' },
@@ -1476,6 +1488,8 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		this.logger.info('Registering webhook', { name, url, authType });
 
 		try {
+			let webhookId: string | undefined;
+
 			await vscode.window.withProgress(
 				{
 					location: vscode.ProgressLocation.Notification,
@@ -1483,7 +1497,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					cancellable: false,
 				},
 				async () => {
-					await this.useCases.registerWebHook.execute(this.currentEnvironmentId, {
+					webhookId = await this.useCases.registerWebHook.execute(this.currentEnvironmentId, {
 						name,
 						url,
 						authType,
@@ -1495,7 +1509,31 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			);
 
 			void vscode.window.showInformationMessage(`WebHook "${name}" registered successfully.`);
-			await this.handleRefresh();
+
+			// Delta update: fetch the new webhook and add to tree
+			if (webhookId) {
+				const newWebHook = await this.repositories.webHook.findById(
+					this.currentEnvironmentId,
+					webhookId
+				);
+
+				if (newWebHook) {
+					const { WebHookViewModelMapper } = await import(
+						'../../application/mappers/WebHookViewModelMapper.js'
+					);
+					const mapper = new WebHookViewModelMapper();
+					const webhookViewModel = mapper.toTreeItem(newWebHook);
+
+					// Add as root-level node (no parent)
+					await this.panel.postMessage({
+						command: 'addNode',
+						data: {
+							parentId: null,
+							node: webhookViewModel,
+						},
+					});
+				}
+			}
 		} catch (error) {
 			this.logger.error('Failed to register webhook', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -2392,7 +2430,6 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				authType: webhook.getAuthType().getValue(),
 				description: webhook.getDescription(),
 				authTypes: [
-					{ value: 1, label: 'None' },
 					{ value: 2, label: 'HttpHeader' },
 					{ value: 3, label: 'WebhookKey' },
 					{ value: 4, label: 'HttpQueryString' },
