@@ -94,16 +94,31 @@ describe('ServiceEndpointContract', () => {
 			expect(ServiceEndpointContract.fromValue(11)).toBe(ServiceEndpointContract.ContainerStorage);
 		});
 
-		it('should throw for value 8 (WebHook)', () => {
-			expect(() => ServiceEndpointContract.fromValue(8)).toThrow(
-				'Invalid ServiceEndpointContract value: 8'
-			);
+		it('should return Unknown for value 8 (WebHook - handled separately)', () => {
+			const contract = ServiceEndpointContract.fromValue(8);
+			expect(contract.getName()).toBe('Unknown (8)');
+			expect(contract.getValue()).toBe(8);
+			expect(contract.isUnknown()).toBe(true);
 		});
 
-		it('should throw for invalid value', () => {
-			expect(() => ServiceEndpointContract.fromValue(999)).toThrow(
-				'Invalid ServiceEndpointContract value: 999'
-			);
+		it('should return Unknown for unrecognized values', () => {
+			const contract = ServiceEndpointContract.fromValue(999);
+			expect(contract.getName()).toBe('Unknown (999)');
+			expect(contract.getValue()).toBe(999);
+			expect(contract.isUnknown()).toBe(true);
+		});
+	});
+
+	describe('isUnknown', () => {
+		it('should return false for known contract types', () => {
+			expect(ServiceEndpointContract.Queue.isUnknown()).toBe(false);
+			expect(ServiceEndpointContract.Topic.isUnknown()).toBe(false);
+			expect(ServiceEndpointContract.EventHub.isUnknown()).toBe(false);
+		});
+
+		it('should return true for unknown contract types', () => {
+			const unknown = ServiceEndpointContract.fromValue(999);
+			expect(unknown.isUnknown()).toBe(true);
 		});
 	});
 

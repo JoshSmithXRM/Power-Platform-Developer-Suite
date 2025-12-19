@@ -72,7 +72,7 @@ describe('ServiceEndpointViewModelMapper', () => {
 			expect(viewModel.name).toBe('Test Service Endpoint');
 			expect(viewModel.description).toBe('A test endpoint');
 			expect(viewModel.contract).toBe('Queue');
-			expect(viewModel.contractValue).toBe(6);
+			expect(viewModel.contractValue).toBe(2);
 			expect(viewModel.authType).toBe('SASKey');
 			expect(viewModel.authTypeValue).toBe(2);
 			expect(viewModel.messageFormat).toBe('JSON');

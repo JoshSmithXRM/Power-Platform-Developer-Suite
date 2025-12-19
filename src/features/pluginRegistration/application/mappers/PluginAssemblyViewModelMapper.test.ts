@@ -50,7 +50,7 @@ describe('PluginAssemblyViewModelMapper', () => {
 
 			expect(result.id).toBe('asm-abc');
 			expect(result.name).toBe('MyCompany.Plugins');
-			expect(result.displayName).toBe('MyCompany.Plugins');
+			expect(result.displayName).toBe('(Assembly) MyCompany.Plugins');
 			expect(result.type).toBe('assembly');
 			expect(result.icon).toBe('⚙️');
 		});

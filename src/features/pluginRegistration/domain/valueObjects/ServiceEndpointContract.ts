@@ -37,7 +37,8 @@ export class ServiceEndpointContract {
 
 	/**
 	 * Creates ServiceEndpointContract from Dataverse numeric value.
-	 * @throws Error if value is not recognized (including 8 which is WebHook)
+	 * Returns an "Unknown" contract for unrecognized values to prevent UI from breaking
+	 * when Microsoft adds new contract types.
 	 */
 	public static fromValue(value: number): ServiceEndpointContract {
 		switch (value) {
@@ -62,8 +63,24 @@ export class ServiceEndpointContract {
 			case 11:
 				return ServiceEndpointContract.ContainerStorage;
 			default:
-				throw new Error(`Invalid ServiceEndpointContract value: ${value}`);
+				// Return unknown contract instead of throwing to prevent UI from breaking
+				return ServiceEndpointContract.createUnknown(value);
 		}
+	}
+
+	/**
+	 * Creates an unknown contract type for values not yet implemented.
+	 * These contracts will display in the tree but have limited functionality.
+	 */
+	private static createUnknown(value: number): ServiceEndpointContract {
+		return new ServiceEndpointContract(value, `Unknown (${value})`);
+	}
+
+	/**
+	 * Returns true if this is an unknown/unrecognized contract type.
+	 */
+	public isUnknown(): boolean {
+		return this.name.startsWith('Unknown');
 	}
 
 	/**

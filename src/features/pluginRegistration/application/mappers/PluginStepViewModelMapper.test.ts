@@ -87,7 +87,7 @@ describe('PluginStepViewModelMapper', () => {
 
 			expect(result.id).toBe('step-abc');
 			expect(result.name).toBe('My Step');
-			expect(result.displayName).toBe('My Step');
+			expect(result.displayName).toBe('(Step) My Step');
 			expect(result.type).toBe('step');
 			expect(result.parentId).toBe('parent-type-id');
 		});

@@ -35,7 +35,7 @@ export class WebHookViewModelMapper {
 			type: 'webHook',
 			name: webHook.getName(),
 			displayName: `(WebHook) ${webHook.getName()}`,
-			icon: '🪝',
+			icon: '🌐',
 			metadata,
 			isManaged: webHook.isInManagedState(),
 			children: steps,

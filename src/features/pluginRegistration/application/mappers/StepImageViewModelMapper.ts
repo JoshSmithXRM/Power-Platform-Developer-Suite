@@ -22,7 +22,7 @@ export class StepImageViewModelMapper {
 			parentId: stepId,
 			type: 'image',
 			name: image.getName(),
-			displayName: image.getName(),
+			displayName: `(Image) ${image.getName()}`,
 			icon: '🖼️',
 			metadata,
 			isManaged: false,

@@ -35,7 +35,7 @@ export class PluginStepViewModelMapper {
 			parentId: pluginTypeId,
 			type: 'step',
 			name: step.getName(),
-			displayName: step.getName(),
+			displayName: `(Step) ${step.getName()}`,
 			icon: step.isEnabled() ? '⚡' : '🚫',
 			metadata,
 			isManaged: step.isInManagedState(),

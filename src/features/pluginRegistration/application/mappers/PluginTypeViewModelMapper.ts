@@ -25,7 +25,7 @@ export class PluginTypeViewModelMapper {
 			parentId: assemblyId,
 			type: 'pluginType',
 			name: pluginType.getName(),
-			displayName: pluginType.getName(),
+			displayName: `(Plugin) ${pluginType.getName()}`,
 			icon: pluginType.isWorkflowActivity() ? '🔶' : '🔌',
 			metadata,
 			isManaged: false,
