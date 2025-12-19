@@ -85,6 +85,7 @@ export class ServiceEndpoint {
 	public isQueueOrTopic(): boolean {
 		return (
 			this.contract.equals(ServiceEndpointContract.Queue) ||
+			this.contract.equals(ServiceEndpointContract.QueuePersistent) ||
 			this.contract.equals(ServiceEndpointContract.Topic)
 		);
 	}

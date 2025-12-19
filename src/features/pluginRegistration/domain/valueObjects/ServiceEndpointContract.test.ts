@@ -7,6 +7,11 @@ describe('ServiceEndpointContract', () => {
 			expect(ServiceEndpointContract.OneWay.getName()).toBe('OneWay');
 		});
 
+		it('should have Queue with value 2', () => {
+			expect(ServiceEndpointContract.Queue.getValue()).toBe(2);
+			expect(ServiceEndpointContract.Queue.getName()).toBe('Queue');
+		});
+
 		it('should have Rest with value 3', () => {
 			expect(ServiceEndpointContract.Rest.getValue()).toBe(3);
 			expect(ServiceEndpointContract.Rest.getName()).toBe('Rest');
@@ -22,20 +27,39 @@ describe('ServiceEndpointContract', () => {
 			expect(ServiceEndpointContract.Topic.getName()).toBe('Topic');
 		});
 
-		it('should have Queue with value 6', () => {
-			expect(ServiceEndpointContract.Queue.getValue()).toBe(6);
-			expect(ServiceEndpointContract.Queue.getName()).toBe('Queue');
+		it('should have QueuePersistent with value 6', () => {
+			expect(ServiceEndpointContract.QueuePersistent.getValue()).toBe(6);
+			expect(ServiceEndpointContract.QueuePersistent.getName()).toBe('Queue (Persistent)');
 		});
 
 		it('should have EventHub with value 7', () => {
 			expect(ServiceEndpointContract.EventHub.getValue()).toBe(7);
 			expect(ServiceEndpointContract.EventHub.getName()).toBe('EventHub');
 		});
+
+		it('should have EventGrid with value 9', () => {
+			expect(ServiceEndpointContract.EventGrid.getValue()).toBe(9);
+			expect(ServiceEndpointContract.EventGrid.getName()).toBe('Event Grid');
+		});
+
+		it('should have ManagedDataLake with value 10', () => {
+			expect(ServiceEndpointContract.ManagedDataLake.getValue()).toBe(10);
+			expect(ServiceEndpointContract.ManagedDataLake.getName()).toBe('Managed Data Lake');
+		});
+
+		it('should have ContainerStorage with value 11', () => {
+			expect(ServiceEndpointContract.ContainerStorage.getValue()).toBe(11);
+			expect(ServiceEndpointContract.ContainerStorage.getName()).toBe('Container Storage');
+		});
 	});
 
 	describe('fromValue', () => {
 		it('should return OneWay for value 1', () => {
 			expect(ServiceEndpointContract.fromValue(1)).toBe(ServiceEndpointContract.OneWay);
+		});
+
+		it('should return Queue for value 2', () => {
+			expect(ServiceEndpointContract.fromValue(2)).toBe(ServiceEndpointContract.Queue);
 		});
 
 		it('should return Rest for value 3', () => {
@@ -50,18 +74,24 @@ describe('ServiceEndpointContract', () => {
 			expect(ServiceEndpointContract.fromValue(5)).toBe(ServiceEndpointContract.Topic);
 		});
 
-		it('should return Queue for value 6', () => {
-			expect(ServiceEndpointContract.fromValue(6)).toBe(ServiceEndpointContract.Queue);
+		it('should return QueuePersistent for value 6', () => {
+			expect(ServiceEndpointContract.fromValue(6)).toBe(ServiceEndpointContract.QueuePersistent);
 		});
 
 		it('should return EventHub for value 7', () => {
 			expect(ServiceEndpointContract.fromValue(7)).toBe(ServiceEndpointContract.EventHub);
 		});
 
-		it('should throw for value 2 (not used)', () => {
-			expect(() => ServiceEndpointContract.fromValue(2)).toThrow(
-				'Invalid ServiceEndpointContract value: 2'
-			);
+		it('should return EventGrid for value 9', () => {
+			expect(ServiceEndpointContract.fromValue(9)).toBe(ServiceEndpointContract.EventGrid);
+		});
+
+		it('should return ManagedDataLake for value 10', () => {
+			expect(ServiceEndpointContract.fromValue(10)).toBe(ServiceEndpointContract.ManagedDataLake);
+		});
+
+		it('should return ContainerStorage for value 11', () => {
+			expect(ServiceEndpointContract.fromValue(11)).toBe(ServiceEndpointContract.ContainerStorage);
 		});
 
 		it('should throw for value 8 (WebHook)', () => {
@@ -80,49 +110,70 @@ describe('ServiceEndpointContract', () => {
 	describe('all', () => {
 		it('should return all contract types excluding WebHook', () => {
 			const all = ServiceEndpointContract.all();
-			expect(all).toHaveLength(6);
+			expect(all).toHaveLength(10);
 			expect(all).toContain(ServiceEndpointContract.OneWay);
+			expect(all).toContain(ServiceEndpointContract.Queue);
 			expect(all).toContain(ServiceEndpointContract.Rest);
 			expect(all).toContain(ServiceEndpointContract.TwoWay);
 			expect(all).toContain(ServiceEndpointContract.Topic);
-			expect(all).toContain(ServiceEndpointContract.Queue);
+			expect(all).toContain(ServiceEndpointContract.QueuePersistent);
 			expect(all).toContain(ServiceEndpointContract.EventHub);
+			expect(all).toContain(ServiceEndpointContract.EventGrid);
+			expect(all).toContain(ServiceEndpointContract.ManagedDataLake);
+			expect(all).toContain(ServiceEndpointContract.ContainerStorage);
 		});
 	});
 
 	describe('common', () => {
-		it('should return common contract types (Queue, Topic, EventHub)', () => {
+		it('should return common contract types for registration', () => {
 			const common = ServiceEndpointContract.common();
-			expect(common).toHaveLength(3);
+			expect(common).toHaveLength(4);
 			expect(common).toContain(ServiceEndpointContract.Queue);
 			expect(common).toContain(ServiceEndpointContract.Topic);
 			expect(common).toContain(ServiceEndpointContract.EventHub);
+			expect(common).toContain(ServiceEndpointContract.EventGrid);
 		});
 	});
 
 	describe('requiresNamespace', () => {
+		it('should return true for OneWay', () => {
+			expect(ServiceEndpointContract.OneWay.requiresNamespace()).toBe(true);
+		});
+
 		it('should return true for Queue', () => {
 			expect(ServiceEndpointContract.Queue.requiresNamespace()).toBe(true);
 		});
 
-		it('should return true for Topic', () => {
-			expect(ServiceEndpointContract.Topic.requiresNamespace()).toBe(true);
-		});
-
-		it('should return true for OneWay', () => {
-			expect(ServiceEndpointContract.OneWay.requiresNamespace()).toBe(true);
+		it('should return false for Rest (uses URL)', () => {
+			expect(ServiceEndpointContract.Rest.requiresNamespace()).toBe(false);
 		});
 
 		it('should return true for TwoWay', () => {
 			expect(ServiceEndpointContract.TwoWay.requiresNamespace()).toBe(true);
 		});
 
-		it('should return true for Rest', () => {
-			expect(ServiceEndpointContract.Rest.requiresNamespace()).toBe(true);
+		it('should return true for Topic', () => {
+			expect(ServiceEndpointContract.Topic.requiresNamespace()).toBe(true);
+		});
+
+		it('should return true for QueuePersistent', () => {
+			expect(ServiceEndpointContract.QueuePersistent.requiresNamespace()).toBe(true);
 		});
 
 		it('should return false for EventHub', () => {
 			expect(ServiceEndpointContract.EventHub.requiresNamespace()).toBe(false);
+		});
+
+		it('should return false for EventGrid', () => {
+			expect(ServiceEndpointContract.EventGrid.requiresNamespace()).toBe(false);
+		});
+
+		it('should return false for ManagedDataLake', () => {
+			expect(ServiceEndpointContract.ManagedDataLake.requiresNamespace()).toBe(false);
+		});
+
+		it('should return false for ContainerStorage', () => {
+			expect(ServiceEndpointContract.ContainerStorage.requiresNamespace()).toBe(false);
 		});
 	});
 
@@ -132,8 +183,8 @@ describe('ServiceEndpointContract', () => {
 		});
 
 		it('should return true for instances with same value', () => {
-			const contract1 = ServiceEndpointContract.fromValue(6);
-			const contract2 = ServiceEndpointContract.fromValue(6);
+			const contract1 = ServiceEndpointContract.fromValue(2);
+			const contract2 = ServiceEndpointContract.fromValue(2);
 			expect(contract1.equals(contract2)).toBe(true);
 		});
 
