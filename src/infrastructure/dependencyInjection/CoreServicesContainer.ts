@@ -33,15 +33,6 @@ export class CoreServicesContainer {
 		this.outputChannel = vscode.window.createOutputChannel('Power Platform Developer Suite', { log: true });
 		this.logger = new OutputChannelLogger(this.outputChannel);
 
-		// Auto-enable debug logging in development mode (F5)
-		if (context.extensionMode === vscode.ExtensionMode.Development) {
-			void vscode.commands.executeCommand(
-				'workbench.action.setLogLevelForChannel',
-				this.outputChannel.name,
-				'Debug'
-			);
-		}
-
 		// Create configuration service (no dependencies)
 		this.configService = new VsCodeConfigurationService();
 
