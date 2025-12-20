@@ -305,6 +305,16 @@
                 "category": "Power Platform Developer Suite"
             },
             {
+                "command": "power-platform-dev-suite.editDataProvider",
+                "title": "Edit Data Provider",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.unregisterDataProvider",
+                "title": "Unregister Data Provider",
+                "category": "Power Platform Developer Suite"
+            },
+            {
                 "command": "power-platform-dev-suite.metadataBrowser",
                 "title": "Metadata Browser",
                 "category": "Power Platform Developer Suite"
@@ -611,6 +621,16 @@
                 {
                     "command": "power-platform-dev-suite.unregisterWebHook",
                     "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'webHook' && canDelete",
+                    "group": "3_delete@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.editDataProvider",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'dataProvider' && canUpdate",
+                    "group": "2_actions@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.unregisterDataProvider",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'dataProvider' && canDelete",
                     "group": "3_delete@1"
                 },
                 {

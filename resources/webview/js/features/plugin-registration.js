@@ -334,6 +334,9 @@ function buildVscodeContext(item) {
 	} else if (item.type === 'serviceEndpoint' && item.metadata) {
 		context.canUpdate = item.metadata.canUpdate === true;
 		context.canDelete = item.metadata.canDelete === true;
+	} else if (item.type === 'dataProvider' && item.metadata) {
+		context.canUpdate = item.metadata.canUpdate === true;
+		context.canDelete = item.metadata.canDelete === true;
 	}
 
 	return JSON.stringify(context);
@@ -1151,6 +1154,9 @@ window.createBehavior({
 				break;
 			case 'showRegisterDataProviderModal':
 				handleShowRegisterDataProviderModal(message.data);
+				break;
+			case 'showEditDataProviderModal':
+				handleShowEditDataProviderModal(message.data);
 				break;
 			case 'selectAndShowDetails':
 				handleSelectAndShowDetails(message.data);
@@ -2068,6 +2074,124 @@ function handleShowRegisterDataProviderModal(data) {
 					updatePluginId: values.updatePluginId || undefined,
 					deletePluginId: values.deletePluginId || undefined,
 					solutionUniqueName: values.solution || undefined
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Edit Data Provider modal with pre-populated values.
+ * @param {Object} data - { dataProviderId, name, dataSourceLogicalName, description, retrievePluginId, retrieveMultiplePluginId, createPluginId, updatePluginId, deletePluginId, pluginTypes }
+ */
+function handleShowEditDataProviderModal(data) {
+	const {
+		dataProviderId,
+		name,
+		dataSourceLogicalName,
+		description,
+		retrievePluginId,
+		retrieveMultiplePluginId,
+		createPluginId,
+		updatePluginId,
+		deletePluginId,
+		pluginTypes
+	} = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build plugin type options (with empty option for "Not Implemented")
+	const pluginTypeOptions = [
+		{ value: '', label: '(Not Implemented)' },
+		...(pluginTypes || [])
+	];
+
+	window.showFormModal({
+		title: 'Edit Data Provider',
+		width: '600px',
+		fields: [
+			{ id: 'sectionBasic', type: 'section', label: 'Basic Information' },
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: name || '',
+				required: true,
+				placeholder: 'e.g., MyVirtualEntityProvider'
+			},
+			{
+				id: 'dataSourceLogicalName',
+				label: 'Data Source Entity (Virtual Entity)',
+				type: 'text',
+				value: dataSourceLogicalName || '',
+				disabled: true // Cannot change data source after creation
+			},
+			{
+				id: 'description',
+				label: 'Description',
+				type: 'textarea',
+				value: description || '',
+				placeholder: 'Optional description'
+			},
+			{ id: 'sectionPlugins', type: 'section', label: 'Plugin Mappings' },
+			{
+				id: 'retrievePluginId',
+				label: 'Retrieve Plugin',
+				type: 'combobox',
+				value: retrievePluginId || '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type...'
+			},
+			{
+				id: 'retrieveMultiplePluginId',
+				label: 'RetrieveMultiple Plugin',
+				type: 'combobox',
+				value: retrieveMultiplePluginId || '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type (recommended)...'
+			},
+			{
+				id: 'createPluginId',
+				label: 'Create Plugin',
+				type: 'combobox',
+				value: createPluginId || '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type...'
+			},
+			{
+				id: 'updatePluginId',
+				label: 'Update Plugin',
+				type: 'combobox',
+				value: updatePluginId || '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type...'
+			},
+			{
+				id: 'deletePluginId',
+				label: 'Delete Plugin',
+				type: 'combobox',
+				value: deletePluginId || '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type...'
+			}
+		],
+		submitLabel: 'Update',
+		onSubmit: (values) => {
+			vscode.postMessage({
+				command: 'confirmUpdateDataProvider',
+				data: {
+					dataProviderId: dataProviderId,
+					name: values.name,
+					description: values.description || undefined,
+					// Use null to clear, undefined to leave unchanged, value to set
+					retrievePluginId: values.retrievePluginId === '' ? null : (values.retrievePluginId || undefined),
+					retrieveMultiplePluginId: values.retrieveMultiplePluginId === '' ? null : (values.retrieveMultiplePluginId || undefined),
+					createPluginId: values.createPluginId === '' ? null : (values.createPluginId || undefined),
+					updatePluginId: values.updatePluginId === '' ? null : (values.updatePluginId || undefined),
+					deletePluginId: values.deletePluginId === '' ? null : (values.deletePluginId || undefined)
 				}
 			});
 		}

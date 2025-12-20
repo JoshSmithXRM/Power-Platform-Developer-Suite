@@ -52,6 +52,8 @@ import type { RegisterServiceEndpointUseCase } from '../../application/useCases/
 import type { UpdateServiceEndpointUseCase } from '../../application/useCases/UpdateServiceEndpointUseCase';
 import type { UnregisterServiceEndpointUseCase } from '../../application/useCases/UnregisterServiceEndpointUseCase';
 import type { RegisterDataProviderUseCase } from '../../application/useCases/RegisterDataProviderUseCase';
+import type { UpdateDataProviderUseCase } from '../../application/useCases/UpdateDataProviderUseCase';
+import type { UnregisterDataProviderUseCase } from '../../application/useCases/UnregisterDataProviderUseCase';
 import type { ISdkMessageRepository } from '../../domain/interfaces/ISdkMessageRepository';
 import type { ISdkMessageFilterRepository } from '../../domain/interfaces/ISdkMessageFilterRepository';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
@@ -102,6 +104,8 @@ export interface PluginRegistrationUseCases {
 	readonly updateServiceEndpoint: UpdateServiceEndpointUseCase;
 	readonly unregisterServiceEndpoint: UnregisterServiceEndpointUseCase;
 	readonly registerDataProvider: RegisterDataProviderUseCase;
+	readonly updateDataProvider: UpdateDataProviderUseCase;
+	readonly unregisterDataProvider: UnregisterDataProviderUseCase;
 }
 
 /**
@@ -161,6 +165,7 @@ type PluginRegistrationCommands =
 	| 'confirmUpdateServiceEndpoint'
 	| 'registerDataProvider'
 	| 'confirmRegisterDataProvider'
+	| 'confirmUpdateDataProvider'
 	| 'showValidationError';
 
 /**
@@ -713,6 +718,22 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			};
 			if (providerData.name && providerData.dataSourceLogicalName) {
 				await this.handleConfirmRegisterDataProvider(providerData);
+			}
+		});
+
+		this.coordinator.registerHandler('confirmUpdateDataProvider', async (data) => {
+			const providerData = data as {
+				dataProviderId?: string;
+				name?: string;
+				description?: string;
+				retrievePluginId?: string | null;
+				retrieveMultiplePluginId?: string | null;
+				createPluginId?: string | null;
+				updatePluginId?: string | null;
+				deletePluginId?: string | null;
+			};
+			if (providerData.dataProviderId) {
+				await this.handleConfirmUpdateDataProvider(providerData);
 			}
 		});
 
@@ -3176,6 +3197,184 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				}
 			}
 		);
+	}
+
+	/**
+	 * Edit a data provider. Called from context menu command.
+	 * Shows modal with pre-populated values.
+	 */
+	public async editDataProvider(dataProviderId: string): Promise<void> {
+		this.logger.info('Editing data provider', { dataProviderId });
+
+		const dataProvider = await this.repositories.dataProvider.findById(
+			this.currentEnvironmentId,
+			dataProviderId
+		);
+
+		if (dataProvider === null) {
+			void vscode.window.showErrorMessage('Data Provider not found.');
+			return;
+		}
+
+		// Load plugin types for the plugin pickers (non-workflow activities only)
+		const allPluginTypes = await this.repositories.pluginType.findAll(this.currentEnvironmentId);
+		const pluginTypes = allPluginTypes
+			.filter((pt) => !pt.isWorkflowActivity())
+			.map((pt) => ({
+				value: pt.getId(),
+				label: pt.getFriendlyName() || pt.getName(),
+			}))
+			.sort((a, b) => a.label.localeCompare(b.label));
+
+		// Send modal data to webview with pre-populated values
+		await this.panel.postMessage({
+			command: 'showEditDataProviderModal',
+			data: {
+				dataProviderId,
+				name: dataProvider.getName(),
+				dataSourceLogicalName: dataProvider.getDataSourceLogicalName(),
+				description: dataProvider.getDescription(),
+				retrievePluginId: dataProvider.getRetrievePluginId(),
+				retrieveMultiplePluginId: dataProvider.getRetrieveMultiplePluginId(),
+				createPluginId: dataProvider.getCreatePluginId(),
+				updatePluginId: dataProvider.getUpdatePluginId(),
+				deletePluginId: dataProvider.getDeletePluginId(),
+				pluginTypes,
+			},
+		});
+	}
+
+	/**
+	 * Unregister (delete) a data provider. Called from context menu command.
+	 * Shows confirmation dialog, then deletes the data provider.
+	 */
+	public async unregisterDataProvider(dataProviderId: string): Promise<void> {
+		this.logger.info('Unregistering data provider', { dataProviderId });
+
+		// Fetch data provider and environment info for better messaging
+		const [dataProvider, environment] = await Promise.all([
+			this.repositories.dataProvider.findById(this.currentEnvironmentId, dataProviderId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+
+		const providerName = dataProvider?.getName() ?? 'Unknown Data Provider';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		// Check if data provider is managed (cannot be deleted)
+		if (dataProvider?.isInManagedState()) {
+			void vscode.window.showWarningMessage(
+				`Cannot unregister "${providerName}": This data provider is part of a managed solution and cannot be deleted.`
+			);
+			return;
+		}
+
+		// Confirm deletion with user
+		const confirmation = await vscode.window.showWarningMessage(
+			`Are you sure you want to unregister "${providerName}" from ${environmentName}? This will delete the data provider and cannot be undone.`,
+			{ modal: true },
+			'Unregister'
+		);
+
+		if (confirmation !== 'Unregister') {
+			return; // User cancelled
+		}
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Unregistering ${providerName} from ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.unregisterDataProvider.execute(
+						this.currentEnvironmentId,
+						dataProviderId
+					);
+
+					// Send delta update to webview (instant, no full refresh)
+					await this.panel.postMessage({
+						command: 'removeNode',
+						data: { nodeId: dataProviderId },
+					});
+
+					void vscode.window.showInformationMessage(
+						`${providerName} unregistered successfully from ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to unregister data provider', error);
+					void vscode.window.showErrorMessage(
+						`Failed to unregister ${providerName} from ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
+	}
+
+	/**
+	 * Handle confirmed data provider update.
+	 */
+	private async handleConfirmUpdateDataProvider(providerData: {
+		dataProviderId?: string;
+		name?: string;
+		description?: string;
+		retrievePluginId?: string | null;
+		retrieveMultiplePluginId?: string | null;
+		createPluginId?: string | null;
+		updatePluginId?: string | null;
+		deletePluginId?: string | null;
+	}): Promise<void> {
+		const { dataProviderId, name } = providerData;
+
+		if (!dataProviderId) {
+			void vscode.window.showErrorMessage('Data Provider ID is required.');
+			return;
+		}
+
+		this.logger.info('Updating data provider', { dataProviderId, name });
+
+		try {
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Updating Data Provider: ${name ?? dataProviderId}`,
+					cancellable: false,
+				},
+				async () => {
+					await this.useCases.updateDataProvider.execute(
+						this.currentEnvironmentId,
+						dataProviderId,
+						{
+							name: providerData.name,
+							description: providerData.description,
+							retrievePluginId: providerData.retrievePluginId,
+							retrieveMultiplePluginId: providerData.retrieveMultiplePluginId,
+							createPluginId: providerData.createPluginId,
+							updatePluginId: providerData.updatePluginId,
+							deletePluginId: providerData.deletePluginId,
+						}
+					);
+				}
+			);
+
+			void vscode.window.showInformationMessage(
+				`Data Provider "${name ?? dataProviderId}" updated successfully.`
+			);
+
+			// Refresh tree to show updated data provider
+			await this.handleRefresh();
+
+			// Select the updated data provider and show details
+			await this.panel.postMessage({
+				command: 'selectAndShowDetails',
+				data: { nodeId: dataProviderId },
+			});
+		} catch (error: unknown) {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			this.logger.error('Failed to update data provider', error);
+			void vscode.window.showErrorMessage(`Failed to update data provider: ${errorMessage}`);
+		}
 	}
 
 	/**

@@ -139,6 +139,12 @@ export async function initializePluginRegistration(
 	const { RegisterDataProviderUseCase } = await import(
 		'../../application/useCases/RegisterDataProviderUseCase.js'
 	);
+	const { UpdateDataProviderUseCase } = await import(
+		'../../application/useCases/UpdateDataProviderUseCase.js'
+	);
+	const { UnregisterDataProviderUseCase } = await import(
+		'../../application/useCases/UnregisterDataProviderUseCase.js'
+	);
 	const { DataverseSdkMessageRepository } = await import(
 		'../../infrastructure/repositories/DataverseSdkMessageRepository.js'
 	);
@@ -239,6 +245,11 @@ export async function initializePluginRegistration(
 		dataProviderRepository,
 		logger
 	);
+	const updateDataProviderUseCase = new UpdateDataProviderUseCase(dataProviderRepository, logger);
+	const unregisterDataProviderUseCase = new UnregisterDataProviderUseCase(
+		dataProviderRepository,
+		logger
+	);
 
 	// Bundle use cases and repositories for cleaner panel constructor
 	const useCases = {
@@ -266,6 +277,8 @@ export async function initializePluginRegistration(
 		updateServiceEndpoint: updateServiceEndpointUseCase,
 		unregisterServiceEndpoint: unregisterServiceEndpointUseCase,
 		registerDataProvider: registerDataProviderUseCase,
+		updateDataProvider: updateDataProviderUseCase,
+		unregisterDataProvider: unregisterDataProviderUseCase,
 	};
 
 	const repositories = {

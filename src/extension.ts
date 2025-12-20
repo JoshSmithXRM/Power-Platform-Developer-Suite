@@ -758,6 +758,40 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	);
 
+	const editDataProviderCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.editDataProvider',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const dataProviderId = contextMenuContext?.nodeId;
+			if (!dataProviderId) {
+				vscode.window.showWarningMessage('No data provider selected.');
+				return;
+			}
+			await panel.editDataProvider(dataProviderId);
+		}
+	);
+
+	const unregisterDataProviderCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.unregisterDataProvider',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const dataProviderId = contextMenuContext?.nodeId;
+			if (!dataProviderId) {
+				vscode.window.showWarningMessage('No data provider selected.');
+				return;
+			}
+			await panel.unregisterDataProvider(dataProviderId);
+		}
+	);
+
 	const metadataBrowserCommand = vscode.commands.registerCommand('power-platform-dev-suite.metadataBrowser', async (environmentItem?: { envId: string }) => {
 		try {
 			void initializeMetadataBrowser(context, factories.getEnvironments, factories.dataverseApiServiceFactory, container.environmentRepository, container.logger, environmentItem?.envId);
@@ -935,6 +969,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		editStepImageCommand,
 		editWebHookCommand,
 		unregisterWebHookCommand,
+		editDataProviderCommand,
+		unregisterDataProviderCommand,
 		metadataBrowserCommand,
 		metadataBrowserPickEnvironmentCommand,
 		dataExplorerCommand,
