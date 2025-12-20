@@ -1,17 +1,17 @@
 /**
  * Unified view model for tree nodes.
- * Supports all 8 node types (Package, Assembly, PluginType, Step, Image, WebHook, ServiceEndpoint, DataProvider).
+ * Supports all 9 node types (Package, Assembly, PluginType, Step, Image, WebHook, ServiceEndpoint, DataProvider, CustomApi).
  *
  * Flat structure for client-side tree rendering.
  */
 export interface TreeItemViewModel {
 	readonly id: string;
 	readonly parentId: string | null;
-	readonly type: 'package' | 'assembly' | 'pluginType' | 'step' | 'image' | 'webHook' | 'serviceEndpoint' | 'dataProvider';
+	readonly type: 'package' | 'assembly' | 'pluginType' | 'step' | 'image' | 'webHook' | 'serviceEndpoint' | 'dataProvider' | 'customApi';
 	readonly name: string;
 	readonly displayName: string;
 	readonly icon: string;
-	readonly metadata: PackageMetadata | AssemblyMetadata | PluginTypeMetadata | StepMetadata | ImageMetadata | WebHookMetadata | ServiceEndpointMetadata | DataProviderMetadata;
+	readonly metadata: PackageMetadata | AssemblyMetadata | PluginTypeMetadata | StepMetadata | ImageMetadata | WebHookMetadata | ServiceEndpointMetadata | DataProviderMetadata | CustomApiMetadata;
 	readonly isManaged: boolean;
 	readonly children: TreeItemViewModel[];
 }
@@ -140,6 +140,36 @@ export interface DataProviderMetadata {
 	readonly hasUpdate: boolean;
 	/** Whether Delete operation has a plugin assigned */
 	readonly hasDelete: boolean;
+	readonly createdOn: string;
+	readonly modifiedOn: string;
+	readonly canUpdate: boolean;
+	readonly canDelete: boolean;
+}
+
+/**
+ * CustomApi-specific metadata.
+ * Custom APIs are message-like entities that can be invoked via the Web API.
+ */
+export interface CustomApiMetadata {
+	readonly type: 'customApi';
+	readonly uniqueName: string;
+	readonly description: string | null;
+	/** True if this is an OData function (GET), false if action (POST) */
+	readonly isFunction: boolean;
+	/** True if hidden from discovery */
+	readonly isPrivate: boolean;
+	/** Binding type: Global, Entity, or EntityCollection */
+	readonly bindingType: string;
+	/** Bound entity logical name, if binding type is Entity or EntityCollection */
+	readonly boundEntityLogicalName: string | null;
+	/** Allowed processing: None, Async Only, or Sync and Async */
+	readonly allowedProcessing: string;
+	/** Plugin type name implementing this API, if any */
+	readonly pluginTypeName: string | null;
+	/** Number of request parameters */
+	readonly requestParameterCount: number;
+	/** Number of response properties */
+	readonly responsePropertyCount: number;
 	readonly createdOn: string;
 	readonly modifiedOn: string;
 	readonly canUpdate: boolean;

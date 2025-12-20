@@ -58,6 +58,12 @@ export async function initializePluginRegistration(
 	const { DataverseDataProviderRepository } = await import(
 		'../../infrastructure/repositories/DataverseDataProviderRepository.js'
 	);
+	const { DataverseCustomApiRepository } = await import(
+		'../../infrastructure/repositories/DataverseCustomApiRepository.js'
+	);
+	const { DataverseCustomApiParameterRepository } = await import(
+		'../../infrastructure/repositories/DataverseCustomApiParameterRepository.js'
+	);
 	const { PluginInspectorService } = await import(
 		'../../infrastructure/services/PluginInspectorService.js'
 	);
@@ -186,6 +192,11 @@ export async function initializePluginRegistration(
 		dataverseApiService,
 		logger
 	);
+	const customApiRepository = new DataverseCustomApiRepository(dataverseApiService, logger);
+	const customApiParameterRepository = new DataverseCustomApiParameterRepository(
+		dataverseApiService,
+		logger
+	);
 
 	// Create use cases
 	const loadTreeUseCase = new LoadPluginRegistrationTreeUseCase(
@@ -197,6 +208,8 @@ export async function initializePluginRegistration(
 		webHookRepository,
 		serviceEndpointRepository,
 		dataProviderRepository,
+		customApiRepository,
+		customApiParameterRepository,
 		logger
 	);
 

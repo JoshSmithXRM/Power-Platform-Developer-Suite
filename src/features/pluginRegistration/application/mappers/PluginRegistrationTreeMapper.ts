@@ -6,6 +6,7 @@ import type { StepImage } from '../../domain/entities/StepImage';
 import type { WebHook } from '../../domain/entities/WebHook';
 import type { ServiceEndpoint } from '../../domain/entities/ServiceEndpoint';
 import type { DataProvider } from '../../domain/entities/DataProvider';
+import type { CustomApiTreeNode } from '../useCases/LoadPluginRegistrationTreeUseCase';
 import type { TreeItemViewModel } from '../viewModels/TreeItemViewModel';
 
 import { PluginAssemblyViewModelMapper } from './PluginAssemblyViewModelMapper';
@@ -16,6 +17,7 @@ import { StepImageViewModelMapper } from './StepImageViewModelMapper';
 import { WebHookViewModelMapper } from './WebHookViewModelMapper';
 import { ServiceEndpointViewModelMapper } from './ServiceEndpointViewModelMapper';
 import { DataProviderViewModelMapper } from './DataProviderViewModelMapper';
+import { CustomApiViewModelMapper } from './CustomApiViewModelMapper';
 
 /**
  * Helper interface for assembly tree nodes (reused in packages and standalone).
@@ -51,6 +53,7 @@ export class PluginRegistrationTreeMapper {
 	private readonly webHookMapper: WebHookViewModelMapper;
 	private readonly serviceEndpointMapper: ServiceEndpointViewModelMapper;
 	private readonly dataProviderMapper: DataProviderViewModelMapper;
+	private readonly customApiMapper: CustomApiViewModelMapper;
 
 	constructor() {
 		this.packageMapper = new PluginPackageViewModelMapper();
@@ -61,18 +64,21 @@ export class PluginRegistrationTreeMapper {
 		this.webHookMapper = new WebHookViewModelMapper();
 		this.serviceEndpointMapper = new ServiceEndpointViewModelMapper();
 		this.dataProviderMapper = new DataProviderViewModelMapper();
+		this.customApiMapper = new CustomApiViewModelMapper();
 	}
 
 	/**
 	 * Converts domain tree to ViewModels.
-	 * Returns array with packages first, then standalone assemblies, then webhooks, then service endpoints, then data providers.
+	 * Returns array with packages first, then standalone assemblies, then webhooks, then service endpoints,
+	 * then data providers, then custom APIs.
 	 */
 	public toTreeItems(
 		packages: ReadonlyArray<PackageTreeNode>,
 		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>,
 		webHooks: ReadonlyArray<WebHook> = [],
 		serviceEndpoints: ReadonlyArray<ServiceEndpoint> = [],
-		dataProviders: ReadonlyArray<DataProvider> = []
+		dataProviders: ReadonlyArray<DataProvider> = [],
+		customApis: ReadonlyArray<CustomApiTreeNode> = []
 	): TreeItemViewModel[] {
 		const items: TreeItemViewModel[] = [];
 
@@ -109,6 +115,17 @@ export class PluginRegistrationTreeMapper {
 		// 5. Map data providers (root-level, no children)
 		for (const dataProvider of dataProviders) {
 			items.push(this.dataProviderMapper.toTreeItem(dataProvider));
+		}
+
+		// 6. Map custom APIs (root-level, no children - parameters managed in modal)
+		for (const customApiNode of customApis) {
+			items.push(
+				this.customApiMapper.toTreeItem(
+					customApiNode.customApi,
+					customApiNode.requestParameterCount,
+					customApiNode.responsePropertyCount
+				)
+			);
 		}
 
 		return items;

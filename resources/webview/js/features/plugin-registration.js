@@ -337,6 +337,9 @@ function buildVscodeContext(item) {
 	} else if (item.type === 'dataProvider' && item.metadata) {
 		context.canUpdate = item.metadata.canUpdate === true;
 		context.canDelete = item.metadata.canDelete === true;
+	} else if (item.type === 'customApi' && item.metadata) {
+		context.canUpdate = item.metadata.canUpdate === true;
+		context.canDelete = item.metadata.canDelete === true;
 	}
 
 	return JSON.stringify(context);
@@ -406,7 +409,9 @@ function getIcon(type, iconHint) {
 		'step': '⚡',
 		'image': '🖼️',
 		'webHook': '🪝',
-		'serviceEndpoint': '📡'
+		'serviceEndpoint': '📡',
+		'dataProvider': '🗃️',
+		'customApi': '🔧'
 	};
 
 	return icons[type] || '📄';
@@ -3698,6 +3703,12 @@ function handleShowNodeDetails(data) {
 		case 'serviceEndpoint':
 			html += renderServiceEndpointDetails(data);
 			break;
+		case 'dataProvider':
+			html += renderDataProviderDetails(data);
+			break;
+		case 'customApi':
+			html += renderCustomApiDetails(data);
+			break;
 		default:
 			html = '<p class="detail-placeholder">Unknown node type</p>';
 	}
@@ -3838,6 +3849,101 @@ function renderServiceEndpointDetails(data) {
 		<span class="detail-value">${escapeHtml(data.messageFormat || '')}</span>
 		<span class="detail-label">User Information:</span>
 		<span class="detail-value">${escapeHtml(data.userClaim || '')}</span>
+
+		<span class="detail-section-title">System</span>
+		<span class="detail-label">Managed:</span>
+		<span class="detail-value">${renderManagedStatus(data.isManaged)}</span>
+		<span class="detail-label">Created:</span>
+		<span class="detail-value">${formatDate(data.createdOn)}</span>
+		<span class="detail-label">Modified:</span>
+		<span class="detail-value">${formatDate(data.modifiedOn)}</span>
+	`;
+
+	return html;
+}
+
+/**
+ * Render data provider details.
+ */
+function renderDataProviderDetails(data) {
+	let html = `
+		<span class="detail-section-title">General</span>
+		<span class="detail-label">Name:</span>
+		<span class="detail-value">${escapeHtml(data.name || '')}</span>
+		<span class="detail-label">Data Source:</span>
+		<span class="detail-value monospace">${escapeHtml(data.dataSourceLogicalName || '')}</span>
+		<span class="detail-label">Description:</span>
+		<span class="detail-value">${escapeHtml(data.description || '-')}</span>
+
+		<span class="detail-section-title">Operations</span>
+		<span class="detail-label">Retrieve:</span>
+		<span class="detail-value">${data.hasRetrieve ? '✓ Configured' : '✗ Not configured'}</span>
+		<span class="detail-label">Retrieve Multiple:</span>
+		<span class="detail-value">${data.hasRetrieveMultiple ? '✓ Configured' : '✗ Not configured'}</span>
+		<span class="detail-label">Create:</span>
+		<span class="detail-value">${data.hasCreate ? '✓ Configured' : '✗ Not configured'}</span>
+		<span class="detail-label">Update:</span>
+		<span class="detail-value">${data.hasUpdate ? '✓ Configured' : '✗ Not configured'}</span>
+		<span class="detail-label">Delete:</span>
+		<span class="detail-value">${data.hasDelete ? '✓ Configured' : '✗ Not configured'}</span>
+
+		<span class="detail-section-title">System</span>
+		<span class="detail-label">Managed:</span>
+		<span class="detail-value">${renderManagedStatus(data.isManaged)}</span>
+		<span class="detail-label">Created:</span>
+		<span class="detail-value">${formatDate(data.createdOn)}</span>
+		<span class="detail-label">Modified:</span>
+		<span class="detail-value">${formatDate(data.modifiedOn)}</span>
+	`;
+
+	return html;
+}
+
+/**
+ * Render custom API details.
+ */
+function renderCustomApiDetails(data) {
+	let html = `
+		<span class="detail-section-title">General</span>
+		<span class="detail-label">Name:</span>
+		<span class="detail-value">${escapeHtml(data.name || '')}</span>
+		<span class="detail-label">Unique Name:</span>
+		<span class="detail-value monospace">${escapeHtml(data.uniqueName || '')}</span>
+		<span class="detail-label">Display Name:</span>
+		<span class="detail-value">${escapeHtml(data.displayName || '')}</span>
+		<span class="detail-label">Description:</span>
+		<span class="detail-value">${escapeHtml(data.description || '-')}</span>
+
+		<span class="detail-section-title">Behavior</span>
+		<span class="detail-label">Type:</span>
+		<span class="detail-value">${data.isFunction ? 'Function (GET)' : 'Action (POST)'}</span>
+		<span class="detail-label">Private:</span>
+		<span class="detail-value">${data.isPrivate ? 'Yes (hidden from discovery)' : 'No'}</span>
+
+		<span class="detail-section-title">Binding</span>
+		<span class="detail-label">Binding Type:</span>
+		<span class="detail-value">${escapeHtml(data.bindingType || 'Global')}</span>
+	`;
+
+	if (data.boundEntityLogicalName) {
+		html += `
+		<span class="detail-label">Bound Entity:</span>
+		<span class="detail-value monospace">${escapeHtml(data.boundEntityLogicalName)}</span>
+		`;
+	}
+
+	html += `
+		<span class="detail-section-title">Processing</span>
+		<span class="detail-label">Allowed Processing:</span>
+		<span class="detail-value">${escapeHtml(data.allowedProcessing || 'None')}</span>
+		<span class="detail-label">Plugin Implementation:</span>
+		<span class="detail-value">${data.pluginTypeName ? escapeHtml(data.pluginTypeName) : 'None'}</span>
+
+		<span class="detail-section-title">Parameters</span>
+		<span class="detail-label">Request Parameters:</span>
+		<span class="detail-value">${data.requestParameterCount || 0}</span>
+		<span class="detail-label">Response Properties:</span>
+		<span class="detail-value">${data.responsePropertyCount || 0}</span>
 
 		<span class="detail-section-title">System</span>
 		<span class="detail-label">Managed:</span>

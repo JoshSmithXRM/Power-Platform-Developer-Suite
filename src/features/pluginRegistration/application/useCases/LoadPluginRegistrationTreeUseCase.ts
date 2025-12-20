@@ -7,6 +7,8 @@ import type { StepImage } from '../../domain/entities/StepImage';
 import type { WebHook } from '../../domain/entities/WebHook';
 import type { ServiceEndpoint } from '../../domain/entities/ServiceEndpoint';
 import type { DataProvider } from '../../domain/entities/DataProvider';
+import type { CustomApi } from '../../domain/entities/CustomApi';
+import type { CustomApiParameter } from '../../domain/entities/CustomApiParameter';
 import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
 import type { IPluginPackageRepository } from '../../domain/interfaces/IPluginPackageRepository';
 import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
@@ -15,7 +17,18 @@ import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRep
 import type { IWebHookRepository } from '../../domain/interfaces/IWebHookRepository';
 import type { IServiceEndpointRepository } from '../../domain/interfaces/IServiceEndpointRepository';
 import type { IDataProviderRepository } from '../../domain/interfaces/IDataProviderRepository';
+import type { ICustomApiRepository } from '../../domain/interfaces/ICustomApiRepository';
+import type { ICustomApiParameterRepository } from '../../domain/interfaces/ICustomApiParameterRepository';
 import type { AssemblyTreeNode, PackageTreeNode } from '../mappers/PluginRegistrationTreeMapper';
+
+/**
+ * Custom API with parameter counts for tree display.
+ */
+export interface CustomApiTreeNode {
+	readonly customApi: CustomApi;
+	readonly requestParameterCount: number;
+	readonly responsePropertyCount: number;
+}
 
 /**
  * Result of loading the plugin registration tree.
@@ -26,6 +39,7 @@ export interface PluginRegistrationTreeResult {
 	readonly webHooks: ReadonlyArray<WebHook>;
 	readonly serviceEndpoints: ReadonlyArray<ServiceEndpoint>;
 	readonly dataProviders: ReadonlyArray<DataProvider>;
+	readonly customApis: ReadonlyArray<CustomApiTreeNode>;
 	readonly totalNodeCount: number;
 }
 
@@ -46,6 +60,8 @@ interface BulkFetchResult {
 	readonly webHooks: readonly WebHook[];
 	readonly serviceEndpoints: readonly ServiceEndpoint[];
 	readonly dataProviders: readonly DataProvider[];
+	readonly customApis: readonly CustomApi[];
+	readonly customApiParameters: readonly CustomApiParameter[];
 }
 
 /**
@@ -79,6 +95,8 @@ export class LoadPluginRegistrationTreeUseCase {
 		private readonly webHookRepository: IWebHookRepository,
 		private readonly serviceEndpointRepository: IServiceEndpointRepository | null,
 		private readonly dataProviderRepository: IDataProviderRepository | null,
+		private readonly customApiRepository: ICustomApiRepository | null,
+		private readonly customApiParameterRepository: ICustomApiParameterRepository | null,
 		private readonly logger: ILogger
 	) {}
 
@@ -135,6 +153,8 @@ export class LoadPluginRegistrationTreeUseCase {
 			'webhooks',
 			'service endpoints',
 			'data providers',
+			'custom APIs',
+			'custom API parameters',
 		];
 		const completedNames: string[] = [];
 
@@ -165,51 +185,79 @@ export class LoadPluginRegistrationTreeUseCase {
 		reportProgress('Fetching data from Dataverse...', 10);
 
 		// Parallel fetch all data with progress tracking per repository
-		const [packages, assemblies, pluginTypes, steps, images, webHooks, serviceEndpoints, dataProviders] =
-			await Promise.all([
-				this.packageRepository.findAll(environmentId, solutionId).then((r) => {
-					trackProgress('packages');
-					return r;
-				}),
-				this.assemblyRepository.findAll(environmentId, solutionId).then((r) => {
-					trackProgress('assemblies');
-					return r;
-				}),
-				this.pluginTypeRepository.findAll(environmentId).then((r) => {
-					trackProgress('plugin types');
-					return r;
-				}),
-				this.stepRepository.findAll(environmentId).then((r) => {
-					trackProgress('steps');
-					return r;
-				}),
-				this.imageRepository.findAll(environmentId).then((r) => {
-					trackProgress('images');
-					return r;
-				}),
-				this.webHookRepository.findAll(environmentId).then((r) => {
-					trackProgress('webhooks');
-					return r;
-				}),
-				this.serviceEndpointRepository !== null
-					? this.serviceEndpointRepository.findAll(environmentId).then((r) => {
-							trackProgress('service endpoints');
-							return r;
-						})
-					: Promise.resolve([]).then((r) => {
-							trackProgress('service endpoints');
-							return r;
-						}),
-				this.dataProviderRepository !== null
-					? this.dataProviderRepository.findAll(environmentId).then((r) => {
-							trackProgress('data providers');
-							return r;
-						})
-					: Promise.resolve([]).then((r) => {
-							trackProgress('data providers');
-							return r;
-						}),
-			]);
+		const [
+			packages,
+			assemblies,
+			pluginTypes,
+			steps,
+			images,
+			webHooks,
+			serviceEndpoints,
+			dataProviders,
+			customApis,
+			customApiParameters,
+		] = await Promise.all([
+			this.packageRepository.findAll(environmentId, solutionId).then((r) => {
+				trackProgress('packages');
+				return r;
+			}),
+			this.assemblyRepository.findAll(environmentId, solutionId).then((r) => {
+				trackProgress('assemblies');
+				return r;
+			}),
+			this.pluginTypeRepository.findAll(environmentId).then((r) => {
+				trackProgress('plugin types');
+				return r;
+			}),
+			this.stepRepository.findAll(environmentId).then((r) => {
+				trackProgress('steps');
+				return r;
+			}),
+			this.imageRepository.findAll(environmentId).then((r) => {
+				trackProgress('images');
+				return r;
+			}),
+			this.webHookRepository.findAll(environmentId).then((r) => {
+				trackProgress('webhooks');
+				return r;
+			}),
+			this.serviceEndpointRepository !== null
+				? this.serviceEndpointRepository.findAll(environmentId).then((r) => {
+						trackProgress('service endpoints');
+						return r;
+					})
+				: Promise.resolve([]).then((r) => {
+						trackProgress('service endpoints');
+						return r;
+					}),
+			this.dataProviderRepository !== null
+				? this.dataProviderRepository.findAll(environmentId).then((r) => {
+						trackProgress('data providers');
+						return r;
+					})
+				: Promise.resolve([]).then((r) => {
+						trackProgress('data providers');
+						return r;
+					}),
+			this.customApiRepository !== null
+				? this.customApiRepository.findAll(environmentId).then((r) => {
+						trackProgress('custom APIs');
+						return r;
+					})
+				: Promise.resolve([]).then((r) => {
+						trackProgress('custom APIs');
+						return r;
+					}),
+			this.customApiParameterRepository !== null
+				? this.customApiParameterRepository.findAll(environmentId).then((r) => {
+						trackProgress('custom API parameters');
+						return r;
+					})
+				: Promise.resolve([]).then((r) => {
+						trackProgress('custom API parameters');
+						return r;
+					}),
+		]);
 
 		this.logger.debug('LoadPluginRegistrationTreeUseCase: Bulk fetch complete', {
 			packages: packages.length,
@@ -220,10 +268,23 @@ export class LoadPluginRegistrationTreeUseCase {
 			webHooks: webHooks.length,
 			serviceEndpoints: serviceEndpoints.length,
 			dataProviders: dataProviders.length,
+			customApis: customApis.length,
+			customApiParameters: customApiParameters.length,
 			totalMs: Date.now() - startTime,
 		});
 
-		return { packages, assemblies, pluginTypes, steps, images, webHooks, serviceEndpoints, dataProviders };
+		return {
+			packages,
+			assemblies,
+			pluginTypes,
+			steps,
+			images,
+			webHooks,
+			serviceEndpoints,
+			dataProviders,
+			customApis,
+			customApiParameters,
+		};
 	}
 
 	/**
@@ -265,12 +326,16 @@ export class LoadPluginRegistrationTreeUseCase {
 			imagesByStepId
 		);
 
+		// Build Custom API tree nodes with parameter counts
+		const customApiTrees = this.buildCustomApiTrees(data.customApis, data.customApiParameters);
+
 		const totalNodeCount = this.countTotalNodes(
 			packageTrees,
 			standaloneAssemblyTrees,
 			data.webHooks,
 			data.serviceEndpoints,
-			data.dataProviders
+			data.dataProviders,
+			customApiTrees
 		);
 
 		reportProgress('Complete!', 100);
@@ -281,8 +346,32 @@ export class LoadPluginRegistrationTreeUseCase {
 			webHooks: data.webHooks,
 			serviceEndpoints: data.serviceEndpoints,
 			dataProviders: data.dataProviders,
+			customApis: customApiTrees,
 			totalNodeCount,
 		};
+	}
+
+	/**
+	 * Builds Custom API tree nodes with parameter counts.
+	 */
+	private buildCustomApiTrees(
+		customApis: readonly CustomApi[],
+		parameters: readonly CustomApiParameter[]
+	): CustomApiTreeNode[] {
+		// Build lookup map of parameters by custom API ID
+		const paramsByApiId = this.groupBy(parameters, (p) => p.getCustomApiId());
+
+		return customApis.map((api) => {
+			const apiParams = paramsByApiId.get(api.getId()) ?? [];
+			const requestCount = apiParams.filter((p) => p.isRequest()).length;
+			const responseCount = apiParams.filter((p) => p.isResponse()).length;
+
+			return {
+				customApi: api,
+				requestParameterCount: requestCount,
+				responsePropertyCount: responseCount,
+			};
+		});
 	}
 
 	/**
@@ -357,14 +446,16 @@ export class LoadPluginRegistrationTreeUseCase {
 		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>,
 		webHooks: ReadonlyArray<WebHook>,
 		serviceEndpoints: ReadonlyArray<ServiceEndpoint>,
-		dataProviders: ReadonlyArray<DataProvider>
+		dataProviders: ReadonlyArray<DataProvider>,
+		customApis: ReadonlyArray<CustomApiTreeNode>
 	): number {
 		let count =
 			packages.length +
 			standaloneAssemblies.length +
 			webHooks.length +
 			serviceEndpoints.length +
-			dataProviders.length;
+			dataProviders.length +
+			customApis.length;
 
 		for (const packageNode of packages) {
 			count += this.countAssemblyTreeNodes(packageNode.assemblies);
