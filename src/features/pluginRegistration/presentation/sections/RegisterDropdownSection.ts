@@ -18,16 +18,17 @@ export class RegisterDropdownSection extends DropdownSection {
 	}
 
 	protected getDropdownItems(): ReadonlyArray<DropdownItem> {
+		// Order matches Plugin Registration Tool (PRT) with package before assembly
 		return [
-			{ id: 'assembly', label: 'Register New Assembly', icon: 'file-binary' },
 			{ id: 'package', label: 'Register New Package', icon: 'package' },
-			{ id: 'webHook', label: 'Register New WebHook', icon: 'globe' },
-			{ id: 'serviceEndpoint', label: 'Register New Service Endpoint', icon: 'broadcast' },
-			{ id: 'dataProvider', label: 'Register New Data Provider', icon: 'database' },
-			{ id: 'customApi', label: 'Register New Custom API', icon: 'symbol-method' },
-			{ id: 'separator1', label: '', separator: true },
+			{ id: 'assembly', label: 'Register New Assembly', icon: 'file-binary' },
 			{ id: 'step', label: 'Register New Step', icon: 'zap' },
 			{ id: 'image', label: 'Register New Image', icon: 'file-media' },
+			{ id: 'separator1', label: '', separator: true },
+			{ id: 'serviceEndpoint', label: 'Register New Service Endpoint', icon: 'broadcast' },
+			{ id: 'webHook', label: 'Register New WebHook', icon: 'globe' },
+			{ id: 'dataProvider', label: 'Register New Data Provider', icon: 'database' },
+			{ id: 'customApi', label: 'Register New Custom API', icon: 'symbol-method' },
 		];
 	}
 
