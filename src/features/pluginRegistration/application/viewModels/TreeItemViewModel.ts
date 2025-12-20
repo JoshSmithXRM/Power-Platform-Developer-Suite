@@ -1,17 +1,17 @@
 /**
  * Unified view model for tree nodes.
- * Supports all 7 node types (Package, Assembly, PluginType, Step, Image, WebHook, ServiceEndpoint).
+ * Supports all 8 node types (Package, Assembly, PluginType, Step, Image, WebHook, ServiceEndpoint, DataProvider).
  *
  * Flat structure for client-side tree rendering.
  */
 export interface TreeItemViewModel {
 	readonly id: string;
 	readonly parentId: string | null;
-	readonly type: 'package' | 'assembly' | 'pluginType' | 'step' | 'image' | 'webHook' | 'serviceEndpoint';
+	readonly type: 'package' | 'assembly' | 'pluginType' | 'step' | 'image' | 'webHook' | 'serviceEndpoint' | 'dataProvider';
 	readonly name: string;
 	readonly displayName: string;
 	readonly icon: string;
-	readonly metadata: PackageMetadata | AssemblyMetadata | PluginTypeMetadata | StepMetadata | ImageMetadata | WebHookMetadata | ServiceEndpointMetadata;
+	readonly metadata: PackageMetadata | AssemblyMetadata | PluginTypeMetadata | StepMetadata | ImageMetadata | WebHookMetadata | ServiceEndpointMetadata | DataProviderMetadata;
 	readonly isManaged: boolean;
 	readonly children: TreeItemViewModel[];
 }
@@ -116,6 +116,30 @@ export interface ServiceEndpointMetadata {
 	readonly namespace: string;
 	readonly path: string | null;
 	readonly description: string | null;
+	readonly createdOn: string;
+	readonly modifiedOn: string;
+	readonly canUpdate: boolean;
+	readonly canDelete: boolean;
+}
+
+/**
+ * DataProvider-specific metadata.
+ * Data Providers enable Virtual Entities by mapping plugin types to CRUD operations.
+ */
+export interface DataProviderMetadata {
+	readonly type: 'dataProvider';
+	readonly dataSourceLogicalName: string;
+	readonly description: string | null;
+	/** Whether Retrieve operation has a plugin assigned */
+	readonly hasRetrieve: boolean;
+	/** Whether RetrieveMultiple operation has a plugin assigned */
+	readonly hasRetrieveMultiple: boolean;
+	/** Whether Create operation has a plugin assigned */
+	readonly hasCreate: boolean;
+	/** Whether Update operation has a plugin assigned */
+	readonly hasUpdate: boolean;
+	/** Whether Delete operation has a plugin assigned */
+	readonly hasDelete: boolean;
 	readonly createdOn: string;
 	readonly modifiedOn: string;
 	readonly canUpdate: boolean;

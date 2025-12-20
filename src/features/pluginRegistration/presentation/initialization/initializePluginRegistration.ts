@@ -55,6 +55,9 @@ export async function initializePluginRegistration(
 	const { DataverseServiceEndpointRepository } = await import(
 		'../../infrastructure/repositories/DataverseServiceEndpointRepository.js'
 	);
+	const { DataverseDataProviderRepository } = await import(
+		'../../infrastructure/repositories/DataverseDataProviderRepository.js'
+	);
 	const { PluginInspectorService } = await import(
 		'../../infrastructure/services/PluginInspectorService.js'
 	);
@@ -160,6 +163,7 @@ export async function initializePluginRegistration(
 	const imageRepository = new DataverseStepImageRepository(dataverseApiService, logger);
 	const webHookRepository = new DataverseWebHookRepository(dataverseApiService, logger);
 	const serviceEndpointRepository = new DataverseServiceEndpointRepository(dataverseApiService, logger);
+	const dataProviderRepository = new DataverseDataProviderRepository(dataverseApiService, logger);
 	const sdkMessageRepository = new DataverseSdkMessageRepository(dataverseApiService, logger);
 	const sdkMessageFilterRepository = new DataverseSdkMessageFilterRepository(
 		dataverseApiService,
@@ -183,6 +187,7 @@ export async function initializePluginRegistration(
 		imageRepository,
 		webHookRepository,
 		serviceEndpointRepository,
+		dataProviderRepository,
 		logger
 	);
 

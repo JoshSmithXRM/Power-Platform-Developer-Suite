@@ -6,6 +6,7 @@ import type { PluginType } from '../../domain/entities/PluginType';
 import type { StepImage } from '../../domain/entities/StepImage';
 import type { WebHook } from '../../domain/entities/WebHook';
 import type { ServiceEndpoint } from '../../domain/entities/ServiceEndpoint';
+import type { DataProvider } from '../../domain/entities/DataProvider';
 import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
 import type { IPluginPackageRepository } from '../../domain/interfaces/IPluginPackageRepository';
 import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepRepository';
@@ -13,6 +14,7 @@ import type { IPluginTypeRepository } from '../../domain/interfaces/IPluginTypeR
 import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRepository';
 import type { IWebHookRepository } from '../../domain/interfaces/IWebHookRepository';
 import type { IServiceEndpointRepository } from '../../domain/interfaces/IServiceEndpointRepository';
+import type { IDataProviderRepository } from '../../domain/interfaces/IDataProviderRepository';
 import type { AssemblyTreeNode, PackageTreeNode } from '../mappers/PluginRegistrationTreeMapper';
 
 /**
@@ -23,6 +25,7 @@ export interface PluginRegistrationTreeResult {
 	readonly standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>;
 	readonly webHooks: ReadonlyArray<WebHook>;
 	readonly serviceEndpoints: ReadonlyArray<ServiceEndpoint>;
+	readonly dataProviders: ReadonlyArray<DataProvider>;
 	readonly totalNodeCount: number;
 }
 
@@ -42,6 +45,7 @@ interface BulkFetchResult {
 	readonly images: readonly StepImage[];
 	readonly webHooks: readonly WebHook[];
 	readonly serviceEndpoints: readonly ServiceEndpoint[];
+	readonly dataProviders: readonly DataProvider[];
 }
 
 /**
@@ -74,6 +78,7 @@ export class LoadPluginRegistrationTreeUseCase {
 		private readonly imageRepository: IStepImageRepository,
 		private readonly webHookRepository: IWebHookRepository,
 		private readonly serviceEndpointRepository: IServiceEndpointRepository | null,
+		private readonly dataProviderRepository: IDataProviderRepository | null,
 		private readonly logger: ILogger
 	) {}
 
@@ -110,6 +115,7 @@ export class LoadPluginRegistrationTreeUseCase {
 			standaloneAssemblyCount: fetchResult.assemblies.length,
 			webHookCount: fetchResult.webHooks.length,
 			serviceEndpointCount: fetchResult.serviceEndpoints.length,
+			dataProviderCount: fetchResult.dataProviders.length,
 			totalNodeCount: result.totalNodeCount,
 		});
 
@@ -128,6 +134,7 @@ export class LoadPluginRegistrationTreeUseCase {
 			'images',
 			'webhooks',
 			'service endpoints',
+			'data providers',
 		];
 		const completedNames: string[] = [];
 
@@ -158,7 +165,7 @@ export class LoadPluginRegistrationTreeUseCase {
 		reportProgress('Fetching data from Dataverse...', 10);
 
 		// Parallel fetch all data with progress tracking per repository
-		const [packages, assemblies, pluginTypes, steps, images, webHooks, serviceEndpoints] =
+		const [packages, assemblies, pluginTypes, steps, images, webHooks, serviceEndpoints, dataProviders] =
 			await Promise.all([
 				this.packageRepository.findAll(environmentId, solutionId).then((r) => {
 					trackProgress('packages');
@@ -193,6 +200,15 @@ export class LoadPluginRegistrationTreeUseCase {
 							trackProgress('service endpoints');
 							return r;
 						}),
+				this.dataProviderRepository !== null
+					? this.dataProviderRepository.findAll(environmentId).then((r) => {
+							trackProgress('data providers');
+							return r;
+						})
+					: Promise.resolve([]).then((r) => {
+							trackProgress('data providers');
+							return r;
+						}),
 			]);
 
 		this.logger.debug('LoadPluginRegistrationTreeUseCase: Bulk fetch complete', {
@@ -203,10 +219,11 @@ export class LoadPluginRegistrationTreeUseCase {
 			images: images.length,
 			webHooks: webHooks.length,
 			serviceEndpoints: serviceEndpoints.length,
+			dataProviders: dataProviders.length,
 			totalMs: Date.now() - startTime,
 		});
 
-		return { packages, assemblies, pluginTypes, steps, images, webHooks, serviceEndpoints };
+		return { packages, assemblies, pluginTypes, steps, images, webHooks, serviceEndpoints, dataProviders };
 	}
 
 	/**
@@ -252,7 +269,8 @@ export class LoadPluginRegistrationTreeUseCase {
 			packageTrees,
 			standaloneAssemblyTrees,
 			data.webHooks,
-			data.serviceEndpoints
+			data.serviceEndpoints,
+			data.dataProviders
 		);
 
 		reportProgress('Complete!', 100);
@@ -262,6 +280,7 @@ export class LoadPluginRegistrationTreeUseCase {
 			standaloneAssemblies: standaloneAssemblyTrees,
 			webHooks: data.webHooks,
 			serviceEndpoints: data.serviceEndpoints,
+			dataProviders: data.dataProviders,
 			totalNodeCount,
 		};
 	}
@@ -337,13 +356,15 @@ export class LoadPluginRegistrationTreeUseCase {
 		packages: ReadonlyArray<PackageTreeNode>,
 		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>,
 		webHooks: ReadonlyArray<WebHook>,
-		serviceEndpoints: ReadonlyArray<ServiceEndpoint>
+		serviceEndpoints: ReadonlyArray<ServiceEndpoint>,
+		dataProviders: ReadonlyArray<DataProvider>
 	): number {
 		let count =
 			packages.length +
 			standaloneAssemblies.length +
 			webHooks.length +
-			serviceEndpoints.length;
+			serviceEndpoints.length +
+			dataProviders.length;
 
 		for (const packageNode of packages) {
 			count += this.countAssemblyTreeNodes(packageNode.assemblies);

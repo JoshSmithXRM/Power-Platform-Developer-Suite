@@ -947,7 +947,8 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				treeResult.packages,
 				treeResult.standaloneAssemblies,
 				treeResult.webHooks,
-				treeResult.serviceEndpoints
+				treeResult.serviceEndpoints,
+				treeResult.dataProviders
 			);
 
 			// Count webhooks and service endpoints in the mapped tree items
