@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Plugin Registration Panel** - New panel for managing Dataverse plugin registrations
-  - **Tree Browser** - Hierarchical view of packages, assemblies, types, steps, and images
+  - **Tree Browser** - Hierarchical view of packages, assemblies, types, steps, images, webhooks, and service endpoints
     - Expandable/collapsible tree nodes with icons
     - Text search filter across all nodes
     - Toggle filters: Hide Microsoft assemblies, Hide hidden steps
@@ -34,8 +34,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Image Management** - Full CRUD for step images (pre/post images)
     - Pre-image, post-image, or both
     - Entity alias and attribute selection
+  - **WebHook Management** - Full CRUD for webhook registrations
+    - Endpoint URL configuration with validation
+    - Authentication types: HttpHeader, WebhookKey, HttpQueryString
+    - Key-value authentication properties for headers/query strings
+    - Solution assignment during registration
+  - **Service Endpoint Management** - Full CRUD for Azure service endpoints
+    - Endpoint types: Azure Service Bus (Queue/Topic), Event Hub, Webhook (REST)
+    - Connection modes: Normal, Federated
+    - Authentication: SAS Key, SAS Token
+    - Message formats: JSON, .NET Binary, XML
+    - User claims configuration (None, UserId, UserInfo)
   - **Detail Panel** - Shows properties of selected tree node
-    - Displays all relevant metadata for packages, assemblies, types, steps, and images
+    - Displays all relevant metadata for packages, assemblies, types, steps, images, webhooks, and service endpoints
   - **Solution Filtering** - Client-side tree filtering by solution
     - Pre-fetches solution memberships in parallel with tree load (no UX impact)
     - Instant filtering when switching solutions (no server round-trip)
