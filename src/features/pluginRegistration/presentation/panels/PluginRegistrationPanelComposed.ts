@@ -1579,8 +1579,8 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				command: 'showRegisterWebHookModal',
 				data: {
 					authTypes: [
-						{ value: 4, label: 'WebhookKey' },
 						{ value: 5, label: 'HttpHeader' },
+						{ value: 4, label: 'WebhookKey' },
 						{ value: 6, label: 'HttpQueryString' },
 					],
 					solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({

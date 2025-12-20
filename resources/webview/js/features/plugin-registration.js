@@ -1463,9 +1463,9 @@ function handleShowEditWebHookModal(data) {
 	}));
 
 	// Determine initial visibility based on current auth type
-	const currentAuthType = authType || 2; // Default to HttpHeader if not provided
-	const showKeyValues = currentAuthType === 2 || currentAuthType === 4;
-	const showWebhookKey = currentAuthType === 3;
+	const currentAuthType = authType || 5; // Default to HttpHeader(5) if not provided
+	const showKeyValues = currentAuthType === 5 || currentAuthType === 6;
+	const showWebhookKey = currentAuthType === 4;
 
 	window.showFormModal({
 		title: 'Edit WebHook',
@@ -1507,7 +1507,7 @@ function handleShowEditWebHookModal(data) {
 			},
 			{
 				id: 'webhookKey',
-				label: 'WebHook Key',
+				label: 'Value',
 				type: 'password',
 				value: '', // Auth values not pre-populated for security
 				placeholder: 'Leave empty to keep existing value',
@@ -1526,10 +1526,10 @@ function handleShowEditWebHookModal(data) {
 		onFieldChange: (fieldId, value, updateField) => {
 			if (fieldId === 'authType') {
 				const authTypeValue = parseInt(value, 10);
-				// HttpHeader(2) or HttpQueryString(4) - show key-value grid
-				const showKV = authTypeValue === 2 || authTypeValue === 4;
-				// WebhookKey(3) - show single password field
-				const showWK = authTypeValue === 3;
+				// HttpHeader(5) or HttpQueryString(6) - show key-value grid
+				const showKV = authTypeValue === 5 || authTypeValue === 6;
+				// WebhookKey(4) - show single password field
+				const showWK = authTypeValue === 4;
 
 				updateField('authKeyValues', undefined, undefined, showKV);
 				updateField('webhookKey', undefined, undefined, showWK);
@@ -1542,18 +1542,18 @@ function handleShowEditWebHookModal(data) {
 					command: 'showValidationError',
 					data: { message: 'Endpoint URL should be valid.' }
 				});
-				return;
+				return false; // Keep modal open
 			}
 
 			const newAuthType = parseInt(values.authType, 10);
 			let authValue;
 
 			// Serialize auth value based on auth type
-			if (newAuthType === 3) {
-				// WebhookKey - plain string (only if provided)
+			if (newAuthType === 4) {
+				// WebhookKey(4) - plain string (only if provided)
 				authValue = values.webhookKey || undefined;
-			} else if (newAuthType === 2 || newAuthType === 4) {
-				// HttpHeader or HttpQueryString - XML format (only if provided)
+			} else if (newAuthType === 5 || newAuthType === 6) {
+				// HttpHeader(5) or HttpQueryString(6) - XML format (only if provided)
 				const keyValues = values.authKeyValues || [];
 				if (keyValues.length > 0) {
 					authValue = serializeAuthValueToXml(keyValues);
