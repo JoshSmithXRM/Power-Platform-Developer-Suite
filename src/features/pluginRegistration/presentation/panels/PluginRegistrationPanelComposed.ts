@@ -393,6 +393,18 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		}
 	}
 
+	/**
+	 * Resolve solution unique name to solution ID using cached solutions.
+	 * Used to update client-side solution memberships cache after registration.
+	 */
+	private resolveSolutionIdFromUniqueName(uniqueName: string | undefined): string | undefined {
+		if (!uniqueName) return undefined;
+		const solution = this.unmanagedSolutionsWithPrefix.find(
+			(s) => s.uniqueName === uniqueName
+		);
+		return solution?.id;
+	}
+
 	private createCoordinator(): {
 		coordinator: PanelCoordinator<PluginRegistrationCommands>;
 		scaffoldingBehavior: HtmlScaffoldingBehavior;
@@ -1635,12 +1647,16 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					const mapper = new WebHookViewModelMapper();
 					const webhookViewModel = mapper.toTreeItem(newWebHook);
 
+					// Resolve solution ID for client-side cache update
+					const solutionId = this.resolveSolutionIdFromUniqueName(solutionUniqueName);
+
 					// Add as root-level node (no parent)
 					await this.panel.postMessage({
 						command: 'addNode',
 						data: {
 							parentId: null,
 							node: webhookViewModel,
+							solutionId, // Updates client-side solution memberships cache
 						},
 					});
 
@@ -1845,11 +1861,15 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					const mapper = new ServiceEndpointViewModelMapper();
 					const endpointViewModel = mapper.toTreeItem(newEndpoint);
 
+					// Resolve solution ID for client-side cache update
+					const solutionId = this.resolveSolutionIdFromUniqueName(endpointData.solutionUniqueName);
+
 					await this.panel.postMessage({
 						command: 'addNode',
 						data: {
 							parentId: null,
 							node: endpointViewModel,
+							solutionId, // Updates client-side solution memberships cache
 						},
 					});
 
@@ -2010,7 +2030,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			},
 			async () => {
 				try {
-					await this.useCases.registerPackage.execute(this.currentEnvironmentId, {
+					const packageId = await this.useCases.registerPackage.execute(this.currentEnvironmentId, {
 						name: prefixedName,
 						version,
 						uniqueName: prefixedName,
@@ -2022,8 +2042,8 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 						`${prefixedName} v${version} registered successfully in ${environmentName}.`
 					);
 
-					// Refresh tree to show the new package
-					await this.handleRefresh();
+					// Fetch the new package and send delta update
+					await this.sendPackageDeltaUpdate(packageId);
 				} catch (error: unknown) {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 					this.logger.error('Failed to register plugin package', error);
@@ -2788,8 +2808,8 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				authType: webhook.getAuthType().getValue(),
 				description: webhook.getDescription(),
 				authTypes: [
-					{ value: 4, label: 'WebhookKey' },
 					{ value: 5, label: 'HttpHeader' },
+					{ value: 4, label: 'WebhookKey' },
 					{ value: 6, label: 'HttpQueryString' },
 				],
 				solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
@@ -3070,11 +3090,15 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 						const mapper = new PluginStepViewModelMapper();
 						const stepViewModel = mapper.toTreeItem(newStep, data.pluginTypeId, []);
 
+						// Resolve solution ID for client-side cache update
+						const solutionId = this.resolveSolutionIdFromUniqueName(data.solutionUniqueName);
+
 						await this.panel.postMessage({
 							command: 'addNode',
 							data: {
 								parentId: data.pluginTypeId,
 								node: stepViewModel,
+								solutionId, // Updates client-side solution memberships cache
 							},
 						});
 
@@ -3601,6 +3625,47 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			assemblyId,
 			pluginTypeCount: pluginTypeItems.length,
 		});
+	}
+
+	/**
+	 * Fetch a newly registered package and send delta update to webview.
+	 * This avoids a full tree refresh after registration.
+	 */
+	private async sendPackageDeltaUpdate(packageId: string): Promise<void> {
+		this.logger.debug('Sending package delta update', { packageId });
+
+		// Fetch the newly created package
+		const pkg = await this.repositories.package.findById(this.currentEnvironmentId, packageId);
+
+		if (pkg === null) {
+			// Fallback to full refresh if package not found (shouldn't happen)
+			this.logger.warn('Package not found for delta update, falling back to refresh', {
+				packageId,
+			});
+			await this.handleRefresh();
+			return;
+		}
+
+		// Build package tree item (no assemblies yet for new package)
+		const packageNode = this.packageMapper.toTreeItem(
+			pkg,
+			[], // No assemblies yet
+			0 // assemblyCount = 0 for new package
+		);
+
+		// Send delta update to webview
+		await this.panel.postMessage({
+			command: 'addPackage',
+			data: { packageNode },
+		});
+
+		// Select the new package and show details
+		await this.panel.postMessage({
+			command: 'selectAndShowDetails',
+			data: { nodeId: packageId, nodeType: 'package' },
+		});
+
+		this.logger.debug('Package delta update sent', { packageId });
 	}
 
 	// ========================================

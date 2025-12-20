@@ -1097,6 +1097,9 @@ window.createBehavior({
 			case 'addStandaloneAssembly':
 				handleAddStandaloneAssembly(message.data);
 				break;
+			case 'addPackage':
+				handleAddPackage(message.data);
+				break;
 			case 'showUpdatePackageModal':
 				handleShowUpdatePackageModal(message.data);
 				break;
@@ -1272,7 +1275,7 @@ function handleShowRegisterWebHookModal(data) {
 				id: 'authType',
 				label: 'Authentication',
 				type: 'select',
-				value: '2', // Default to HttpHeader
+				value: '5', // Default to HttpHeader (5)
 				options: authTypeOptions,
 				required: true
 			},
@@ -1285,15 +1288,15 @@ function handleShowRegisterWebHookModal(data) {
 				keyPlaceholder: 'Header name',
 				valuePlaceholder: 'Header value',
 				value: [],
-				hidden: false // Shown by default for HttpHeader(2), also for HttpQueryString(4)
+				hidden: false // Shown by default for HttpHeader(5), also for HttpQueryString(6)
 			},
 			{
 				id: 'webhookKey',
-				label: 'WebHook Key',
+				label: 'Value',
 				type: 'password',
 				value: '',
 				placeholder: 'Enter webhook secret key',
-				hidden: true // Initially hidden, shown for WebhookKey(3)
+				hidden: true // Initially hidden, shown for WebhookKey(4)
 			},
 			{
 				id: 'description',
@@ -1315,10 +1318,10 @@ function handleShowRegisterWebHookModal(data) {
 		onFieldChange: (fieldId, value, updateField) => {
 			if (fieldId === 'authType') {
 				const authTypeValue = parseInt(value, 10);
-				// HttpHeader(2) or HttpQueryString(4) - show key-value grid
-				const showKeyValues = authTypeValue === 2 || authTypeValue === 4;
-				// WebhookKey(3) - show single password field
-				const showWebhookKey = authTypeValue === 3;
+				// HttpHeader(5) or HttpQueryString(6) - show key-value grid
+				const showKeyValues = authTypeValue === 5 || authTypeValue === 6;
+				// WebhookKey(4) - show single password field
+				const showWebhookKey = authTypeValue === 4;
 
 				updateField('authKeyValues', undefined, undefined, showKeyValues);
 				updateField('webhookKey', undefined, undefined, showWebhookKey);
@@ -1331,18 +1334,18 @@ function handleShowRegisterWebHookModal(data) {
 					command: 'showValidationError',
 					data: { message: 'Endpoint URL should be valid.' }
 				});
-				return;
+				return false; // Keep modal open
 			}
 
 			const authType = parseInt(values.authType, 10);
 			let authValue;
 
 			// Serialize auth value based on auth type
-			if (authType === 3) {
-				// WebhookKey - plain string
+			if (authType === 4) {
+				// WebhookKey(4) - plain string
 				authValue = values.webhookKey || undefined;
-			} else if (authType === 2 || authType === 4) {
-				// HttpHeader or HttpQueryString - XML format
+			} else if (authType === 5 || authType === 6) {
+				// HttpHeader(5) or HttpQueryString(6) - XML format
 				const keyValues = values.authKeyValues || [];
 				if (keyValues.length > 0) {
 					authValue = serializeAuthValueToXml(keyValues);
@@ -2353,6 +2356,51 @@ function handleAddStandaloneAssembly(data) {
 }
 
 /**
+ * Add a new package to the tree.
+ * Used for register operations to provide near-instant UI feedback.
+ * @param {Object} data - { packageNode } - The TreeItemViewModel for the new package
+ */
+function handleAddPackage(data) {
+	const { packageNode } = data;
+	if (!packageNode) return;
+
+	// Add to tree data (packages go at root level, before assemblies)
+	// Find the first standalone assembly (type === 'assembly' at root) and insert before it
+	// Or if no standalone assemblies exist, append at end
+	let insertIndex = treeData.length;
+	for (let i = 0; i < treeData.length; i++) {
+		if (treeData[i].type === 'assembly') {
+			insertIndex = i;
+			break;
+		}
+	}
+	treeData.splice(insertIndex, 0, packageNode);
+
+	// Ensure tree container is visible (in case it was empty before)
+	const treeEmpty = document.getElementById('treeEmpty');
+	const pluginTree = document.getElementById('pluginTree');
+	const treeToolbar = document.getElementById('treeToolbar');
+
+	if (treeEmpty) treeEmpty.style.display = 'none';
+	if (pluginTree) pluginTree.style.display = 'block';
+	if (treeToolbar) treeToolbar.style.display = 'flex';
+
+	// Expand the new package node
+	expandedNodes.add(packageNode.id);
+
+	// Re-render tree
+	renderTree();
+
+	// Re-apply filter if active
+	if (currentFilter) {
+		filterTree(currentFilter);
+	}
+
+	// Scroll the new node into view
+	scrollNodeIntoView(packageNode.id);
+}
+
+/**
  * Scroll a tree node into view.
  * @param {string} nodeId - ID of the node to scroll to
  */
@@ -3247,11 +3295,17 @@ function handleShowEditImageModal(data) {
 
 /**
  * Handle adding a new node to the tree (delta update).
- * @param {Object} data - { parentId, node } - parentId can be null for root-level nodes
+ * @param {Object} data - { parentId, node, solutionId? } - parentId can be null for root-level nodes
  */
 function handleAddNode(data) {
-	const { parentId, node } = data;
+	const { parentId, node, solutionId } = data;
 	if (!node || !node.id) return;
+
+	// If node was registered in a solution, update the memberships cache
+	// This ensures the node isn't filtered out by solution filter
+	if (solutionId && solutionMemberships[solutionId]) {
+		solutionMemberships[solutionId].push(node.id);
+	}
 
 	// Root-level node (no parent) - add directly to treeData
 	if (parentId === null || parentId === undefined) {

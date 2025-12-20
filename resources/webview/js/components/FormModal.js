@@ -700,8 +700,11 @@ window.showFormModal = function(options) {
 		console.debug('[FormModal] Validation complete', { isValid, values });
 		if (isValid) {
 			console.debug('[FormModal] Calling onSubmit with values');
-			onSubmit(values);
-			removeDialog();
+			const result = onSubmit(values);
+			// Only close if onSubmit doesn't return false (allows validation in onSubmit)
+			if (result !== false) {
+				removeDialog();
+			}
 		} else {
 			console.warn('[FormModal] Validation failed - form not submitted');
 		}
