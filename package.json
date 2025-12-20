@@ -315,6 +315,16 @@
                 "category": "Power Platform Developer Suite"
             },
             {
+                "command": "power-platform-dev-suite.editCustomApi",
+                "title": "Edit Custom API",
+                "category": "Power Platform Developer Suite"
+            },
+            {
+                "command": "power-platform-dev-suite.unregisterCustomApi",
+                "title": "Unregister Custom API",
+                "category": "Power Platform Developer Suite"
+            },
+            {
                 "command": "power-platform-dev-suite.metadataBrowser",
                 "title": "Metadata Browser",
                 "category": "Power Platform Developer Suite"
@@ -631,6 +641,16 @@
                 {
                     "command": "power-platform-dev-suite.unregisterDataProvider",
                     "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'dataProvider' && canDelete",
+                    "group": "3_delete@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.editCustomApi",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'customApi' && canUpdate",
+                    "group": "2_actions@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.unregisterCustomApi",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'customApi' && canDelete",
                     "group": "3_delete@1"
                 },
                 {

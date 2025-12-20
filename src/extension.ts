@@ -792,6 +792,40 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	);
 
+	const editCustomApiCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.editCustomApi',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const customApiId = contextMenuContext?.nodeId;
+			if (!customApiId) {
+				vscode.window.showWarningMessage('No Custom API selected.');
+				return;
+			}
+			await panel.editCustomApi(customApiId);
+		}
+	);
+
+	const unregisterCustomApiCommand = vscode.commands.registerCommand(
+		'power-platform-dev-suite.unregisterCustomApi',
+		async (contextMenuContext?: { nodeId?: string }) => {
+			const panel = PluginRegistrationPanelComposed.getActivePanel();
+			if (!panel) {
+				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
+				return;
+			}
+			const customApiId = contextMenuContext?.nodeId;
+			if (!customApiId) {
+				vscode.window.showWarningMessage('No Custom API selected.');
+				return;
+			}
+			await panel.unregisterCustomApi(customApiId);
+		}
+	);
+
 	const metadataBrowserCommand = vscode.commands.registerCommand('power-platform-dev-suite.metadataBrowser', async (environmentItem?: { envId: string }) => {
 		try {
 			void initializeMetadataBrowser(context, factories.getEnvironments, factories.dataverseApiServiceFactory, container.environmentRepository, container.logger, environmentItem?.envId);
@@ -971,6 +1005,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		unregisterWebHookCommand,
 		editDataProviderCommand,
 		unregisterDataProviderCommand,
+		editCustomApiCommand,
+		unregisterCustomApiCommand,
 		metadataBrowserCommand,
 		metadataBrowserPickEnvironmentCommand,
 		dataExplorerCommand,

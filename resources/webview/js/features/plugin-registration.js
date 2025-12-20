@@ -1163,6 +1163,12 @@ window.createBehavior({
 			case 'showEditDataProviderModal':
 				handleShowEditDataProviderModal(message.data);
 				break;
+			case 'showRegisterCustomApiModal':
+				handleShowRegisterCustomApiModal(message.data);
+				break;
+			case 'showEditCustomApiModal':
+				handleShowEditCustomApiModal(message.data);
+				break;
 			case 'selectAndShowDetails':
 				handleSelectAndShowDetails(message.data);
 				break;
@@ -2197,6 +2203,359 @@ function handleShowEditDataProviderModal(data) {
 					createPluginId: values.createPluginId === '' ? null : (values.createPluginId || undefined),
 					updatePluginId: values.updatePluginId === '' ? null : (values.updatePluginId || undefined),
 					deletePluginId: values.deletePluginId === '' ? null : (values.deletePluginId || undefined)
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Register Custom API modal.
+ * @param {Object} data - { pluginTypes, solutions }
+ */
+function handleShowRegisterCustomApiModal(data) {
+	const { pluginTypes, solutions } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build solution options
+	const solutionOptions = [
+		{ value: '', label: 'None (do not add to solution)' },
+		...(solutions || []).map(s => ({
+			value: s.uniqueName,
+			label: s.name
+		}))
+	];
+
+	// Build plugin type options (with empty option for "No Implementation")
+	const pluginTypeOptions = [
+		{ value: '', label: '(No Plugin Implementation)' },
+		...(pluginTypes || [])
+	];
+
+	// Build binding type options
+	const bindingTypeOptions = [
+		{ value: '0', label: 'Global (unbound)' },
+		{ value: '1', label: 'Entity' },
+		{ value: '2', label: 'Entity Collection' }
+	];
+
+	// Build allowed processing options
+	const processingOptions = [
+		{ value: '0', label: 'None (sync only)' },
+		{ value: '1', label: 'Async Only' },
+		{ value: '2', label: 'Sync and Async' }
+	];
+
+	// Build parameter type options
+	const parameterTypeOptions = [
+		{ value: '0', label: 'Boolean' },
+		{ value: '1', label: 'DateTime' },
+		{ value: '2', label: 'Decimal' },
+		{ value: '3', label: 'Entity' },
+		{ value: '4', label: 'EntityCollection' },
+		{ value: '5', label: 'EntityReference' },
+		{ value: '6', label: 'Float' },
+		{ value: '7', label: 'Integer' },
+		{ value: '8', label: 'Money' },
+		{ value: '9', label: 'Picklist' },
+		{ value: '10', label: 'String' },
+		{ value: '11', label: 'StringArray' },
+		{ value: '12', label: 'Guid' }
+	];
+
+	window.showFormModal({
+		title: 'Register Custom API',
+		width: '700px',
+		fields: [
+			{ id: 'sectionBasic', type: 'section', label: 'Basic Information' },
+			{
+				id: 'displayName',
+				label: 'Display Name',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'e.g., Get Customer Orders'
+			},
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'e.g., GetCustomerOrders',
+				helpText: 'PascalCase, no spaces or special characters'
+			},
+			{
+				id: 'uniqueName',
+				label: 'Unique Name',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'e.g., new_GetCustomerOrders',
+				helpText: 'Publisher prefix + underscore + name'
+			},
+			{
+				id: 'description',
+				label: 'Description',
+				type: 'textarea',
+				value: '',
+				placeholder: 'Optional description'
+			},
+			{ id: 'sectionBehavior', type: 'section', label: 'API Behavior' },
+			{
+				id: 'isFunction',
+				label: 'Is Function',
+				type: 'checkbox',
+				value: false,
+				helpText: 'Function (GET) vs Action (POST)'
+			},
+			{
+				id: 'isPrivate',
+				label: 'Is Private',
+				type: 'checkbox',
+				value: false,
+				helpText: 'Private APIs are not exposed in Web API'
+			},
+			{
+				id: 'executePrivilegeName',
+				label: 'Execute Privilege',
+				type: 'text',
+				value: '',
+				placeholder: 'e.g., prvExecuteMyAPI (optional)'
+			},
+			{ id: 'sectionBinding', type: 'section', label: 'Binding' },
+			{
+				id: 'bindingType',
+				label: 'Binding Type',
+				type: 'select',
+				value: '0',
+				options: bindingTypeOptions,
+				required: true
+			},
+			{
+				id: 'boundEntityLogicalName',
+				label: 'Bound Entity',
+				type: 'text',
+				value: '',
+				placeholder: 'e.g., account',
+				helpText: 'Required when Binding Type is Entity or Entity Collection',
+				visibleWhen: { field: 'bindingType', values: ['1', '2'] }
+			},
+			{ id: 'sectionProcessing', type: 'section', label: 'Processing' },
+			{
+				id: 'allowedCustomProcessingStepType',
+				label: 'Allowed Processing',
+				type: 'select',
+				value: '0',
+				options: processingOptions
+			},
+			{
+				id: 'pluginTypeId',
+				label: 'Plugin Type',
+				type: 'combobox',
+				value: '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type (optional)...'
+			},
+			{ id: 'sectionParameters', type: 'section', label: 'Request Parameters' },
+			{
+				id: 'requestParameters',
+				type: 'parameterList',
+				value: [],
+				direction: 'request',
+				parameterTypeOptions
+			},
+			{ id: 'sectionResponse', type: 'section', label: 'Response Properties' },
+			{
+				id: 'responseProperties',
+				type: 'parameterList',
+				value: [],
+				direction: 'response',
+				parameterTypeOptions
+			},
+			{ id: 'sectionSolution', type: 'section', label: 'Solution' },
+			{
+				id: 'solution',
+				label: 'Add to Solution',
+				type: 'select',
+				value: '',
+				options: solutionOptions
+			}
+		],
+		submitLabel: 'Register',
+		onSubmit: (values) => {
+			vscode.postMessage({
+				command: 'confirmRegisterCustomApi',
+				data: {
+					name: values.name,
+					uniqueName: values.uniqueName,
+					displayName: values.displayName,
+					description: values.description || undefined,
+					isFunction: values.isFunction || false,
+					isPrivate: values.isPrivate || false,
+					executePrivilegeName: values.executePrivilegeName || undefined,
+					bindingType: parseInt(values.bindingType, 10),
+					boundEntityLogicalName: values.boundEntityLogicalName || undefined,
+					allowedCustomProcessingStepType: parseInt(values.allowedCustomProcessingStepType, 10),
+					pluginTypeId: values.pluginTypeId || undefined,
+					solutionUniqueName: values.solution || undefined,
+					requestParameters: values.requestParameters || [],
+					responseProperties: values.responseProperties || []
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Edit Custom API modal with pre-populated values.
+ * @param {Object} data - { customApiId, name, uniqueName, displayName, description, isFunction, isPrivate, executePrivilegeName, bindingType, boundEntityLogicalName, allowedCustomProcessingStepType, pluginTypeId, pluginTypes }
+ */
+function handleShowEditCustomApiModal(data) {
+	const {
+		customApiId,
+		name,
+		uniqueName,
+		displayName,
+		description,
+		isFunction,
+		isPrivate,
+		executePrivilegeName,
+		bindingType,
+		boundEntityLogicalName,
+		allowedCustomProcessingStepType,
+		pluginTypeId,
+		pluginTypes
+	} = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build plugin type options (with empty option for "No Implementation")
+	const pluginTypeOptions = [
+		{ value: '', label: '(No Plugin Implementation)' },
+		...(pluginTypes || [])
+	];
+
+	// Build binding type display (read-only)
+	const bindingTypeLabels = { 0: 'Global (unbound)', 1: 'Entity', 2: 'Entity Collection' };
+	const bindingTypeLabel = bindingTypeLabels[bindingType] || 'Unknown';
+
+	// Build allowed processing display
+	const processingLabels = { 0: 'None (sync only)', 1: 'Async Only', 2: 'Sync and Async' };
+	const processingLabel = processingLabels[allowedCustomProcessingStepType] || 'Unknown';
+
+	window.showFormModal({
+		title: 'Edit Custom API',
+		width: '600px',
+		fields: [
+			{ id: 'sectionBasic', type: 'section', label: 'Basic Information' },
+			{
+				id: 'displayName',
+				label: 'Display Name',
+				type: 'text',
+				value: displayName || '',
+				required: true
+			},
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: name || '',
+				disabled: true,
+				helpText: 'Cannot be changed after creation'
+			},
+			{
+				id: 'uniqueName',
+				label: 'Unique Name',
+				type: 'text',
+				value: uniqueName || '',
+				disabled: true,
+				helpText: 'Cannot be changed after creation'
+			},
+			{
+				id: 'description',
+				label: 'Description',
+				type: 'textarea',
+				value: description || '',
+				placeholder: 'Optional description'
+			},
+			{ id: 'sectionBehavior', type: 'section', label: 'API Behavior' },
+			{
+				id: 'isFunction',
+				label: 'Is Function',
+				type: 'text',
+				value: isFunction ? 'Yes (GET)' : 'No (POST)',
+				disabled: true,
+				helpText: 'Cannot be changed after creation'
+			},
+			{
+				id: 'isPrivate',
+				label: 'Is Private',
+				type: 'checkbox',
+				value: isPrivate || false,
+				helpText: 'Private APIs are not exposed in Web API'
+			},
+			{
+				id: 'executePrivilegeName',
+				label: 'Execute Privilege',
+				type: 'text',
+				value: executePrivilegeName || '',
+				placeholder: 'e.g., prvExecuteMyAPI (optional)'
+			},
+			{ id: 'sectionBinding', type: 'section', label: 'Binding (Read-only)' },
+			{
+				id: 'bindingTypeDisplay',
+				label: 'Binding Type',
+				type: 'text',
+				value: bindingTypeLabel,
+				disabled: true,
+				helpText: 'Cannot be changed after creation'
+			},
+			{
+				id: 'boundEntityDisplay',
+				label: 'Bound Entity',
+				type: 'text',
+				value: boundEntityLogicalName || '(none)',
+				disabled: true,
+				helpText: 'Cannot be changed after creation'
+			},
+			{ id: 'sectionProcessing', type: 'section', label: 'Processing (Read-only)' },
+			{
+				id: 'processingDisplay',
+				label: 'Allowed Processing',
+				type: 'text',
+				value: processingLabel,
+				disabled: true,
+				helpText: 'Cannot be changed after creation'
+			},
+			{
+				id: 'pluginTypeId',
+				label: 'Plugin Type',
+				type: 'combobox',
+				value: pluginTypeId || '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type (optional)...'
+			}
+		],
+		submitLabel: 'Update',
+		onSubmit: (values) => {
+			vscode.postMessage({
+				command: 'confirmUpdateCustomApi',
+				data: {
+					customApiId: customApiId,
+					displayName: values.displayName,
+					description: values.description || undefined,
+					isPrivate: values.isPrivate || false,
+					executePrivilegeName: values.executePrivilegeName || undefined,
+					// Use null to clear plugin type, undefined means don't change
+					pluginTypeId: values.pluginTypeId === '' ? null : (values.pluginTypeId || undefined)
 				}
 			});
 		}

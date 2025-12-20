@@ -344,6 +344,7 @@ function handleDropdownItemClick(dropdownId, itemId) {
 			'webHook': 'registerWebHook',
 			'serviceEndpoint': 'registerServiceEndpoint',
 			'dataProvider': 'registerDataProvider',
+			'customApi': 'registerCustomApi',
 			'step': 'registerStep',
 			'image': 'registerImage'
 		}

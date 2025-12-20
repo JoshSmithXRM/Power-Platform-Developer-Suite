@@ -151,6 +151,15 @@ export async function initializePluginRegistration(
 	const { UnregisterDataProviderUseCase } = await import(
 		'../../application/useCases/UnregisterDataProviderUseCase.js'
 	);
+	const { RegisterCustomApiUseCase } = await import(
+		'../../application/useCases/RegisterCustomApiUseCase.js'
+	);
+	const { UpdateCustomApiUseCase } = await import(
+		'../../application/useCases/UpdateCustomApiUseCase.js'
+	);
+	const { UnregisterCustomApiUseCase } = await import(
+		'../../application/useCases/UnregisterCustomApiUseCase.js'
+	);
 	const { DataverseSdkMessageRepository } = await import(
 		'../../infrastructure/repositories/DataverseSdkMessageRepository.js'
 	);
@@ -263,6 +272,13 @@ export async function initializePluginRegistration(
 		dataProviderRepository,
 		logger
 	);
+	const registerCustomApiUseCase = new RegisterCustomApiUseCase(
+		customApiRepository,
+		customApiParameterRepository,
+		logger
+	);
+	const updateCustomApiUseCase = new UpdateCustomApiUseCase(customApiRepository, logger);
+	const unregisterCustomApiUseCase = new UnregisterCustomApiUseCase(customApiRepository, logger);
 
 	// Bundle use cases and repositories for cleaner panel constructor
 	const useCases = {
@@ -292,6 +308,9 @@ export async function initializePluginRegistration(
 		registerDataProvider: registerDataProviderUseCase,
 		updateDataProvider: updateDataProviderUseCase,
 		unregisterDataProvider: unregisterDataProviderUseCase,
+		registerCustomApi: registerCustomApiUseCase,
+		updateCustomApi: updateCustomApiUseCase,
+		unregisterCustomApi: unregisterCustomApiUseCase,
 	};
 
 	const repositories = {
@@ -303,6 +322,8 @@ export async function initializePluginRegistration(
 		webHook: webHookRepository,
 		serviceEndpoint: serviceEndpointRepository,
 		dataProvider: dataProviderRepository,
+		customApi: customApiRepository,
+		customApiParameter: customApiParameterRepository,
 		solution: solutionRepository,
 		sdkMessage: sdkMessageRepository,
 		sdkMessageFilter: sdkMessageFilterRepository,

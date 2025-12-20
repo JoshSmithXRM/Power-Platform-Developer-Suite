@@ -54,6 +54,9 @@ import type { UnregisterServiceEndpointUseCase } from '../../application/useCase
 import type { RegisterDataProviderUseCase } from '../../application/useCases/RegisterDataProviderUseCase';
 import type { UpdateDataProviderUseCase } from '../../application/useCases/UpdateDataProviderUseCase';
 import type { UnregisterDataProviderUseCase } from '../../application/useCases/UnregisterDataProviderUseCase';
+import type { RegisterCustomApiUseCase } from '../../application/useCases/RegisterCustomApiUseCase';
+import type { UpdateCustomApiUseCase } from '../../application/useCases/UpdateCustomApiUseCase';
+import type { UnregisterCustomApiUseCase } from '../../application/useCases/UnregisterCustomApiUseCase';
 import type { ISdkMessageRepository } from '../../domain/interfaces/ISdkMessageRepository';
 import type { ISdkMessageFilterRepository } from '../../domain/interfaces/ISdkMessageFilterRepository';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
@@ -72,6 +75,8 @@ import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRep
 import type { IWebHookRepository } from '../../domain/interfaces/IWebHookRepository';
 import type { IServiceEndpointRepository } from '../../domain/interfaces/IServiceEndpointRepository';
 import type { IDataProviderRepository } from '../../domain/interfaces/IDataProviderRepository';
+import type { ICustomApiRepository } from '../../domain/interfaces/ICustomApiRepository';
+import type { ICustomApiParameterRepository } from '../../domain/interfaces/ICustomApiParameterRepository';
 import { StepImageViewModelMapper } from '../../application/mappers/StepImageViewModelMapper';
 import type { PluginInspectorService } from '../../infrastructure/services/PluginInspectorService';
 import type { PluginTypeToRegister } from '../../application/useCases/RegisterPluginAssemblyUseCase';
@@ -106,6 +111,9 @@ export interface PluginRegistrationUseCases {
 	readonly registerDataProvider: RegisterDataProviderUseCase;
 	readonly updateDataProvider: UpdateDataProviderUseCase;
 	readonly unregisterDataProvider: UnregisterDataProviderUseCase;
+	readonly registerCustomApi: RegisterCustomApiUseCase;
+	readonly updateCustomApi: UpdateCustomApiUseCase;
+	readonly unregisterCustomApi: UnregisterCustomApiUseCase;
 }
 
 /**
@@ -120,6 +128,8 @@ export interface PluginRegistrationRepositories {
 	readonly webHook: IWebHookRepository;
 	readonly serviceEndpoint: IServiceEndpointRepository;
 	readonly dataProvider: IDataProviderRepository;
+	readonly customApi: ICustomApiRepository;
+	readonly customApiParameter: ICustomApiParameterRepository;
 	readonly solution: ISolutionRepository;
 	readonly sdkMessage: ISdkMessageRepository;
 	readonly sdkMessageFilter: ISdkMessageFilterRepository;
@@ -166,6 +176,9 @@ type PluginRegistrationCommands =
 	| 'registerDataProvider'
 	| 'confirmRegisterDataProvider'
 	| 'confirmUpdateDataProvider'
+	| 'registerCustomApi'
+	| 'confirmRegisterCustomApi'
+	| 'confirmUpdateCustomApi'
 	| 'showValidationError';
 
 /**
@@ -734,6 +747,61 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			};
 			if (providerData.dataProviderId) {
 				await this.handleConfirmUpdateDataProvider(providerData);
+			}
+		});
+
+		this.coordinator.registerHandler('registerCustomApi', async () => {
+			await this.handleRegisterCustomApi();
+		});
+
+		this.coordinator.registerHandler('confirmRegisterCustomApi', async (data) => {
+			const apiData = data as {
+				name?: string;
+				uniqueName?: string;
+				displayName?: string;
+				description?: string;
+				isFunction?: boolean;
+				isPrivate?: boolean;
+				executePrivilegeName?: string;
+				bindingType?: number;
+				boundEntityLogicalName?: string;
+				allowedCustomProcessingStepType?: number;
+				pluginTypeId?: string;
+				solutionUniqueName?: string;
+				requestParameters?: Array<{
+					name: string;
+					uniqueName: string;
+					displayName: string;
+					description?: string;
+					type: number;
+					logicalEntityName?: string;
+					isOptional?: boolean;
+				}>;
+				responseProperties?: Array<{
+					name: string;
+					uniqueName: string;
+					displayName: string;
+					description?: string;
+					type: number;
+					logicalEntityName?: string;
+				}>;
+			};
+			if (apiData.name && apiData.uniqueName && apiData.displayName) {
+				await this.handleConfirmRegisterCustomApi(apiData);
+			}
+		});
+
+		this.coordinator.registerHandler('confirmUpdateCustomApi', async (data) => {
+			const apiData = data as {
+				customApiId?: string;
+				displayName?: string;
+				description?: string;
+				isPrivate?: boolean;
+				executePrivilegeName?: string;
+				pluginTypeId?: string | null;
+			};
+			if (apiData.customApiId) {
+				await this.handleConfirmUpdateCustomApi(apiData);
 			}
 		});
 
@@ -3376,6 +3444,365 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			this.logger.error('Failed to update data provider', error);
 			void vscode.window.showErrorMessage(`Failed to update data provider: ${errorMessage}`);
 		}
+	}
+
+	/**
+	 * Handle request to show Register Custom API modal.
+	 * Loads plugin types and solutions for the dropdowns.
+	 */
+	private async handleRegisterCustomApi(): Promise<void> {
+		this.logger.info('Register Custom API requested');
+
+		try {
+			// Load unmanaged solutions for the dropdown
+			this.unmanagedSolutionsWithPrefix =
+				await this.repositories.solution.findUnmanagedWithPublisherPrefix(
+					this.currentEnvironmentId
+				);
+
+			// Load plugin types for the plugin picker (non-workflow activities only)
+			const allPluginTypes = await this.repositories.pluginType.findAll(this.currentEnvironmentId);
+			const pluginOptions = allPluginTypes
+				.filter((pt) => !pt.isWorkflowActivity())
+				.map((pt) => ({
+					value: pt.getId(),
+					label: pt.getFriendlyName() || pt.getName(),
+				}))
+				.sort((a, b) => a.label.localeCompare(b.label));
+
+			// Send message to webview to show modal
+			await this.panel.postMessage({
+				command: 'showRegisterCustomApiModal',
+				data: {
+					pluginTypes: pluginOptions,
+					solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
+						id: s.id,
+						uniqueName: s.uniqueName,
+						name: s.name,
+					})),
+				},
+			});
+		} catch (error) {
+			this.logger.error('Failed to load data for Custom API registration', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(
+				`Failed to prepare Custom API registration: ${errorMessage}`
+			);
+		}
+	}
+
+	/**
+	 * Handle confirmed Custom API registration.
+	 */
+	private async handleConfirmRegisterCustomApi(apiData: {
+		name?: string;
+		uniqueName?: string;
+		displayName?: string;
+		description?: string;
+		isFunction?: boolean;
+		isPrivate?: boolean;
+		executePrivilegeName?: string;
+		bindingType?: number;
+		boundEntityLogicalName?: string;
+		allowedCustomProcessingStepType?: number;
+		pluginTypeId?: string;
+		solutionUniqueName?: string;
+		requestParameters?: Array<{
+			name: string;
+			uniqueName: string;
+			displayName: string;
+			description?: string;
+			type: number;
+			logicalEntityName?: string;
+			isOptional?: boolean;
+		}>;
+		responseProperties?: Array<{
+			name: string;
+			uniqueName: string;
+			displayName: string;
+			description?: string;
+			type: number;
+			logicalEntityName?: string;
+		}>;
+	}): Promise<void> {
+		const { name, uniqueName, displayName } = apiData;
+
+		// Validate required fields
+		if (!name || !uniqueName || !displayName) {
+			void vscode.window.showErrorMessage('Name, Unique Name, and Display Name are required.');
+			return;
+		}
+
+		this.logger.info('Registering Custom API', { name, uniqueName });
+
+		try {
+			let customApiId: string | undefined;
+
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Registering Custom API: ${displayName}`,
+					cancellable: false,
+				},
+				async () => {
+					customApiId = await this.useCases.registerCustomApi.execute(
+						this.currentEnvironmentId,
+						{
+							name,
+							uniqueName,
+							displayName,
+							description: apiData.description,
+							isFunction: apiData.isFunction ?? false,
+							isPrivate: apiData.isPrivate ?? false,
+							executePrivilegeName: apiData.executePrivilegeName,
+							bindingType: apiData.bindingType ?? 0,
+							boundEntityLogicalName: apiData.boundEntityLogicalName,
+							allowedCustomProcessingStepType: apiData.allowedCustomProcessingStepType ?? 0,
+							pluginTypeId: apiData.pluginTypeId,
+							solutionUniqueName: apiData.solutionUniqueName,
+							requestParameters: apiData.requestParameters,
+							responseProperties: apiData.responseProperties,
+						}
+					);
+				}
+			);
+
+			void vscode.window.showInformationMessage(
+				`Custom API "${displayName}" registered successfully.`
+			);
+
+			// Delta update: fetch the new Custom API and add to tree
+			if (customApiId) {
+				const newCustomApi = await this.repositories.customApi.findById(
+					this.currentEnvironmentId,
+					customApiId
+				);
+
+				if (newCustomApi) {
+					const { CustomApiViewModelMapper } = await import(
+						'../../application/mappers/CustomApiViewModelMapper.js'
+					);
+					const mapper = new CustomApiViewModelMapper();
+
+					// Load parameters for the new API
+					const parameters = await this.repositories.customApiParameter.findByCustomApiId(
+						this.currentEnvironmentId,
+						customApiId
+					);
+
+					// Count request vs response parameters
+					const requestCount = parameters.filter((p) => p.isRequest()).length;
+					const responseCount = parameters.filter((p) => p.isResponse()).length;
+
+					const customApiViewModel = mapper.toTreeItem(newCustomApi, requestCount, responseCount);
+
+					// Resolve solution ID for client-side cache update
+					const solutionId = this.resolveSolutionIdFromUniqueName(
+						apiData.solutionUniqueName
+					);
+
+					// Add as root-level node (no parent)
+					await this.panel.postMessage({
+						command: 'addNode',
+						data: {
+							parentId: null,
+							node: customApiViewModel,
+							solutionId,
+						},
+					});
+
+					// Select the new Custom API and show details
+					await this.panel.postMessage({
+						command: 'selectAndShowDetails',
+						data: { nodeId: customApiId, nodeType: 'customApi' },
+					});
+				}
+			}
+		} catch (error) {
+			this.logger.error('Failed to register Custom API', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(
+				`Failed to register Custom API: ${errorMessage}`
+			);
+		}
+	}
+
+	/**
+	 * Handle confirmed Custom API update.
+	 */
+	private async handleConfirmUpdateCustomApi(apiData: {
+		customApiId?: string;
+		displayName?: string;
+		description?: string;
+		isPrivate?: boolean;
+		executePrivilegeName?: string;
+		pluginTypeId?: string | null;
+	}): Promise<void> {
+		const { customApiId, displayName } = apiData;
+
+		if (!customApiId) {
+			void vscode.window.showErrorMessage('Custom API ID is required.');
+			return;
+		}
+
+		this.logger.info('Updating Custom API', { customApiId, displayName });
+
+		try {
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Updating Custom API: ${displayName ?? customApiId}`,
+					cancellable: false,
+				},
+				async () => {
+					await this.useCases.updateCustomApi.execute(
+						this.currentEnvironmentId,
+						customApiId,
+						{
+							displayName: apiData.displayName,
+							description: apiData.description,
+							isPrivate: apiData.isPrivate,
+							executePrivilegeName: apiData.executePrivilegeName,
+							// Convert null to undefined (API uses null for clearing, interface uses undefined)
+							pluginTypeId: apiData.pluginTypeId === null ? undefined : apiData.pluginTypeId,
+						}
+					);
+				}
+			);
+
+			void vscode.window.showInformationMessage(
+				`Custom API "${displayName ?? customApiId}" updated successfully.`
+			);
+
+			// Refresh tree to show updated Custom API
+			await this.handleRefresh();
+
+			// Select the updated Custom API and show details
+			await this.panel.postMessage({
+				command: 'selectAndShowDetails',
+				data: { nodeId: customApiId },
+			});
+		} catch (error: unknown) {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			this.logger.error('Failed to update Custom API', error);
+			void vscode.window.showErrorMessage(`Failed to update Custom API: ${errorMessage}`);
+		}
+	}
+
+	/**
+	 * Edit a Custom API. Called from context menu command.
+	 * Shows modal with pre-populated values.
+	 */
+	public async editCustomApi(customApiId: string): Promise<void> {
+		this.logger.info('Editing Custom API', { customApiId });
+
+		const customApi = await this.repositories.customApi.findById(
+			this.currentEnvironmentId,
+			customApiId
+		);
+
+		if (customApi === null) {
+			void vscode.window.showErrorMessage('Custom API not found.');
+			return;
+		}
+
+		// Load plugin types for the plugin picker (non-workflow activities only)
+		const allPluginTypes = await this.repositories.pluginType.findAll(this.currentEnvironmentId);
+		const pluginTypes = allPluginTypes
+			.filter((pt) => !pt.isWorkflowActivity())
+			.map((pt) => ({
+				value: pt.getId(),
+				label: pt.getFriendlyName() || pt.getName(),
+			}))
+			.sort((a, b) => a.label.localeCompare(b.label));
+
+		// Send modal data to webview with pre-populated values
+		await this.panel.postMessage({
+			command: 'showEditCustomApiModal',
+			data: {
+				customApiId,
+				name: customApi.getName(),
+				uniqueName: customApi.getUniqueName(),
+				displayName: customApi.getDisplayName(),
+				description: customApi.getDescription(),
+				isFunction: customApi.getIsFunction(),
+				isPrivate: customApi.getIsPrivate(),
+				executePrivilegeName: customApi.getExecutePrivilegeName(),
+				bindingType: customApi.getBindingType().getValue(),
+				boundEntityLogicalName: customApi.getBoundEntityLogicalName(),
+				allowedCustomProcessingStepType: customApi.getAllowedCustomProcessingStepType().getValue(),
+				pluginTypeId: customApi.getPluginTypeId(),
+				pluginTypes,
+			},
+		});
+	}
+
+	/**
+	 * Unregister (delete) a Custom API. Called from context menu command.
+	 * Shows confirmation dialog, then deletes the Custom API.
+	 */
+	public async unregisterCustomApi(customApiId: string): Promise<void> {
+		this.logger.info('Unregistering Custom API', { customApiId });
+
+		// Fetch Custom API and environment info for better messaging
+		const [customApi, environment] = await Promise.all([
+			this.repositories.customApi.findById(this.currentEnvironmentId, customApiId),
+			this.getEnvironmentById(this.currentEnvironmentId),
+		]);
+
+		const apiName = customApi?.getDisplayName() ?? 'Unknown Custom API';
+		const environmentName = environment?.name ?? 'Unknown Environment';
+
+		// Check if Custom API is managed (cannot be deleted)
+		if (customApi?.isInManagedState()) {
+			void vscode.window.showWarningMessage(
+				`Cannot unregister "${apiName}": This Custom API is part of a managed solution and cannot be deleted.`
+			);
+			return;
+		}
+
+		// Confirm deletion with user
+		const confirmation = await vscode.window.showWarningMessage(
+			`Are you sure you want to unregister "${apiName}" from ${environmentName}? This will delete the Custom API and all its parameters.`,
+			{ modal: true },
+			'Unregister'
+		);
+
+		if (confirmation !== 'Unregister') {
+			return; // User cancelled
+		}
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Unregistering ${apiName} from ${environmentName}...`,
+				cancellable: false,
+			},
+			async () => {
+				try {
+					await this.useCases.unregisterCustomApi.execute(
+						this.currentEnvironmentId,
+						customApiId
+					);
+
+					// Send delta update to webview (instant, no full refresh)
+					await this.panel.postMessage({
+						command: 'removeNode',
+						data: { nodeId: customApiId },
+					});
+
+					void vscode.window.showInformationMessage(
+						`${apiName} unregistered successfully from ${environmentName}.`
+					);
+				} catch (error: unknown) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error('Failed to unregister Custom API', error);
+					void vscode.window.showErrorMessage(
+						`Failed to unregister ${apiName} from ${environmentName}: ${errorMessage}`
+					);
+				}
+			}
+		);
 	}
 
 	/**
