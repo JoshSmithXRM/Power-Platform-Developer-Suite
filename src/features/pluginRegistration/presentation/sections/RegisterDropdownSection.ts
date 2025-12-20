@@ -23,6 +23,7 @@ export class RegisterDropdownSection extends DropdownSection {
 			{ id: 'package', label: 'Register New Package', icon: 'package' },
 			{ id: 'webHook', label: 'Register New WebHook', icon: 'globe' },
 			{ id: 'serviceEndpoint', label: 'Register New Service Endpoint', icon: 'broadcast' },
+			{ id: 'dataProvider', label: 'Register New Data Provider', icon: 'database' },
 			{ id: 'separator1', label: '', separator: true },
 			{ id: 'step', label: 'Register New Step', icon: 'zap' },
 			{ id: 'image', label: 'Register New Image', icon: 'file-media' },

@@ -342,6 +342,8 @@ function handleDropdownItemClick(dropdownId, itemId) {
 			'assembly': 'registerAssembly',
 			'package': 'registerPackage',
 			'webHook': 'registerWebHook',
+			'serviceEndpoint': 'registerServiceEndpoint',
+			'dataProvider': 'registerDataProvider',
 			'step': 'registerStep',
 			'image': 'registerImage'
 		}

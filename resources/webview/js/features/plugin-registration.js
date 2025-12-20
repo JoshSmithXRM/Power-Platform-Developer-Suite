@@ -1149,6 +1149,9 @@ window.createBehavior({
 			case 'showEditServiceEndpointModal':
 				handleShowEditServiceEndpointModal(message.data);
 				break;
+			case 'showRegisterDataProviderModal':
+				handleShowRegisterDataProviderModal(message.data);
+				break;
 			case 'selectAndShowDetails':
 				handleSelectAndShowDetails(message.data);
 				break;
@@ -1940,6 +1943,131 @@ function handleShowEditServiceEndpointModal(data) {
 					sasToken: values.sasToken || undefined,
 					messageFormat: newMessageFormat,
 					userClaim: newUserClaim
+				}
+			});
+		}
+	});
+}
+
+/**
+ * Show the Register Data Provider modal.
+ * @param {Object} data - { pluginTypes, solutions }
+ */
+function handleShowRegisterDataProviderModal(data) {
+	const { pluginTypes, solutions } = data;
+
+	if (!window.showFormModal) {
+		console.error('FormModal component not loaded');
+		return;
+	}
+
+	// Build solution options
+	const solutionOptions = [
+		{ value: '', label: 'None (do not add to solution)' },
+		...(solutions || []).map(s => ({
+			value: s.uniqueName,
+			label: s.name
+		}))
+	];
+
+	// Build plugin type options (with empty option for "Not Implemented")
+	const pluginTypeOptions = [
+		{ value: '', label: '(Not Implemented)' },
+		...(pluginTypes || [])
+	];
+
+	window.showFormModal({
+		title: 'Register Data Provider',
+		width: '600px',
+		fields: [
+			{ id: 'sectionBasic', type: 'section', label: 'Basic Information' },
+			{
+				id: 'name',
+				label: 'Name',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'e.g., MyVirtualEntityProvider'
+			},
+			{
+				id: 'dataSourceLogicalName',
+				label: 'Data Source Entity (Virtual Entity)',
+				type: 'text',
+				value: '',
+				required: true,
+				placeholder: 'e.g., new_virtualentity'
+			},
+			{
+				id: 'description',
+				label: 'Description',
+				type: 'textarea',
+				value: '',
+				placeholder: 'Optional description'
+			},
+			{ id: 'sectionPlugins', type: 'section', label: 'Plugin Mappings' },
+			{
+				id: 'retrievePluginId',
+				label: 'Retrieve Plugin',
+				type: 'combobox',
+				value: '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type...'
+			},
+			{
+				id: 'retrieveMultiplePluginId',
+				label: 'RetrieveMultiple Plugin',
+				type: 'combobox',
+				value: '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type (recommended)...'
+			},
+			{
+				id: 'createPluginId',
+				label: 'Create Plugin',
+				type: 'combobox',
+				value: '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type...'
+			},
+			{
+				id: 'updatePluginId',
+				label: 'Update Plugin',
+				type: 'combobox',
+				value: '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type...'
+			},
+			{
+				id: 'deletePluginId',
+				label: 'Delete Plugin',
+				type: 'combobox',
+				value: '',
+				options: pluginTypeOptions,
+				placeholder: 'Select plugin type...'
+			},
+			{ id: 'sectionSolution', type: 'section', label: 'Solution' },
+			{
+				id: 'solution',
+				label: 'Add to Solution',
+				type: 'select',
+				value: '',
+				options: solutionOptions
+			}
+		],
+		submitLabel: 'Register',
+		onSubmit: (values) => {
+			vscode.postMessage({
+				command: 'confirmRegisterDataProvider',
+				data: {
+					name: values.name,
+					dataSourceLogicalName: values.dataSourceLogicalName,
+					description: values.description || undefined,
+					retrievePluginId: values.retrievePluginId || undefined,
+					retrieveMultiplePluginId: values.retrieveMultiplePluginId || undefined,
+					createPluginId: values.createPluginId || undefined,
+					updatePluginId: values.updatePluginId || undefined,
+					deletePluginId: values.deletePluginId || undefined,
+					solutionUniqueName: values.solution || undefined
 				}
 			});
 		}

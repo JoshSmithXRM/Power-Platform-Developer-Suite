@@ -51,6 +51,7 @@ import type { UnregisterWebHookUseCase } from '../../application/useCases/Unregi
 import type { RegisterServiceEndpointUseCase } from '../../application/useCases/RegisterServiceEndpointUseCase';
 import type { UpdateServiceEndpointUseCase } from '../../application/useCases/UpdateServiceEndpointUseCase';
 import type { UnregisterServiceEndpointUseCase } from '../../application/useCases/UnregisterServiceEndpointUseCase';
+import type { RegisterDataProviderUseCase } from '../../application/useCases/RegisterDataProviderUseCase';
 import type { ISdkMessageRepository } from '../../domain/interfaces/ISdkMessageRepository';
 import type { ISdkMessageFilterRepository } from '../../domain/interfaces/ISdkMessageFilterRepository';
 import { NupkgFilenameParser } from '../../infrastructure/utils/NupkgFilenameParser';
@@ -68,6 +69,7 @@ import type { IPluginTypeRepository } from '../../domain/interfaces/IPluginTypeR
 import type { IStepImageRepository } from '../../domain/interfaces/IStepImageRepository';
 import type { IWebHookRepository } from '../../domain/interfaces/IWebHookRepository';
 import type { IServiceEndpointRepository } from '../../domain/interfaces/IServiceEndpointRepository';
+import type { IDataProviderRepository } from '../../domain/interfaces/IDataProviderRepository';
 import { StepImageViewModelMapper } from '../../application/mappers/StepImageViewModelMapper';
 import type { PluginInspectorService } from '../../infrastructure/services/PluginInspectorService';
 import type { PluginTypeToRegister } from '../../application/useCases/RegisterPluginAssemblyUseCase';
@@ -99,6 +101,7 @@ export interface PluginRegistrationUseCases {
 	readonly registerServiceEndpoint: RegisterServiceEndpointUseCase;
 	readonly updateServiceEndpoint: UpdateServiceEndpointUseCase;
 	readonly unregisterServiceEndpoint: UnregisterServiceEndpointUseCase;
+	readonly registerDataProvider: RegisterDataProviderUseCase;
 }
 
 /**
@@ -112,6 +115,7 @@ export interface PluginRegistrationRepositories {
 	readonly image: IStepImageRepository;
 	readonly webHook: IWebHookRepository;
 	readonly serviceEndpoint: IServiceEndpointRepository;
+	readonly dataProvider: IDataProviderRepository;
 	readonly solution: ISolutionRepository;
 	readonly sdkMessage: ISdkMessageRepository;
 	readonly sdkMessageFilter: ISdkMessageFilterRepository;
@@ -155,6 +159,8 @@ type PluginRegistrationCommands =
 	| 'registerServiceEndpoint'
 	| 'confirmRegisterServiceEndpoint'
 	| 'confirmUpdateServiceEndpoint'
+	| 'registerDataProvider'
+	| 'confirmRegisterDataProvider'
 	| 'showValidationError';
 
 /**
@@ -585,6 +591,10 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			await this.handleRegisterServiceEndpoint();
 		});
 
+		this.coordinator.registerHandler('registerDataProvider', async () => {
+			await this.handleRegisterDataProvider();
+		});
+
 		this.coordinator.registerHandler('registerStep', async () => {
 			await this.handleRegisterStepFromDropdown();
 		});
@@ -686,6 +696,23 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			};
 			if (endpointData.serviceEndpointId) {
 				await this.handleConfirmUpdateServiceEndpoint(endpointData);
+			}
+		});
+
+		this.coordinator.registerHandler('confirmRegisterDataProvider', async (data) => {
+			const providerData = data as {
+				name?: string;
+				dataSourceLogicalName?: string;
+				description?: string;
+				retrievePluginId?: string;
+				retrieveMultiplePluginId?: string;
+				createPluginId?: string;
+				updatePluginId?: string;
+				deletePluginId?: string;
+				solutionUniqueName?: string;
+			};
+			if (providerData.name && providerData.dataSourceLogicalName) {
+				await this.handleConfirmRegisterDataProvider(providerData);
 			}
 		});
 
@@ -1956,6 +1983,151 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			void vscode.window.showErrorMessage(
 				`Failed to update Service Endpoint in ${environmentName}: ${errorMessage}`
+			);
+		}
+	}
+
+	/**
+	 * Handle Register Data Provider action from dropdown.
+	 * Shows modal with form for data provider registration.
+	 */
+	private async handleRegisterDataProvider(): Promise<void> {
+		this.logger.info('Register Data Provider requested');
+
+		try {
+			// Load unmanaged solutions for the dropdown
+			this.unmanagedSolutionsWithPrefix =
+				await this.repositories.solution.findUnmanagedWithPublisherPrefix(
+					this.currentEnvironmentId
+				);
+
+			// Load plugin types for the plugin pickers (non-workflow activities only)
+			const allPluginTypes = await this.repositories.pluginType.findAll(this.currentEnvironmentId);
+			const pluginOptions = allPluginTypes
+				.filter((pt) => !pt.isWorkflowActivity())
+				.map((pt) => ({
+					value: pt.getId(),
+					label: pt.getFriendlyName() || pt.getName(),
+				}))
+				.sort((a, b) => a.label.localeCompare(b.label));
+
+			// Send message to webview to show modal
+			await this.panel.postMessage({
+				command: 'showRegisterDataProviderModal',
+				data: {
+					pluginTypes: pluginOptions,
+					solutions: this.unmanagedSolutionsWithPrefix.map((s) => ({
+						id: s.id,
+						uniqueName: s.uniqueName,
+						name: s.name,
+					})),
+				},
+			});
+		} catch (error) {
+			this.logger.error('Failed to load data for data provider registration', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(
+				`Failed to prepare data provider registration: ${errorMessage}`
+			);
+		}
+	}
+
+	/**
+	 * Handle confirmed data provider registration.
+	 */
+	private async handleConfirmRegisterDataProvider(providerData: {
+		name?: string;
+		dataSourceLogicalName?: string;
+		description?: string;
+		retrievePluginId?: string;
+		retrieveMultiplePluginId?: string;
+		createPluginId?: string;
+		updatePluginId?: string;
+		deletePluginId?: string;
+		solutionUniqueName?: string;
+	}): Promise<void> {
+		const { name, dataSourceLogicalName } = providerData;
+
+		// Validate required fields
+		if (!name || !dataSourceLogicalName) {
+			void vscode.window.showErrorMessage('Name and Data Source are required.');
+			return;
+		}
+
+		this.logger.info('Registering data provider', { name, dataSourceLogicalName });
+
+		try {
+			let dataProviderId: string | undefined;
+
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Registering Data Provider: ${name}`,
+					cancellable: false,
+				},
+				async () => {
+					dataProviderId = await this.useCases.registerDataProvider.execute(
+						this.currentEnvironmentId,
+						{
+							name: name,
+							dataSourceLogicalName: dataSourceLogicalName,
+							description: providerData.description,
+							retrievePluginId: providerData.retrievePluginId || undefined,
+							retrieveMultiplePluginId: providerData.retrieveMultiplePluginId || undefined,
+							createPluginId: providerData.createPluginId || undefined,
+							updatePluginId: providerData.updatePluginId || undefined,
+							deletePluginId: providerData.deletePluginId || undefined,
+							solutionUniqueName: providerData.solutionUniqueName || undefined,
+						}
+					);
+				}
+			);
+
+			void vscode.window.showInformationMessage(
+				`Data Provider "${name}" registered successfully.`
+			);
+
+			// Delta update: fetch the new data provider and add to tree
+			if (dataProviderId) {
+				const newDataProvider = await this.repositories.dataProvider.findById(
+					this.currentEnvironmentId,
+					dataProviderId
+				);
+
+				if (newDataProvider) {
+					const { DataProviderViewModelMapper } = await import(
+						'../../application/mappers/DataProviderViewModelMapper.js'
+					);
+					const mapper = new DataProviderViewModelMapper();
+					const dataProviderViewModel = mapper.toTreeItem(newDataProvider);
+
+					// Resolve solution ID for client-side cache update
+					const solutionId = this.resolveSolutionIdFromUniqueName(
+						providerData.solutionUniqueName
+					);
+
+					// Add as root-level node (no parent)
+					await this.panel.postMessage({
+						command: 'addNode',
+						data: {
+							parentId: null,
+							node: dataProviderViewModel,
+							solutionId,
+						},
+					});
+
+					// Select the new data provider and show details
+					await this.panel.postMessage({
+						command: 'selectAndShowDetails',
+						data: { nodeId: dataProviderId, nodeType: 'dataProvider' },
+					});
+				}
+			}
+		} catch (error) {
+			this.logger.error('Failed to register data provider', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			void vscode.window.showErrorMessage(
+				`Failed to register Data Provider: ${errorMessage}`
 			);
 		}
 	}
