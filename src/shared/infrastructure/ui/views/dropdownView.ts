@@ -14,6 +14,9 @@ export function renderDropdown(config: DropdownRenderConfig): string {
 	const buttonClass = `dropdown-button dropdown-button--${variant}`;
 	const iconHtml = icon ? `<span class="codicon codicon-${escapeHtml(icon)}"></span>` : '';
 
+	// Only show checkmark column for selection-style dropdowns (where currentSelectionId is defined)
+	const isSelectionDropdown = currentSelectionId !== undefined;
+
 	const itemsHtml = items
 		.map(item => {
 			if (item.separator) {
@@ -23,11 +26,14 @@ export function renderDropdown(config: DropdownRenderConfig): string {
 			const disabledClass = item.disabled ? ' dropdown-item--disabled' : '';
 			const selectedClass = item.id === currentSelectionId ? ' dropdown-item--selected' : '';
 
-			// Use simple Unicode checkmark if codicons don't work
-			const checkmark =
-				item.id === currentSelectionId
-					? '<span style="color: var(--vscode-testing-iconPassed); font-size: 16px; width: 16px; display: inline-block; text-align: center;">✓</span>'
-					: '<span class="dropdown-item-spacer"></span>';
+			// Only render checkmark/spacer for selection-style dropdowns
+			let checkmarkHtml = '';
+			if (isSelectionDropdown) {
+				checkmarkHtml =
+					item.id === currentSelectionId
+						? '<span style="color: var(--vscode-testing-iconPassed); font-size: 16px; width: 16px; display: inline-block; text-align: center;">✓</span>'
+						: '<span class="dropdown-item-spacer"></span>';
+			}
 
 			const itemIcon = item.icon
 				? `<span class="codicon codicon-${escapeHtml(item.icon)}"></span>`
@@ -38,7 +44,7 @@ export function renderDropdown(config: DropdownRenderConfig): string {
 			     data-dropdown-id="${escapeHtml(id)}"
 			     data-dropdown-item-id="${escapeHtml(item.id)}"
 			     ${item.disabled ? 'data-disabled="true"' : ''}>
-				${checkmark}
+				${checkmarkHtml}
 				${itemIcon}
 				<span class="dropdown-item-label">${escapeHtml(item.label)}</span>
 			</div>

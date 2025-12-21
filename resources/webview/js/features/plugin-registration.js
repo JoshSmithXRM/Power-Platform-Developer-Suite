@@ -856,18 +856,28 @@ function filterMicrosoftAssemblies(items) {
  * A node belongs to a solution if its ID is in the solution's membership set,
  * OR if any of its descendants belong to the solution.
  *
+ * Note: Some item types (dataProvider, customApi) are not tracked in solutioncomponent,
+ * so they are always shown regardless of solution filter.
+ *
  * @param {Array} items - Tree items to filter
  * @param {Set<string>} memberIds - Set of object IDs in the selected solution
  * @returns {Array} Filtered tree with only members and their ancestors
  */
 function filterBySolution(items, memberIds) {
+	// Item types that are NOT tracked in solutioncomponent table
+	// These should always be shown regardless of solution filter
+	const untrackableTypes = new Set(['dataProvider', 'customApi']);
+
 	return items
 		.map(item => {
 			// Deep clone the item
 			const clone = { ...item };
 
+			// Items of untrackable types are always considered members
+			const isUntrackableType = untrackableTypes.has(item.type);
+
 			// Track if this item is directly a member
-			const isDirectMember = memberIds.has(item.id);
+			const isDirectMember = isUntrackableType || memberIds.has(item.id);
 
 			if (clone.children && clone.children.length > 0) {
 				// Images are NOT solution components - keep them if parent step is kept

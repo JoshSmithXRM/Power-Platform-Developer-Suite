@@ -252,7 +252,8 @@ describe('DropdownSection', () => {
 
 			expect(html).not.toContain('dropdown-item--selected');
 			expect(html).not.toContain('✓');
-			expect(html).toContain('dropdown-item-spacer');
+			// Action menus (no currentSelectionId) should NOT have spacers
+			expect(html).not.toContain('dropdown-item-spacer');
 		});
 	});
 
@@ -627,7 +628,8 @@ describe('DropdownSection', () => {
 			const html = section.render({});
 
 			expect(html).not.toContain('dropdown-item--selected');
-			expect(html).toContain('dropdown-item-spacer');
+			// Action menus (no currentSelectionId) should NOT have spacers
+			expect(html).not.toContain('dropdown-item-spacer');
 		});
 	});
 

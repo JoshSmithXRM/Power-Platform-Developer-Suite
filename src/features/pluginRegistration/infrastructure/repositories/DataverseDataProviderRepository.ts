@@ -9,6 +9,9 @@ import { DataProvider } from '../../domain/entities/DataProvider';
 
 /**
  * DTO for Dataverse entitydataprovider entity.
+ *
+ * Note: entitydataprovider has a very limited schema.
+ * Does NOT have: iscustomizable, _solutionid_value, createdon, modifiedon
  */
 interface DataProviderDto {
 	entitydataproviderid: string;
@@ -21,10 +24,6 @@ interface DataProviderDto {
 	updateplugin: string | null;
 	deleteplugin: string | null;
 	ismanaged: boolean;
-	iscustomizable: boolean;
-	_solutionid_value: string | null;
-	createdon: string;
-	modifiedon: string;
 }
 
 /**
@@ -43,10 +42,11 @@ interface DataProviderCollectionResponse {
  */
 export class DataverseDataProviderRepository implements IDataProviderRepository {
 	private static readonly ENTITY_SET = 'entitydataproviders';
+	// Note: entitydataprovider has limited schema - no audit fields, no solutionid, no iscustomizable
 	private static readonly SELECT_FIELDS =
 		'entitydataproviderid,name,datasourcelogicalname,description,' +
 		'retrieveplugin,retrievemultipleplugin,createplugin,updateplugin,deleteplugin,' +
-		'ismanaged,iscustomizable,_solutionid_value,createdon,modifiedon';
+		'ismanaged';
 
 	constructor(
 		private readonly apiService: IDataverseApiService,
@@ -279,6 +279,7 @@ export class DataverseDataProviderRepository implements IDataProviderRepository 
 	}
 
 	private mapToDomain(dto: DataProviderDto): DataProvider {
+		// entitydataprovider has limited schema - use defaults for missing fields
 		return new DataProvider(
 			dto.entitydataproviderid,
 			dto.name,
@@ -290,10 +291,10 @@ export class DataverseDataProviderRepository implements IDataProviderRepository 
 			this.normalizePluginId(dto.updateplugin),
 			this.normalizePluginId(dto.deleteplugin),
 			dto.ismanaged,
-			dto.iscustomizable,
-			dto._solutionid_value,
-			new Date(dto.createdon),
-			new Date(dto.modifiedon)
+			!dto.ismanaged, // isCustomizable: assume true if unmanaged (field not exposed)
+			null, // solutionId not exposed
+			new Date(), // createdOn not exposed
+			new Date() // modifiedOn not exposed
 		);
 	}
 }

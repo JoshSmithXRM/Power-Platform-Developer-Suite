@@ -11,6 +11,7 @@ import { BindingType } from '../../domain/valueObjects/BindingType';
 
 /**
  * DTO for Dataverse customapi entity.
+ * Note: customapi does not support $expand on plugintypeid, so we only get the ID
  */
 interface CustomApiDto {
 	customapiid: string;
@@ -29,11 +30,6 @@ interface CustomApiDto {
 	ismanaged: boolean;
 	createdon: string;
 	modifiedon: string;
-	plugintypeid?: {
-		plugintypeid: string;
-		name: string;
-		typename: string;
-	};
 }
 
 /**
@@ -66,10 +62,10 @@ export class DataverseCustomApiRepository implements ICustomApiRepository {
 		});
 
 		const allApis: CustomApi[] = [];
+		// Note: customapi does not support $expand on plugintypeid navigation property
 		let endpoint: string | null =
 			`/api/data/v9.2/${DataverseCustomApiRepository.ENTITY_SET}` +
 			`?$select=${DataverseCustomApiRepository.SELECT_FIELDS}` +
-			`&$expand=plugintypeid($select=plugintypeid,name,typename)` +
 			'&$orderby=displayname asc';
 
 		// Handle pagination
@@ -123,8 +119,7 @@ export class DataverseCustomApiRepository implements ICustomApiRepository {
 
 		const endpoint =
 			`/api/data/v9.2/${DataverseCustomApiRepository.ENTITY_SET}(${customApiId})` +
-			`?$select=${DataverseCustomApiRepository.SELECT_FIELDS}` +
-			`&$expand=plugintypeid($select=plugintypeid,name,typename)`;
+			`?$select=${DataverseCustomApiRepository.SELECT_FIELDS}`;
 
 		try {
 			const dto = await this.apiService.get<CustomApiDto>(environmentId, endpoint);
@@ -273,7 +268,7 @@ export class DataverseCustomApiRepository implements ICustomApiRepository {
 			dto.boundentitylogicalname,
 			AllowedCustomProcessingStepType.fromValue(dto.allowedcustomprocessingsteptype),
 			dto._plugintypeid_value,
-			dto.plugintypeid?.name ?? null,
+			null, // customapi does not support $expand on plugintypeid
 			dto._sdkmessageid_value,
 			dto.ismanaged,
 			new Date(dto.createdon),

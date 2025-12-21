@@ -152,13 +152,13 @@ describe('DeleteDropdownSection', () => {
 			expect(html).toContain('data-dropdown-trigger="deleteDropdown"');
 		});
 
-		it('should render dropdown items with spacers for checkmarks', () => {
+		it('should render dropdown items without spacers (action menu)', () => {
 			const section = new DeleteDropdownSection();
 
 			const html = section.render({});
 
-			// Should have spacers since no items are selected
-			expect(html).toContain('dropdown-item-spacer');
+			// Action menus (no currentSelectionId) should NOT have spacers
+			expect(html).not.toContain('dropdown-item-spacer');
 		});
 	});
 });
