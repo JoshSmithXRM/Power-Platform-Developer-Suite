@@ -10,6 +10,7 @@ import { ExecutionStage } from '../../domain/valueObjects/ExecutionStage';
 import { ExecutionMode } from '../../domain/valueObjects/ExecutionMode';
 import { StepStatus } from '../../domain/valueObjects/StepStatus';
 import { ImageType } from '../../domain/valueObjects/ImageType';
+import { TreeViewMode } from '../enums/TreeViewMode';
 
 describe('PluginRegistrationTreeMapper', () => {
 	const mapper = new PluginRegistrationTreeMapper();
@@ -86,7 +87,7 @@ describe('PluginRegistrationTreeMapper', () => {
 
 	describe('toTreeItems', () => {
 		it('should return empty array when no packages or assemblies', () => {
-			const result = mapper.toTreeItems([], []);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, [], []);
 			expect(result).toEqual([]);
 		});
 
@@ -97,7 +98,7 @@ describe('PluginRegistrationTreeMapper', () => {
 				pluginTypes: [],
 			};
 
-			const result = mapper.toTreeItems([], [standaloneNode]);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, [], [standaloneNode]);
 
 			expect(result).toHaveLength(1);
 			expect(result[0]!.id).toBe('asm-1');
@@ -116,7 +117,7 @@ describe('PluginRegistrationTreeMapper', () => {
 				}],
 			};
 
-			const result = mapper.toTreeItems([packageNode], []);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, [packageNode], []);
 
 			expect(result).toHaveLength(1);
 			expect(result[0]!.id).toBe('pkg-1');
@@ -138,7 +139,7 @@ describe('PluginRegistrationTreeMapper', () => {
 				pluginTypes: [],
 			};
 
-			const result = mapper.toTreeItems([packageNode], [standaloneNode]);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, [packageNode], [standaloneNode]);
 
 			expect(result).toHaveLength(2);
 			expect(result[0]!.type).toBe('package');
@@ -166,7 +167,7 @@ describe('PluginRegistrationTreeMapper', () => {
 				}],
 			};
 
-			const result = mapper.toTreeItems([packageNode], []);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, [packageNode], []);
 
 			// Check package
 			expect(result).toHaveLength(1);
@@ -210,7 +211,7 @@ describe('PluginRegistrationTreeMapper', () => {
 				}],
 			};
 
-			const result = mapper.toTreeItems([], [standaloneNode]);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, [], [standaloneNode]);
 
 			// Assembly has 1 active step, so canDelete should be false
 			const assemblyMeta = result[0]!.metadata;
@@ -232,7 +233,7 @@ describe('PluginRegistrationTreeMapper', () => {
 				}],
 			};
 
-			const result = mapper.toTreeItems([], [standaloneNode]);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, [], [standaloneNode]);
 
 			// Assembly has 0 active steps (only disabled), so canDelete should be true
 			const assemblyMeta = result[0]!.metadata;
@@ -250,7 +251,7 @@ describe('PluginRegistrationTreeMapper', () => {
 				{ package: pkg2, assemblies: [] },
 			];
 
-			const result = mapper.toTreeItems(packages, []);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, packages, []);
 
 			expect(result).toHaveLength(2);
 			expect(result[0]!.id).toBe('pkg-1');
@@ -266,7 +267,7 @@ describe('PluginRegistrationTreeMapper', () => {
 				{ assembly: asm2, pluginTypes: [] },
 			];
 
-			const result = mapper.toTreeItems([], standalones);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, [], standalones);
 
 			expect(result).toHaveLength(2);
 			expect(result[0]!.id).toBe('asm-1');
@@ -286,7 +287,7 @@ describe('PluginRegistrationTreeMapper', () => {
 				],
 			};
 
-			const result = mapper.toTreeItems([], [standaloneNode]);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, [], [standaloneNode]);
 
 			expect(result[0]!.children).toHaveLength(2);
 			expect(result[0]!.children[0]!.id).toBe('type-1');
@@ -311,7 +312,7 @@ describe('PluginRegistrationTreeMapper', () => {
 				}],
 			};
 
-			const result = mapper.toTreeItems([], [standaloneNode]);
+			const result = mapper.toTreeItems(TreeViewMode.Assembly, [], [standaloneNode]);
 
 			const stepNode = result[0]!.children[0]!.children[0]!;
 			expect(stepNode.children).toHaveLength(2);

@@ -1,17 +1,43 @@
 /**
  * Unified view model for tree nodes.
- * Supports all 9 node types (Package, Assembly, PluginType, Step, Image, WebHook, ServiceEndpoint, DataProvider, CustomApi).
+ * Supports all node types including grouping nodes for Message View.
+ *
+ * Node types:
+ * - Assembly View: Package, Assembly, PluginType, Step, Image, WebHook, ServiceEndpoint, DataProvider, CustomApi
+ * - Message View: SdkMessage, EntityGroup (grouping nodes) + Step, Image, CustomApi
  *
  * Flat structure for client-side tree rendering.
  */
 export interface TreeItemViewModel {
 	readonly id: string;
 	readonly parentId: string | null;
-	readonly type: 'package' | 'assembly' | 'pluginType' | 'step' | 'image' | 'webHook' | 'serviceEndpoint' | 'dataProvider' | 'customApi';
+	readonly type:
+		| 'package'
+		| 'assembly'
+		| 'pluginType'
+		| 'step'
+		| 'image'
+		| 'webHook'
+		| 'serviceEndpoint'
+		| 'dataProvider'
+		| 'customApi'
+		| 'sdkMessage' // Message View: groups steps by SDK message
+		| 'entityGroup'; // Message View: groups steps by entity under a message
 	readonly name: string;
 	readonly displayName: string;
 	readonly icon: string;
-	readonly metadata: PackageMetadata | AssemblyMetadata | PluginTypeMetadata | StepMetadata | ImageMetadata | WebHookMetadata | ServiceEndpointMetadata | DataProviderMetadata | CustomApiMetadata;
+	readonly metadata:
+		| PackageMetadata
+		| AssemblyMetadata
+		| PluginTypeMetadata
+		| StepMetadata
+		| ImageMetadata
+		| WebHookMetadata
+		| ServiceEndpointMetadata
+		| DataProviderMetadata
+		| CustomApiMetadata
+		| SdkMessageMetadata
+		| EntityGroupMetadata;
 	readonly isManaged: boolean;
 	readonly children: TreeItemViewModel[];
 }
@@ -174,4 +200,32 @@ export interface CustomApiMetadata {
 	readonly modifiedOn: string;
 	readonly canUpdate: boolean;
 	readonly canDelete: boolean;
+}
+
+/**
+ * SDK Message metadata for Message View grouping nodes.
+ * Groups plugin steps by their SDK message (Create, Update, Delete, etc.).
+ */
+export interface SdkMessageMetadata {
+	readonly type: 'sdkMessage';
+	/** The SDK message name (e.g., "Create", "Update", "Delete") */
+	readonly messageName: string;
+	/** Total number of steps registered for this message */
+	readonly stepCount: number;
+	/** True if any step under this message has an entity filter */
+	readonly hasEntityGroups: boolean;
+}
+
+/**
+ * Entity Group metadata for Message View grouping nodes.
+ * Groups plugin steps by entity under an SDK message.
+ */
+export interface EntityGroupMetadata {
+	readonly type: 'entityGroup';
+	/** The parent SDK message name */
+	readonly messageName: string;
+	/** The entity logical name (e.g., "account", "contact") */
+	readonly entityLogicalName: string;
+	/** Number of steps for this message/entity combination */
+	readonly stepCount: number;
 }

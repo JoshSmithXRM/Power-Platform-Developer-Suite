@@ -25,7 +25,10 @@ import type { SafeWebviewPanel } from '../../../../shared/infrastructure/ui/pane
 import { DEFAULT_SOLUTION_ID } from '../../../../shared/domain/constants/SolutionConstants';
 import type { ISolutionRepository } from '../../../solutionExplorer/domain/interfaces/ISolutionRepository';
 import type { SolutionOption } from '../../../../shared/infrastructure/ui/views/solutionFilterView';
-import type { LoadPluginRegistrationTreeUseCase } from '../../application/useCases/LoadPluginRegistrationTreeUseCase';
+import type {
+	LoadPluginRegistrationTreeUseCase,
+	PluginRegistrationTreeResult,
+} from '../../application/useCases/LoadPluginRegistrationTreeUseCase';
 import type { EnablePluginStepUseCase } from '../../application/useCases/EnablePluginStepUseCase';
 import type { DisablePluginStepUseCase } from '../../application/useCases/DisablePluginStepUseCase';
 import type { UpdatePluginAssemblyUseCase } from '../../application/useCases/UpdatePluginAssemblyUseCase';
@@ -64,8 +67,10 @@ import type { IPluginStepRepository } from '../../domain/interfaces/IPluginStepR
 import type { IPluginAssemblyRepository } from '../../domain/interfaces/IPluginAssemblyRepository';
 import type { IPluginPackageRepository } from '../../domain/interfaces/IPluginPackageRepository';
 import { PluginRegistrationTreeMapper } from '../../application/mappers/PluginRegistrationTreeMapper';
+import { TreeViewMode } from '../../application/enums/TreeViewMode';
 import { PluginRegistrationTreeSection } from '../sections/PluginRegistrationTreeSection';
 import { RegisterDropdownSection } from '../sections/RegisterDropdownSection';
+import { ViewModeSection } from '../sections/ViewModeSection';
 import { PluginStepViewModelMapper } from '../../application/mappers/PluginStepViewModelMapper';
 import { PluginAssemblyViewModelMapper } from '../../application/mappers/PluginAssemblyViewModelMapper';
 import { PluginPackageViewModelMapper } from '../../application/mappers/PluginPackageViewModelMapper';
@@ -150,6 +155,7 @@ type PluginRegistrationCommands =
 	| 'openMaker'
 	| 'environmentChange'
 	| 'solutionChange'
+	| 'viewModeChange'
 	| 'selectNode'
 	| 'filterTree'
 	| 'registerAssembly'
@@ -199,9 +205,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private readonly packageMapper: PluginPackageViewModelMapper;
 	private readonly pluginTypeMapper: PluginTypeViewModelMapper;
 	private readonly imageMapper: StepImageViewModelMapper;
+	private readonly viewModeSection: ViewModeSection;
 
 	private currentEnvironmentId: string;
 	private currentSolutionId: string = DEFAULT_SOLUTION_ID;
+	private currentViewMode: TreeViewMode = TreeViewMode.Assembly;
 	/** Generation counter for load operations - used to discard stale results after environment change */
 	private currentLoadId = 0;
 	private pendingPackageContent: string | null = null;
@@ -220,6 +228,9 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		uniqueName: string;
 		publisherPrefix: string;
 	}> = [];
+	/** Cached tree result for instant view mode switching (no API call needed) */
+	private cachedTreeResult: PluginRegistrationTreeResult | null = null;
+	private cachedMemberships: SolutionMembershipsDto | null = null;
 
 	private constructor(
 		private readonly panel: SafeWebviewPanel,
@@ -255,6 +266,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		const result = this.createCoordinator();
 		this.coordinator = result.coordinator;
 		this.scaffoldingBehavior = result.scaffoldingBehavior;
+		this.viewModeSection = result.viewModeSection;
 
 		// Initialize loading behavior for toolbar buttons
 		this.loadingBehavior = new LoadingStateBehavior(
@@ -432,8 +444,10 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	private createCoordinator(): {
 		coordinator: PanelCoordinator<PluginRegistrationCommands>;
 		scaffoldingBehavior: HtmlScaffoldingBehavior;
+		viewModeSection: ViewModeSection;
 	} {
 		const registerDropdown = new RegisterDropdownSection();
+		const viewModeSection = new ViewModeSection(this.currentViewMode);
 		const environmentSelector = new EnvironmentSelectorSection();
 		const solutionFilter = new SolutionFilterSection();
 		const treeSection = new PluginRegistrationTreeSection();
@@ -448,7 +462,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		);
 
 		const compositionBehavior = new SectionCompositionBehavior(
-			[registerDropdown, actionButtons, environmentSelector, solutionFilter, treeSection],
+			[registerDropdown, viewModeSection, actionButtons, environmentSelector, solutionFilter, treeSection],
 			PanelLayout.SingleColumn
 		);
 
@@ -555,7 +569,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			logger: this.logger,
 		});
 
-		return { coordinator, scaffoldingBehavior };
+		return { coordinator, scaffoldingBehavior, viewModeSection };
 	}
 
 	private registerCommandHandlers(): void {
@@ -578,6 +592,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			const solutionId = (data as { solutionId?: string })?.solutionId;
 			if (solutionId !== undefined) {
 				await this.handleSolutionChange(solutionId);
+			}
+		});
+
+		this.coordinator.registerHandler('viewModeChange', async (data) => {
+			const viewMode = (data as { itemId?: string })?.itemId;
+			if (viewMode === TreeViewMode.Assembly || viewMode === TreeViewMode.Message) {
+				await this.handleViewModeChange(viewMode);
 			}
 		});
 
@@ -1059,7 +1080,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				return;
 			}
 
+			// Cache results for instant view mode switching
+			this.cachedTreeResult = treeResult;
+			this.cachedMemberships = membershipsResult;
+
 			const treeItems = this.treeMapper.toTreeItems(
+				this.currentViewMode,
 				treeResult.packages,
 				treeResult.standaloneAssemblies,
 				treeResult.webHooks,
@@ -1180,6 +1206,46 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		await this.panel.postMessage({
 			command: 'solutionFilterChanged',
 			data: { solutionId },
+		});
+	}
+
+	/**
+	 * Handle view mode change from webview.
+	 * Re-renders tree using cached data (no API call needed).
+	 */
+	private async handleViewModeChange(viewMode: TreeViewMode): Promise<void> {
+		this.logger.debug('View mode changed', { from: this.currentViewMode, to: viewMode });
+
+		if (this.currentViewMode === viewMode) {
+			return; // No change
+		}
+
+		this.currentViewMode = viewMode;
+		this.viewModeSection.setCurrentMode(viewMode);
+
+		// Re-render tree using cached data (instant, no API call)
+		if (this.cachedTreeResult === null || this.cachedMemberships === null) {
+			this.logger.warn('No cached tree data available for view mode switch');
+			return;
+		}
+
+		const treeItems = this.treeMapper.toTreeItems(
+			this.currentViewMode,
+			this.cachedTreeResult.packages,
+			this.cachedTreeResult.standaloneAssemblies,
+			this.cachedTreeResult.webHooks,
+			this.cachedTreeResult.serviceEndpoints,
+			this.cachedTreeResult.dataProviders,
+			this.cachedTreeResult.customApis
+		);
+
+		await this.panel.postMessage({
+			command: 'updateTree',
+			data: {
+				treeItems,
+				isEmpty: this.cachedTreeResult.totalNodeCount === 0,
+				solutionMemberships: this.cachedMemberships,
+			},
 		});
 	}
 
