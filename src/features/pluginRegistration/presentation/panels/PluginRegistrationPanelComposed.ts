@@ -255,7 +255,13 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		this.imageMapper = new StepImageViewModelMapper();
 		this.filenameParser = new NupkgFilenameParser();
 
-		logger.debug('PluginRegistrationPanel: Initializing');
+		// Load persisted view mode for this environment
+		this.currentViewMode = this.loadViewModeFromState(environmentId);
+
+		logger.debug('PluginRegistrationPanel: Initializing', {
+			environmentId,
+			viewMode: this.currentViewMode,
+		});
 
 		// Configure webview
 		panel.webview.options = {
@@ -1223,6 +1229,9 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		this.currentViewMode = viewMode;
 		this.viewModeSection.setCurrentMode(viewMode);
 
+		// Persist view mode for this environment
+		await this.saveViewModeToState(viewMode);
+
 		// Re-render tree using cached data (instant, no API call)
 		if (this.cachedTreeResult === null || this.cachedMemberships === null) {
 			this.logger.warn('No cached tree data available for view mode switch');
@@ -1247,6 +1256,48 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				solutionMemberships: this.cachedMemberships,
 			},
 		});
+	}
+
+	// ========================================
+	// View Mode State Persistence
+	// ========================================
+
+	/** Workspace state key for view mode preferences */
+	private static readonly VIEW_MODE_STATE_KEY = 'pluginRegistration.viewModes';
+
+	/**
+	 * Loads view mode from workspace state for the given environment.
+	 * Returns Assembly view as default if not persisted.
+	 */
+	private loadViewModeFromState(environmentId: string): TreeViewMode {
+		const viewModes = this.extensionContext.workspaceState.get<Record<string, string>>(
+			PluginRegistrationPanelComposed.VIEW_MODE_STATE_KEY,
+			{}
+		);
+
+		const savedMode = viewModes[environmentId];
+		if (savedMode === TreeViewMode.Message) {
+			return TreeViewMode.Message;
+		}
+
+		return TreeViewMode.Assembly; // Default
+	}
+
+	/**
+	 * Saves view mode to workspace state for the current environment.
+	 */
+	private async saveViewModeToState(viewMode: TreeViewMode): Promise<void> {
+		const viewModes = this.extensionContext.workspaceState.get<Record<string, string>>(
+			PluginRegistrationPanelComposed.VIEW_MODE_STATE_KEY,
+			{}
+		);
+
+		viewModes[this.currentEnvironmentId] = viewMode;
+
+		await this.extensionContext.workspaceState.update(
+			PluginRegistrationPanelComposed.VIEW_MODE_STATE_KEY,
+			viewModes
+		);
 	}
 
 	/**

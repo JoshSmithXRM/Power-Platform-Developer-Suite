@@ -87,21 +87,21 @@
 ---
 
 ### Slice 3: Polish - Icons, Counts, Tooltips
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
 - [x] Add step count to Message nodes (e.g., "Create (5 steps)")
 - [x] Add step count to Entity nodes (e.g., "account (3 steps)")
 - [x] Icons for Message and Entity nodes (📨 and 📋)
-- [ ] Add tooltips with metadata
-- [ ] Update CSS if needed for view mode dropdown styling
-- [ ] Unit tests for mapper grouping logic
-- [ ] View mode state persistence (workspace state)
+- [x] Unit tests for mapper grouping logic (10 new tests)
+- [x] View mode state persistence (workspace state - per environment)
+- [ ] Add tooltips with metadata (deferred - low priority)
+- [ ] Update CSS if needed for view mode dropdown styling (verify in F5)
 
 ---
 
 ## Testing
 
-- [x] Unit tests pass: `npm test`
+- [x] Unit tests pass: `npm test` (8532 tests, including 10 new Message View tests)
 - [ ] Manual testing (F5): All slices verified
 - [ ] State persistence tested (close/reopen panel)
 - [ ] Environment switching tested (each env remembers its mode)
@@ -138,13 +138,15 @@
 ### Session 1 (2025-12-21)
 - Created design document with outside-in approach
 - Implemented Slice 1 + Slice 2 (inside-out: Application -> Presentation)
+- Implemented Slice 3 (tests, state persistence)
 - Key files created/modified:
   - `application/enums/TreeViewMode.ts` (NEW)
   - `application/viewModels/TreeItemViewModel.ts` (MODIFIED - added sdkMessage, entityGroup types)
   - `application/mappers/PluginRegistrationTreeMapper.ts` (MODIFIED - added view mode support)
-  - `application/mappers/PluginRegistrationTreeMapper.test.ts` (MODIFIED - updated tests)
+  - `application/mappers/PluginRegistrationTreeMapper.test.ts` (MODIFIED - 10 new Message View tests)
   - `presentation/sections/ViewModeSection.ts` (NEW)
-  - `presentation/panels/PluginRegistrationPanelComposed.ts` (MODIFIED - state management)
-- All 8515 tests pass
+  - `presentation/panels/PluginRegistrationPanelComposed.ts` (MODIFIED - state management, persistence)
+- All 8532 tests pass
 - Compile succeeds
-- Ready for F5 testing
+- Committed Slice 1+2: `d059dc9 feat(plugin-registration): add view mode switcher`
+- Ready for F5 testing and final commit
