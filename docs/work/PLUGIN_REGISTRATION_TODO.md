@@ -1057,13 +1057,29 @@ payload['workflowactivitygroupname'] =
 | **SdkMessageFilter repository** | ✅ Slice 3 |
 | **Secure config handling** | ✅ Slice 3 |
 | **FormModal enhancements (sections, checkboxes)** | ✅ Slice 3 |
+| **Detail panel** | ✅ All node types |
+| **Solution filtering** | ✅ Client-side with parallel pre-fetch |
+| **Attribute picker** | ✅ Searchable checkbox modal |
+| **WebHook CRUD** | ✅ Full management |
+| **Service Endpoint CRUD** | ✅ Full management |
+| **View mode switcher** | ✅ Assembly/Message views |
 
-### REMAINING - MVP
-| Feature | Complexity | Notes |
-|---------|------------|-------|
-| **Solution selector for steps** | LOW | Add step to solution on registration (like assemblies) |
-| **Detail panel** | MEDIUM | Show metadata when node selected |
-| Unit tests | HIGH | Domain + application layer (required before PR) |
+### REMAINING BEFORE PR
+| Item | Priority | Notes |
+|------|----------|-------|
+| **F5 Manual Testing** | BLOCKER | User building Azure resources for testing |
+| **Fix 35 lint errors** | HIGH | Non-null assertions + static methods on value objects |
+| **Unit tests verification** | MEDIUM | Confirm coverage meets targets (domain 80%+, mapper 70%+) |
+| **/prepare-pr** | HIGH | Full validation after testing complete |
+
+### DEFERRED (Post-MVP)
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| Solution selector for steps | LOW | Add step to solution on registration |
+| Filtering Attributes picker enhancement | MEDIUM | Searchable checkbox dialog |
+| Image Attributes picker enhancement | MEDIUM | Same as filtering attributes |
+| Description field for steps | LOW | Separate from name |
+| Filter checkbox persistence | LOW | Remember Hide Microsoft / Hide Hidden Steps |
 
 ---
 

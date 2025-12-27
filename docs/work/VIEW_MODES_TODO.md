@@ -2,7 +2,7 @@
 
 **Branch:** `feature/plugin-registration`
 **Created:** 2025-12-21
-**Status:** Implementation
+**Status:** Implementation Complete - Awaiting F5 Testing
 
 ---
 
@@ -27,14 +27,14 @@
 - [x] Assembly View shows current hierarchy (packages, assemblies, webhooks, etc.)
 - [x] Message View groups steps by SDK Message -> Entity -> Steps
 - [x] Custom APIs visible at root in BOTH views
-- [ ] View mode persists per environment in workspace state
+- [x] View mode persists per environment in workspace state
 - [x] View switching is instant (no API calls, uses cached data)
 
 **Success Criteria:**
-- [ ] User can switch between Assembly and Message views
-- [ ] Message view shows correct hierarchy (Message -> Entity -> Steps)
-- [ ] State persists across panel close/reopen
-- [ ] View switch takes < 100ms (no loading spinner)
+- [ ] User can switch between Assembly and Message views (NEEDS F5 TEST)
+- [ ] Message view shows correct hierarchy (Message -> Entity -> Steps) (NEEDS F5 TEST)
+- [ ] State persists across panel close/reopen (NEEDS F5 TEST)
+- [ ] View switch takes < 100ms (no loading spinner) (NEEDS F5 TEST)
 
 ---
 
@@ -102,7 +102,7 @@
 ## Testing
 
 - [x] Unit tests pass: `npm test` (8532 tests, including 10 new Message View tests)
-- [ ] Manual testing (F5): All slices verified
+- [ ] Manual testing (F5): All slices verified - **BLOCKED: User building Azure resources**
 - [ ] State persistence tested (close/reopen panel)
 - [ ] Environment switching tested (each env remembers its mode)
 - [ ] Performance verified (< 100ms view switch)
@@ -117,12 +117,22 @@
 
 ## Review & Merge
 
-- [ ] All slices implemented
+- [x] All slices implemented
 - [ ] All bugs from manual testing fixed
 - [ ] `/code-review` - APPROVED
-- [ ] CHANGELOG.md updated
+- [x] CHANGELOG.md updated (2025-12-26)
 - [ ] PR created
 - [ ] CI passes
+
+---
+
+## Pre-PR Remaining Items (2025-12-26)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| F5 Manual Testing | BLOCKED | User building Azure resources |
+| Fix 35 lint errors | TODO | Non-null assertions + static methods |
+| /prepare-pr | TODO | After testing complete |
 
 ---
 

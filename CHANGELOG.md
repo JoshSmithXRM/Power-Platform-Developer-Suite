@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Text search filter across all nodes
     - Toggle filters: Hide Microsoft assemblies, Hide hidden steps
     - Solution filter dropdown for filtering by solution membership
+    - **View Mode Switcher** - Toggle between Assembly View and Message View
+      - Assembly View: Traditional hierarchy (Package → Assembly → Type → Step → Image)
+      - Message View: Steps grouped by SDK Message → Entity → Steps
+      - View mode persists per environment
+      - Instant switching (no API calls, uses cached data)
   - **Package Management** - Register, update, and unregister plugin packages (.nupkg)
     - Drag-and-drop or file picker for .nupkg files
     - Automatic metadata extraction (name, version)
