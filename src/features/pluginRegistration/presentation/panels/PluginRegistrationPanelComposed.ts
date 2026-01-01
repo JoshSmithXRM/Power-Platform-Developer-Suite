@@ -3179,6 +3179,41 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	}
 
 	/**
+	 * Register a new plugin step for a service endpoint (WebHook or ServiceEndpoint).
+	 * Called from context menu on webHook or serviceEndpoint nodes.
+	 */
+	public async registerStepForServiceEndpoint(serviceEndpointId: string): Promise<void> {
+		this.logger.info('Registering new step for service endpoint', { serviceEndpointId });
+
+		// Try to find as WebHook first, then as ServiceEndpoint
+		const [webHook, serviceEndpoint, messages, solutions] = await Promise.all([
+			this.repositories.webHook.findById(this.currentEnvironmentId, serviceEndpointId),
+			this.repositories.serviceEndpoint?.findById(this.currentEnvironmentId, serviceEndpointId) ??
+				Promise.resolve(null),
+			this.repositories.sdkMessage.findAllPublic(this.currentEnvironmentId),
+			this.repositories.solution.findUnmanagedWithPublisherPrefix(this.currentEnvironmentId),
+		]);
+
+		const endpointName = webHook?.getName() ?? serviceEndpoint?.getName() ?? 'Unknown Endpoint';
+		const endpointType = webHook !== null ? 'WebHook' : 'Service Endpoint';
+
+		// Send modal data to webview with service endpoint info
+		await this.panel.postMessage({
+			command: 'showRegisterStepModal',
+			data: {
+				serviceEndpointId,
+				serviceEndpointName: `${endpointType}: ${endpointName}`,
+				messages: messages.map((m) => ({ id: m.getId(), name: m.getName() })),
+				solutions: solutions.map((s) => ({
+					id: s.id,
+					uniqueName: s.uniqueName,
+					name: s.name,
+				})),
+			},
+		});
+	}
+
+	/**
 	 * Edit an existing plugin step. Called from context menu on step.
 	 * Shows modal form pre-populated with current values, then updates the step.
 	 */
@@ -4040,7 +4075,8 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	 * Handle confirmation from the Register Step modal.
 	 */
 	private async handleConfirmRegisterStep(data: {
-		pluginTypeId: string;
+		pluginTypeId?: string | undefined;
+		serviceEndpointId?: string | undefined;
 		sdkMessageId: string;
 		sdkMessageFilterId?: string | undefined;
 		primaryEntity?: string | undefined; // Used to lookup filter if not provided directly
@@ -4060,12 +4096,9 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 	}): Promise<void> {
 		this.logger.debug('Handling register step confirmation', data);
 
-		const [environment, pluginType] = await Promise.all([
-			this.getEnvironmentById(this.currentEnvironmentId),
-			this.repositories.pluginType.findById(this.currentEnvironmentId, data.pluginTypeId),
-		]);
+		const isServiceEndpoint = data.serviceEndpointId !== undefined;
+		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 		const environmentName = environment?.name ?? 'Unknown Environment';
-		const pluginTypeName = pluginType?.getName() ?? 'Unknown Plugin';
 
 		await vscode.window.withProgress(
 			{
@@ -4090,6 +4123,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 						this.currentEnvironmentId,
 						{
 							pluginTypeId: data.pluginTypeId,
+							serviceEndpointId: data.serviceEndpointId,
 							sdkMessageId: data.sdkMessageId,
 							sdkMessageFilterId: filterId,
 							name: data.name,
@@ -4119,7 +4153,10 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 							'../../application/mappers/PluginStepViewModelMapper.js'
 						);
 						const mapper = new PluginStepViewModelMapper();
-						const stepViewModel = mapper.toTreeItem(newStep, data.pluginTypeId, []);
+
+						// Use the correct parent ID based on whether it's a plugin type or service endpoint
+						const parentId = isServiceEndpoint ? data.serviceEndpointId! : data.pluginTypeId!;
+						const stepViewModel = mapper.toTreeItem(newStep, parentId, []);
 
 						// Resolve solution ID for client-side cache update
 						const solutionId = this.resolveSolutionIdFromUniqueName(data.solutionUniqueName);
@@ -4127,7 +4164,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 						await this.panel.postMessage({
 							command: 'addNode',
 							data: {
-								parentId: data.pluginTypeId,
+								parentId,
 								node: stepViewModel,
 								solutionId, // Updates client-side solution memberships cache
 							},
@@ -4141,7 +4178,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					}
 
 					void vscode.window.showInformationMessage(
-						`Step "${data.name}" registered for ${pluginTypeName} in ${environmentName}.`
+						`Step "${data.name}" registered in ${environmentName}.`
 					);
 				} catch (error: unknown) {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';

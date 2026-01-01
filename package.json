@@ -624,6 +624,11 @@
                     "group": "3_delete@1"
                 },
                 {
+                    "command": "power-platform-dev-suite.registerPluginStep",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'webHook'",
+                    "group": "1_register@1"
+                },
+                {
                     "command": "power-platform-dev-suite.editWebHook",
                     "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'webHook' && canUpdate",
                     "group": "2_actions@1"
@@ -632,6 +637,11 @@
                     "command": "power-platform-dev-suite.unregisterWebHook",
                     "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'webHook' && canDelete",
                     "group": "3_delete@1"
+                },
+                {
+                    "command": "power-platform-dev-suite.registerPluginStep",
+                    "when": "webviewId == 'powerPlatformDevSuite.pluginRegistration' && webviewSection == 'serviceEndpoint'",
+                    "group": "1_register@1"
                 },
                 {
                     "command": "power-platform-dev-suite.editDataProvider",

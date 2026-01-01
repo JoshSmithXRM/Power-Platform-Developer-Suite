@@ -658,18 +658,24 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const registerPluginStepCommand = vscode.commands.registerCommand(
 		'power-platform-dev-suite.registerPluginStep',
-		async (contextMenuContext?: { nodeId?: string }) => {
+		async (contextMenuContext?: { nodeId?: string; webviewSection?: string }) => {
 			const panel = PluginRegistrationPanelComposed.getActivePanel();
 			if (!panel) {
 				vscode.window.showWarningMessage('No Plugin Registration panel is open.');
 				return;
 			}
-			const pluginTypeId = contextMenuContext?.nodeId;
-			if (!pluginTypeId) {
-				vscode.window.showWarningMessage('No plugin type selected.');
+			const nodeId = contextMenuContext?.nodeId;
+			const nodeType = contextMenuContext?.webviewSection;
+			if (!nodeId) {
+				vscode.window.showWarningMessage('No node selected.');
 				return;
 			}
-			await panel.registerStep(pluginTypeId);
+			// Route based on node type
+			if (nodeType === 'webHook' || nodeType === 'serviceEndpoint') {
+				await panel.registerStepForServiceEndpoint(nodeId);
+			} else {
+				await panel.registerStep(nodeId);
+			}
 		}
 	);
 

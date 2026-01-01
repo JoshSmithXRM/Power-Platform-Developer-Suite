@@ -3206,10 +3206,14 @@ function handleShowUpdateAssemblyModal(data) {
 
 /**
  * Show the Register Step modal.
- * @param {Object} data - { pluginTypeId, pluginTypeName, messages, solutions }
+ * @param {Object} data - { pluginTypeId?, pluginTypeName?, serviceEndpointId?, serviceEndpointName?, messages, solutions }
  */
 function handleShowRegisterStepModal(data) {
-	const { pluginTypeId, pluginTypeName, messages, solutions } = data;
+	const { pluginTypeId, pluginTypeName, serviceEndpointId, serviceEndpointName, messages, solutions } = data;
+
+	// Determine if this is for a plugin type or service endpoint
+	const isServiceEndpoint = !!serviceEndpointId;
+	const eventHandlerName = isServiceEndpoint ? serviceEndpointName : pluginTypeName;
 
 	if (!window.showFormModal) {
 		console.error('FormModal component not loaded');
@@ -3237,16 +3241,16 @@ function handleShowRegisterStepModal(data) {
 	};
 
 	/**
-	 * Generate step name in format: "{PluginTypeName}: {MessageName} of {PrimaryEntity}[ and {SecondaryEntity}]"
+	 * Generate step name in format: "{EventHandlerName}: {MessageName} of {PrimaryEntity}[ and {SecondaryEntity}]"
 	 */
 	function generateStepName() {
 		if (!stepNameState.selectedMessageName) {
-			return `${pluginTypeName}: `;
+			return `${eventHandlerName}: `;
 		}
 		if (!stepNameState.selectedEntity) {
-			return `${pluginTypeName}: ${stepNameState.selectedMessageName}`;
+			return `${eventHandlerName}: ${stepNameState.selectedMessageName}`;
 		}
-		let name = `${pluginTypeName}: ${stepNameState.selectedMessageName} of ${stepNameState.selectedEntity}`;
+		let name = `${eventHandlerName}: ${stepNameState.selectedMessageName} of ${stepNameState.selectedEntity}`;
 		if (stepNameState.selectedSecondaryEntity) {
 			name += ` and ${stepNameState.selectedSecondaryEntity}`;
 		}
@@ -3494,25 +3498,33 @@ function handleShowRegisterStepModal(data) {
 			}
 		},
 		onSubmit: (values) => {
+			const submitData = {
+				sdkMessageId: values.sdkMessageId,
+				name: values.name,
+				stage: parseInt(values.stage, 10),
+				mode: parseInt(values.mode, 10),
+				rank: parseInt(values.rank, 10),
+				supportedDeployment: parseInt(values.supportedDeployment, 10),
+				filteringAttributes: values.filteringAttributes || undefined,
+				asyncAutoDelete: values.asyncAutoDelete === true || values.asyncAutoDelete === 'true',
+				unsecureConfiguration: values.unsecureConfiguration || undefined,
+				secureConfiguration: values.secureConfiguration || undefined,
+				primaryEntity: values.primaryEntity || undefined,
+				secondaryEntity: values.secondaryEntity || undefined,
+				impersonatingUserId: values.impersonatingUserId || undefined,
+				solutionUniqueName: values.solutionUniqueName || undefined
+			};
+
+			// Add either pluginTypeId or serviceEndpointId based on what was provided
+			if (isServiceEndpoint) {
+				submitData.serviceEndpointId = serviceEndpointId;
+			} else {
+				submitData.pluginTypeId = pluginTypeId;
+			}
+
 			vscode.postMessage({
 				command: 'confirmRegisterStep',
-				data: {
-					pluginTypeId,
-					sdkMessageId: values.sdkMessageId,
-					name: values.name,
-					stage: parseInt(values.stage, 10),
-					mode: parseInt(values.mode, 10),
-					rank: parseInt(values.rank, 10),
-					supportedDeployment: parseInt(values.supportedDeployment, 10),
-					filteringAttributes: values.filteringAttributes || undefined,
-					asyncAutoDelete: values.asyncAutoDelete === true || values.asyncAutoDelete === 'true',
-					unsecureConfiguration: values.unsecureConfiguration || undefined,
-					secureConfiguration: values.secureConfiguration || undefined,
-					primaryEntity: values.primaryEntity || undefined,
-					secondaryEntity: values.secondaryEntity || undefined,
-					impersonatingUserId: values.impersonatingUserId || undefined,
-					solutionUniqueName: values.solutionUniqueName || undefined
-				}
+				data: submitData
 			});
 		}
 	});
