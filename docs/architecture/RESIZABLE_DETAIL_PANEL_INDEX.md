@@ -54,26 +54,6 @@ This index organizes all documentation related to the **Resizable Detail Panel C
 
 ---
 
-### 3. Migration Example
-**File:** `../technical-debt/PLUGIN_TRACES_DETAIL_PANEL_MIGRATION.md`
-
-**Purpose:** Step-by-step migration from broken pattern to canonical pattern
-
-**Audience:** Developers fixing Plugin Traces
-
-**Contains:**
-- Current state (broken)
-- Target state (working)
-- Step-by-step migration (5 steps)
-- Before/after code comparisons
-- Testing checklist
-- Rollback plan
-- Success criteria
-
-**Read when:** Migrating Plugin Traces or need concrete example
-
----
-
 ## Reusable Components
 
 ### TypeScript Base Class
@@ -159,40 +139,15 @@ detailPanel.initialize();
 
 ## Related Documentation
 
-### Panel Architecture
-**File:** `PANEL_ARCHITECTURE.md`
+### Panel Development Guide
+**File:** `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md`
 
-**Relation:** Detail panels are composed into split layouts via SectionCompositionBehavior
+**Relation:** Detail panels follow the panel development patterns
 
 **Key Concepts:**
 - SectionPosition.Detail
 - PanelLayout.SplitHorizontal
 - SectionCompositionBehavior
-
----
-
-### Clean Architecture Guide
-**File:** `CLEAN_ARCHITECTURE_GUIDE.md`
-
-**Relation:** Detail panels follow Clean Architecture layers
-
-**Layer Responsibilities:**
-- Domain: Detail data entities (e.g., PluginTrace)
-- Application: DetailViewModel mapping
-- Infrastructure: Panel state persistence
-- Presentation: Section rendering, behavior handling
-
----
-
-### Technical Debt Investigation
-**File:** `../technical-debt/DUPLICATE_RENDERING_INVESTIGATION.md`
-
-**Relation:** Original investigation that identified the problem
-
-**Findings:**
-- Two implementations: one works, one broken
-- Root cause: dynamic rendering vs static structure
-- Recommendation: establish canonical pattern
 
 ---
 
@@ -213,7 +168,6 @@ detailPanel.initialize();
 
 - **Understand the pattern quickly** → Read `RESIZABLE_DETAIL_PANEL_SUMMARY.md`
 - **Implement a new feature** → Read `RESIZABLE_DETAIL_PANEL_PATTERN.md` Usage Guide
-- **Migrate Plugin Traces** → Read `PLUGIN_TRACES_DETAIL_PANEL_MIGRATION.md`
 - **Use base class** → Import `ResizableDetailPanelSection.ts`
 - **Use behavior module** → Import `ResizableDetailPanelBehavior.js`
 - **See working example** → Review Metadata Browser implementation

@@ -612,26 +612,14 @@ function renderTimelineTab(trace) {
 }
 ```
 
-**3. Update technical debt analysis (1 minute)**
-
-Add to `docs/technical-debt/DUPLICATE_RENDERING_ANALYSIS.md`:
-
-```markdown
-## Resolution (2025-01-20)
-
-✅ **RESOLVED** - Dead code deleted, pattern documented.
-
-See: docs/architecture/RENDERING_PATTERN_DECISION.md for official pattern guidance.
-```
-
-**4. Compile and test (2 minutes)**
+**3. Compile and test (2 minutes)**
 
 ```bash
 npm run compile  # Should succeed
 # F5 → Open Plugin Trace Viewer → Select trace → Verify timeline renders
 ```
 
-**5. Commit (1 minute)**
+**4. Commit (1 minute)**
 
 ```bash
 git commit -m "Remove dead code: pluginTraceTimelineView.ts
@@ -649,15 +637,11 @@ See docs/architecture/RENDERING_PATTERN_DECISION.md for pattern guidance."
 
 ### Long-Term Actions (Documentation)
 
-**1. Update PANEL_ARCHITECTURE.md**
-
-Add section on rendering patterns (link to this doc).
-
-**2. Update PANEL_DEVELOPMENT_GUIDE.md**
+**1. Update PANEL_DEVELOPMENT_GUIDE.md**
 
 Add decision criteria for Pattern 1 vs Pattern 2.
 
-**3. Add to code review checklist**
+**2. Add to code review checklist**
 
 ```markdown
 - [ ] If adding TypeScript view file, verify it's imported and used
@@ -755,10 +739,7 @@ Both rendering patterns are valid, well-designed, and follow Clean Architecture 
 
 ## References
 
-- **PANEL_ARCHITECTURE.md** - Panel composition architecture
-- **CLEAN_ARCHITECTURE_GUIDE.md** - Domain, application, infrastructure layers
-- **DUPLICATE_RENDERING_ANALYSIS.md** - Technical debt investigation
-- **CLAUDE.md** - Clean Architecture principles
+- **CLAUDE.md** - Development standards and patterns
 
 ---
 

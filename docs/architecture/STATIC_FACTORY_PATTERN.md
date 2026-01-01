@@ -426,7 +426,6 @@ static create(...): EntityType
 ## Related Items
 
 - **eslint-suppressions.md**: Documents all `local-rules/no-static-entity-methods` suppressions
-- **CLEAN_ARCHITECTURE_GUIDE.md**: Domain layer factory pattern guidance
 
 ---
 

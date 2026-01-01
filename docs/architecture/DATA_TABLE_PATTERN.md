@@ -254,6 +254,4 @@ private getTableConfig(): DataTableConfig {
 
 ## Related Documentation
 
-- [Clean Architecture Guide](CLEAN_ARCHITECTURE_GUIDE.md)
-- [Panel Architecture](PANEL_ARCHITECTURE.md)
 - [Virtual Table Design](../design/VIRTUAL_DATA_TABLE_DESIGN.md)

@@ -271,7 +271,6 @@ if (width) {
 
 ### Documentation
 - **Pattern Guide:** `docs/architecture/RESIZABLE_DETAIL_PANEL_PATTERN.md` (complete)
-- **Migration Example:** `docs/technical-debt/PLUGIN_TRACES_DETAIL_PANEL_MIGRATION.md`
 - **This Summary:** `docs/architecture/RESIZABLE_DETAIL_PANEL_SUMMARY.md`
 
 ### Reusable Components
@@ -362,8 +361,6 @@ A: No limit. Add as many tabs as needed to config.
 
 ## Related Patterns
 
-- **Panel Architecture:** `docs/architecture/PANEL_ARCHITECTURE.md`
-- **Clean Architecture:** `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md`
 - **Panel Development Guide:** `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md`
 
 ---

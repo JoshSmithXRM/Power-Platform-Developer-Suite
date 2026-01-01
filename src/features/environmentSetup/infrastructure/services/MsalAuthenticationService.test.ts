@@ -1,9 +1,6 @@
 /**
  * Complex OAuth integration tests for MsalAuthenticationService
  *
- * This file exceeds the typical 800-line guideline but is justified per CODE_QUALITY_GUIDE.md:
- * "Integration test files (800-1500 lines) - Comprehensive test coverage more important than file size"
- *
  * File size: ~1,768 lines
  * Test count: 59 comprehensive tests covering 4 OAuth flows (Service Principal, Username/Password, Interactive, Device Code)
  *

@@ -11,7 +11,6 @@ Thank you for your interest in contributing! This guide will help you get starte
 3. **Run tests**: `npm test`
 4. **Start development**: `npm run watch` + Press `F5` to launch Extension Development Host
 5. **Read coding standards**: [CLAUDE.md](./CLAUDE.md)
-6. **Read workflows**: [Development Workflows](./.claude/WORKFLOW.md)
 
 ---
 
@@ -80,15 +79,8 @@ src/features/{feature}/
 
 **Read the full standards:**
 - [CLAUDE.md](./CLAUDE.md) - Quick reference for coding standards
-- [Clean Architecture Guide](./docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md) - Detailed architecture patterns
 
-###Testing Requirements
-
-**Coverage Targets:**
-- Domain layer: **95-100%** (critical business logic)
-- Application layer: **85-95%** (use cases and orchestration)
-- Infrastructure layer: **70-85%** (external integrations)
-- Presentation layer: **<50%** (manual testing preferred)
+### Testing Requirements
 
 **Before submitting a PR:**
 ```bash
@@ -97,14 +89,10 @@ npm run compile      # Zero TypeScript errors
 npm run lint         # Zero ESLint violations
 ```
 
-**Test Patterns:**
-- Use test factories for consistent test data
-- Mock repositories for isolation
-- Write integration tests for complex workflows
-
-**Read more:**
-- [Testing Guide](./docs/testing/TESTING_GUIDE.md) - Unit testing patterns
-- [Integration Testing Guide](./docs/testing/INTEGRATION_TESTING_GUIDE.md) - Panel integration tests
+**Testing approach:**
+- F5 (Extension Development Host) is the primary testing method
+- Unit tests for complex parsing/transformation logic
+- Manual testing for UI/panel changes
 
 ---
 
@@ -134,19 +122,10 @@ git checkout -b fix/your-bug-fix
 
 **Development Workflow:**
 
-1. **Write tests first** (TDD encouraged)
-2. **Implement feature** following Clean Architecture layers:
-   - Start with domain (entities, value objects)
-   - Then application (use cases, mappers)
-   - Then infrastructure (repositories, API integration)
-   - Finally presentation (panels, UI)
-3. **Run compile after each layer**: `npm run compile`
-4. **Write tests**: Aim for coverage targets
-5. **Manual testing**: Press `F5` to test in Extension Development Host
-
-**Read detailed workflow:**
-- [Feature Development Workflow](./.claude/WORKFLOW.md#feature-development-workflow)
-- [Bug Fix Workflow](./.claude/WORKFLOW.md#bug-fix-workflow)
+1. **Implement the feature**
+2. **Run compile**: `npm run compile`
+3. **Manual testing**: Press `F5` to test in Extension Development Host
+4. **Write tests**: For complex parsing/transformation logic
 
 ### 4. Commit Changes
 
@@ -287,18 +266,8 @@ Closes #123
 ### Documentation
 
 **Architecture:**
-- [Clean Architecture Guide](./docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md)
-- [Value Object Patterns](./docs/architecture/VALUE_OBJECT_PATTERNS.md)
-- [Domain Service Patterns](./docs/architecture/DOMAIN_SERVICE_PATTERNS.md)
-- [Repository Patterns](./docs/architecture/REPOSITORY_PATTERNS.md)
-
-**Testing:**
-- [Testing Guide](./docs/testing/TESTING_GUIDE.md)
-- [Integration Testing Guide](./docs/testing/INTEGRATION_TESTING_GUIDE.md)
-
-**Workflows:**
-- [Development Workflows](./.claude/WORKFLOW.md)
-- [CLAUDE.md](./CLAUDE.md) - Quick reference
+- [CLAUDE.md](./CLAUDE.md) - Development standards
+- [Webview Patterns](./docs/architecture/WEBVIEW_PATTERNS.md)
 
 ### Commands
 
@@ -318,7 +287,7 @@ npm run marketplace    # Revert to marketplace version
 
 ### Getting Help
 
-- **Documentation**: Start with [CLAUDE.md](./CLAUDE.md) and [Clean Architecture Guide](./docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md)
+- **Documentation**: Start with [CLAUDE.md](./CLAUDE.md)
 - **Issues**: Search [existing issues](https://github.com/joshsmithxrm/power-platform-developer-suite/issues) or open a new one
 - **Discussions**: Use [GitHub Discussions](https://github.com/joshsmithxrm/power-platform-developer-suite/discussions) for questions
 

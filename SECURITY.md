@@ -209,8 +209,6 @@ If you're contributing code, please review:
 - [ ] No console.log of sensitive data in production code
 - [ ] Dependencies up-to-date (run `npm audit`)
 
-**See:** [Code Quality Guide](./docs/architecture/CODE_QUALITY_GUIDE.md) for detailed security patterns
-
 ---
 
 ## Frequently Asked Questions
