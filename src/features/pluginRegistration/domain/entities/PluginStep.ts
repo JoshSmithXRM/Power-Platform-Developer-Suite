@@ -45,7 +45,10 @@ export class PluginStep {
 		private readonly isCustomizable: boolean,
 		private readonly isHidden: boolean,
 		private readonly createdOn: Date,
-		private readonly modifiedOn: Date
+		private readonly modifiedOn: Date,
+		// Event handler info: can be plugintype or serviceendpoint
+		private readonly eventHandlerId: string | null = null,
+		private readonly eventHandlerType: 'plugintype' | 'serviceendpoint' | null = null
 	) {}
 
 	/**
@@ -182,5 +185,38 @@ export class PluginStep {
 
 	public getModifiedOn(): Date {
 		return this.modifiedOn;
+	}
+
+	public getEventHandlerId(): string | null {
+		return this.eventHandlerId;
+	}
+
+	public getEventHandlerType(): 'plugintype' | 'serviceendpoint' | null {
+		return this.eventHandlerType;
+	}
+
+	/**
+	 * Business rule: Step belongs to a service endpoint (WebHook or Service Bus).
+	 */
+	public isServiceEndpointStep(): boolean {
+		return this.eventHandlerType === 'serviceendpoint';
+	}
+
+	/**
+	 * Business rule: Step belongs to a plugin type.
+	 */
+	public isPluginTypeStep(): boolean {
+		return this.eventHandlerType === 'plugintype' || this.eventHandlerType === null;
+	}
+
+	/**
+	 * Gets the service endpoint ID if this is a service endpoint step.
+	 * Returns null for plugin type steps.
+	 */
+	public getServiceEndpointId(): string | null {
+		if (this.eventHandlerType === 'serviceendpoint') {
+			return this.eventHandlerId;
+		}
+		return null;
 	}
 }

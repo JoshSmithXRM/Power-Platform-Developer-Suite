@@ -55,6 +55,15 @@ export interface IPluginStepRepository {
 	findByPluginTypeId(environmentId: string, pluginTypeId: string): Promise<readonly PluginStep[]>;
 
 	/**
+	 * Find all steps for a service endpoint (WebHook or Service Bus).
+	 * Queries by eventhandler field pointing to the service endpoint.
+	 */
+	findByServiceEndpointId(
+		environmentId: string,
+		serviceEndpointId: string
+	): Promise<readonly PluginStep[]>;
+
+	/**
 	 * Find step by ID.
 	 */
 	findById(environmentId: string, stepId: string): Promise<PluginStep | null>;

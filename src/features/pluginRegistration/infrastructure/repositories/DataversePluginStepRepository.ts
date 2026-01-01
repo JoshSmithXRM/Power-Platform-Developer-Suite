@@ -30,6 +30,9 @@ interface PluginStepDto {
 	'_sdkmessageid_value@OData.Community.Display.V1.FormattedValue'?: string;
 	_sdkmessagefilterid_value: string | null;
 	'_sdkmessagefilterid_value@OData.Community.Display.V1.FormattedValue'?: string;
+	// Event handler: polymorphic lookup (plugintype or serviceendpoint)
+	_eventhandler_value: string | null;
+	'_eventhandler_value@Microsoft.Dynamics.CRM.lookuplogicalname'?: string;
 	stage: number;
 	mode: number;
 	rank: number;
@@ -76,7 +79,7 @@ interface PluginStepCollectionResponse {
 export class DataversePluginStepRepository implements IPluginStepRepository {
 	private static readonly ENTITY_SET = 'sdkmessageprocessingsteps';
 	private static readonly SELECT_FIELDS =
-		'sdkmessageprocessingstepid,name,_plugintypeid_value,_sdkmessageid_value,_sdkmessagefilterid_value,stage,mode,rank,statecode,filteringattributes,description,configuration,supporteddeployment,asyncautodelete,ismanaged,iscustomizable,ishidden,createdon,modifiedon';
+		'sdkmessageprocessingstepid,name,_plugintypeid_value,_sdkmessageid_value,_sdkmessagefilterid_value,_eventhandler_value,stage,mode,rank,statecode,filteringattributes,description,configuration,supporteddeployment,asyncautodelete,ismanaged,iscustomizable,ishidden,createdon,modifiedon';
 
 	constructor(
 		private readonly apiService: IDataverseApiService,
@@ -163,6 +166,37 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 		const steps = response.value.map((dto) => this.mapToDomain(dto));
 
 		this.logger.debug('DataversePluginStepRepository: Fetched steps', {
+			count: steps.length,
+		});
+
+		return steps;
+	}
+
+	public async findByServiceEndpointId(
+		environmentId: string,
+		serviceEndpointId: string
+	): Promise<readonly PluginStep[]> {
+		this.logger.debug('DataversePluginStepRepository: Fetching steps for service endpoint', {
+			environmentId,
+			serviceEndpointId,
+		});
+
+		// Query by eventhandler field which is a polymorphic lookup to serviceendpoint
+		const endpoint =
+			`/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}?$select=${DataversePluginStepRepository.SELECT_FIELDS}` +
+			`&$filter=_eventhandler_value eq ${serviceEndpointId}` +
+			`&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)` +
+			`&$orderby=name asc`;
+
+		const response = await this.apiService.get<PluginStepCollectionResponse>(
+			environmentId,
+			endpoint
+		);
+
+		const steps = response.value.map((dto) => this.mapToDomain(dto));
+
+		this.logger.debug('DataversePluginStepRepository: Fetched steps for service endpoint', {
+			serviceEndpointId,
 			count: steps.length,
 		});
 
@@ -484,6 +518,16 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 		const isCustomizable = dto.iscustomizable?.Value ?? true;
 		const isHidden = dto.ishidden?.Value ?? false;
 
+		// Get event handler info (polymorphic lookup - can be plugintype or serviceendpoint)
+		const eventHandlerId = dto._eventhandler_value ?? null;
+		const eventHandlerTypeName = dto['_eventhandler_value@Microsoft.Dynamics.CRM.lookuplogicalname'];
+		const eventHandlerType: 'plugintype' | 'serviceendpoint' | null =
+			eventHandlerTypeName === 'plugintype'
+				? 'plugintype'
+				: eventHandlerTypeName === 'serviceendpoint'
+					? 'serviceendpoint'
+					: null;
+
 		return new PluginStep(
 			dto.sdkmessageprocessingstepid,
 			dto.name,
@@ -505,7 +549,9 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			isCustomizable,
 			isHidden,
 			new Date(dto.createdon),
-			new Date(dto.modifiedon)
+			new Date(dto.modifiedon),
+			eventHandlerId,
+			eventHandlerType
 		);
 	}
 }
