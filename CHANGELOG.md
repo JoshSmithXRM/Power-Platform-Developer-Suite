@@ -7,16 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-01-01
+
 ### Fixed
 
-- **Notebooks - Boolean Column Formatting** - Boolean columns now display correctly
+- **Notebooks - Boolean Column Formatting** 
+  - Boolean columns now display correctly
   - Raw value column shows `true`/`false` (API literal)
   - Virtual `*name` column shows formatted label (`Yes`/`No`)
   - Consistent with optionset and lookup column behavior
 
-- **Notebooks - ManagedProperty Display** - ManagedProperty columns (e.g., `ishidden`, `iscustomizable`) now show the value instead of full JSON
+- **Notebooks - ManagedProperty Display** 
+  - ManagedProperty columns (e.g., `ishidden`, `iscustomizable`) now show the value instead of full JSON
   - Previously showed: `{"Value":false,"CanBeChanged":true,"ManagedPropertyLogicalName":"ishidden"}`
   - Now shows: `0` or `1` (matches SQL filter syntax: `WHERE ishidden = 0`)
+
+### Security
+- **Dependency Update** - Patched `qs` vulnerability (dependency of `axios`)
 
 ## [0.3.3] - 2025-12-10
 
