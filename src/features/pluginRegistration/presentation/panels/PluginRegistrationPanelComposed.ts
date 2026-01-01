@@ -887,6 +887,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		this.coordinator.registerHandler('confirmRegisterStep', async (data) => {
 			const stepData = data as {
 				pluginTypeId?: string;
+				serviceEndpointId?: string; // For webhook/service endpoint steps
 				sdkMessageId?: string;
 				sdkMessageFilterId?: string;
 				primaryEntity?: string; // For filter lookup
@@ -907,7 +908,10 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 			// Validate required fields and provide specific feedback
 			const missingFields: string[] = [];
-			if (!stepData.pluginTypeId) missingFields.push('Plugin Type');
+			// Step must have EITHER pluginTypeId OR serviceEndpointId (not both)
+			if (!stepData.pluginTypeId && !stepData.serviceEndpointId) {
+				missingFields.push('Plugin Type or Service Endpoint');
+			}
 			if (!stepData.sdkMessageId) missingFields.push('Message');
 			if (!stepData.name) missingFields.push('Step Name');
 			if (stepData.stage === undefined) missingFields.push('Stage');
@@ -925,7 +929,6 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			}
 
 			// TypeScript narrowing: validation above guarantees these are defined
-			const pluginTypeId = stepData.pluginTypeId;
 			const sdkMessageId = stepData.sdkMessageId;
 			const name = stepData.name;
 			const stage = stepData.stage;
@@ -935,7 +938,6 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			const asyncAutoDelete = stepData.asyncAutoDelete;
 
 			if (
-				pluginTypeId === undefined ||
 				sdkMessageId === undefined ||
 				name === undefined ||
 				stage === undefined ||
@@ -949,7 +951,8 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			}
 
 			await this.handleConfirmRegisterStep({
-				pluginTypeId,
+				pluginTypeId: stepData.pluginTypeId,
+				serviceEndpointId: stepData.serviceEndpointId,
 				sdkMessageId,
 				sdkMessageFilterId: stepData.sdkMessageFilterId,
 				primaryEntity: stepData.primaryEntity,
