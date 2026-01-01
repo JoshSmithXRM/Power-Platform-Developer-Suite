@@ -3,8 +3,9 @@
  * Supports all node types including grouping nodes for Message View.
  *
  * Node types:
- * - Assembly View: Package, Assembly, PluginType, Step, Image, WebHook, ServiceEndpoint, DataProvider, CustomApi
+ * - Assembly View: Package, Assembly, PluginType, Step, Image, WebHook, ServiceEndpoint, DataProvider
  * - Message View: SdkMessage, EntityGroup (grouping nodes) + Step, Image, CustomApi
+ * - Custom API children: CustomApiEntity, CustomApiPlugin (label nodes)
  *
  * Flat structure for client-side tree rendering.
  */
@@ -21,8 +22,10 @@ export interface TreeItemViewModel {
 		| 'serviceEndpoint'
 		| 'dataProvider'
 		| 'customApi'
+		| 'customApiEntity' // Custom API child: bound entity
+		| 'customApiPlugin' // Custom API child: implementing plugin (label only)
 		| 'sdkMessage' // Message View: groups steps by SDK message
-		| 'entityGroup'; // Message View: groups steps by entity under a message
+		| 'entityGroup'; // Message/Entity View: groups steps by entity
 	readonly name: string;
 	readonly displayName: string;
 	readonly icon: string;
@@ -36,6 +39,8 @@ export interface TreeItemViewModel {
 		| ServiceEndpointMetadata
 		| DataProviderMetadata
 		| CustomApiMetadata
+		| CustomApiEntityMetadata
+		| CustomApiPluginMetadata
 		| SdkMessageMetadata
 		| EntityGroupMetadata;
 	readonly isManaged: boolean;
@@ -229,4 +234,29 @@ export interface EntityGroupMetadata {
 	readonly entityLogicalName: string | null;
 	/** Number of steps for this message/entity combination */
 	readonly stepCount: number;
+}
+
+/**
+ * Custom API Entity metadata (child of Custom API).
+ * Represents the bound entity for entity-bound Custom APIs.
+ */
+export interface CustomApiEntityMetadata {
+	readonly type: 'customApiEntity';
+	/** Parent Custom API ID */
+	readonly customApiId: string;
+	/** The bound entity logical name */
+	readonly entityLogicalName: string;
+}
+
+/**
+ * Custom API Plugin metadata (child of Custom API or Custom API Entity).
+ * Label-only node showing which plugin implements the Custom API.
+ * NOT expandable - to see plugin steps, use Assembly View.
+ */
+export interface CustomApiPluginMetadata {
+	readonly type: 'customApiPlugin';
+	/** Parent Custom API ID */
+	readonly customApiId: string;
+	/** The implementing plugin type name */
+	readonly pluginTypeName: string;
 }

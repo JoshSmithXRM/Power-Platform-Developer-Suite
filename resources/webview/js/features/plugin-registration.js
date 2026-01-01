@@ -799,7 +799,8 @@ function filterHiddenSteps(items) {
 
 			// Filter out containers that BECAME empty due to filtering
 			// Keep containers that were originally empty (e.g., plugin type with no steps registered)
-			if (item.type === 'pluginType' || item.type === 'assembly' || item.type === 'package') {
+			const containerTypes = ['pluginType', 'assembly', 'package', 'sdkMessage', 'entityGroup'];
+			if (containerTypes.includes(item.type)) {
 				const hasChildren = item.children && item.children.length > 0;
 				// Keep if: has children OR was originally empty (didn't become empty due to filter)
 				return hasChildren || item._wasOriginallyEmpty;
@@ -840,9 +841,10 @@ function filterMicrosoftAssemblies(items) {
 				return !item.name.startsWith('Microsoft') || item.name === 'Microsoft.Crm.ServiceBus';
 			}
 
-			// Filter out packages that BECAME empty due to filtering
-			// Keep packages that were originally empty
-			if (item.type === 'package') {
+			// Filter out containers that BECAME empty due to filtering
+			// Keep containers that were originally empty
+			const containerTypes = ['package', 'sdkMessage', 'entityGroup'];
+			if (containerTypes.includes(item.type)) {
 				const hasChildren = item.children && item.children.length > 0;
 				return hasChildren || item._wasOriginallyEmpty;
 			}
