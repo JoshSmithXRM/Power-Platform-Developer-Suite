@@ -920,19 +920,43 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				return;
 			}
 
+			// TypeScript narrowing: validation above guarantees these are defined
+			const pluginTypeId = stepData.pluginTypeId;
+			const sdkMessageId = stepData.sdkMessageId;
+			const name = stepData.name;
+			const stage = stepData.stage;
+			const mode = stepData.mode;
+			const rank = stepData.rank;
+			const supportedDeployment = stepData.supportedDeployment;
+			const asyncAutoDelete = stepData.asyncAutoDelete;
+
+			if (
+				pluginTypeId === undefined ||
+				sdkMessageId === undefined ||
+				name === undefined ||
+				stage === undefined ||
+				mode === undefined ||
+				rank === undefined ||
+				supportedDeployment === undefined ||
+				asyncAutoDelete === undefined
+			) {
+				// Should never reach here due to validation above, but satisfies TypeScript
+				return;
+			}
+
 			await this.handleConfirmRegisterStep({
-				pluginTypeId: stepData.pluginTypeId!,
-				sdkMessageId: stepData.sdkMessageId!,
+				pluginTypeId,
+				sdkMessageId,
 				sdkMessageFilterId: stepData.sdkMessageFilterId,
 				primaryEntity: stepData.primaryEntity,
 				secondaryEntity: stepData.secondaryEntity,
-				name: stepData.name!,
-				stage: stepData.stage!,
-				mode: stepData.mode!,
-				rank: stepData.rank!,
-				supportedDeployment: stepData.supportedDeployment!,
+				name,
+				stage,
+				mode,
+				rank,
+				supportedDeployment,
 				filteringAttributes: stepData.filteringAttributes,
-				asyncAutoDelete: stepData.asyncAutoDelete!,
+				asyncAutoDelete,
 				unsecureConfiguration: stepData.unsecureConfiguration,
 				secureConfiguration: stepData.secureConfiguration,
 				impersonatingUserId: stepData.impersonatingUserId,
@@ -1373,6 +1397,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				case 'serviceEndpoint':
 					details = await this.fetchServiceEndpointDetails(nodeId);
 					break;
+				case 'customApi':
+					details = await this.fetchCustomApiDetails(nodeId);
+					break;
+				case 'dataProvider':
+					details = await this.fetchDataProviderDetails(nodeId);
+					break;
 				default:
 					this.logger.warn('Unknown node type', { nodeType });
 					return;
@@ -1530,6 +1560,63 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			isManaged: endpoint.isInManagedState(),
 			createdOn: endpoint.getCreatedOn().toISOString(),
 			modifiedOn: endpoint.getModifiedOn().toISOString(),
+		};
+	}
+
+	private async fetchCustomApiDetails(customApiId: string): Promise<Record<string, unknown> | null> {
+		const [customApi, parameters] = await Promise.all([
+			this.repositories.customApi.findById(this.currentEnvironmentId, customApiId),
+			this.repositories.customApiParameter.findByCustomApiId(this.currentEnvironmentId, customApiId),
+		]);
+
+		if (customApi === null) return null;
+
+		const requestParameterCount = parameters.filter((p) => p.isRequest()).length;
+		const responsePropertyCount = parameters.filter((p) => p.isResponse()).length;
+
+		return {
+			nodeType: 'customApi',
+			name: customApi.getName(),
+			uniqueName: customApi.getUniqueName(),
+			displayName: customApi.getDisplayName(),
+			description: customApi.getDescription(),
+			isFunction: customApi.getIsFunction(),
+			isPrivate: customApi.getIsPrivate(),
+			bindingType: customApi.getBindingType().getName(),
+			boundEntityLogicalName: customApi.getBoundEntityLogicalName(),
+			allowedProcessing: customApi.getAllowedCustomProcessingStepType().getName(),
+			pluginTypeName: customApi.getPluginTypeName(),
+			requestParameterCount,
+			responsePropertyCount,
+			isManaged: customApi.isInManagedState(),
+			createdOn: customApi.getCreatedOn().toISOString(),
+			modifiedOn: customApi.getModifiedOn().toISOString(),
+		};
+	}
+
+	private async fetchDataProviderDetails(
+		dataProviderId: string
+	): Promise<Record<string, unknown> | null> {
+		const dataProvider = await this.repositories.dataProvider.findById(
+			this.currentEnvironmentId,
+			dataProviderId
+		);
+
+		if (dataProvider === null) return null;
+
+		return {
+			nodeType: 'dataProvider',
+			name: dataProvider.getName(),
+			dataSourceLogicalName: dataProvider.getDataSourceLogicalName(),
+			description: dataProvider.getDescription(),
+			hasRetrieve: dataProvider.getRetrievePluginId() !== null,
+			hasRetrieveMultiple: dataProvider.getRetrieveMultiplePluginId() !== null,
+			hasCreate: dataProvider.getCreatePluginId() !== null,
+			hasUpdate: dataProvider.getUpdatePluginId() !== null,
+			hasDelete: dataProvider.getDeletePluginId() !== null,
+			isManaged: dataProvider.isInManagedState(),
+			createdOn: dataProvider.getCreatedOn().toISOString(),
+			modifiedOn: dataProvider.getModifiedOn().toISOString(),
 		};
 	}
 
@@ -2043,8 +2130,14 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		userClaim?: number;
 		solutionUniqueName?: string;
 	}): Promise<void> {
-		const { name, contract } = endpointData;
+		const { name, contract, solutionNamespace } = endpointData;
 		this.logger.info('Registering service endpoint', { name, contract });
+
+		// Validate required fields
+		if (name === undefined || contract === undefined || solutionNamespace === undefined) {
+			void vscode.window.showErrorMessage('Cannot register service endpoint: Missing required fields');
+			return;
+		}
 
 		try {
 			let serviceEndpointId: string | undefined;
@@ -2059,12 +2152,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 					serviceEndpointId = await this.useCases.registerServiceEndpoint.execute(
 						this.currentEnvironmentId,
 						{
-							name: endpointData.name!,
+							name,
 							description: endpointData.description,
-							contract: endpointData.contract!,
+							contract,
 							connectionMode: endpointData.connectionMode ?? 1,
 							authType: endpointData.authType ?? 2,
-							solutionNamespace: endpointData.solutionNamespace!,
+							solutionNamespace,
 							namespaceAddress: endpointData.namespaceAddress ?? '',
 							path: endpointData.path,
 							sasKeyName: endpointData.sasKeyName,
@@ -2142,6 +2235,12 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		const { serviceEndpointId, name } = endpointData;
 		this.logger.info('Updating service endpoint', { serviceEndpointId, name });
 
+		// Validate required field
+		if (serviceEndpointId === undefined) {
+			void vscode.window.showErrorMessage('Cannot update service endpoint: Missing endpoint ID');
+			return;
+		}
+
 		const environment = await this.getEnvironmentById(this.currentEnvironmentId);
 		const environmentName = environment?.name ?? 'Unknown Environment';
 
@@ -2155,7 +2254,7 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				async () => {
 					await this.useCases.updateServiceEndpoint.execute(
 						this.currentEnvironmentId,
-						serviceEndpointId!,
+						serviceEndpointId,
 						{
 							name: endpointData.name,
 							description: endpointData.description,

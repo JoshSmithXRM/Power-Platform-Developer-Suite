@@ -411,7 +411,7 @@ function getIcon(type, iconHint) {
 		'webHook': '🪝',
 		'serviceEndpoint': '📡',
 		'dataProvider': '🗃️',
-		'customApi': '🔧'
+		'customApi': '🎯'
 	};
 
 	return icons[type] || '📄';
