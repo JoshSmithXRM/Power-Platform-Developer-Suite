@@ -36,10 +36,10 @@ VS Code webview development patterns:
 | Document | Decision |
 |----------|----------|
 | [0001_ESLINT_SUPPRESSIONS.md](adr/0001_ESLINT_SUPPRESSIONS.md) | ESLint suppression policy |
-| [0004_API_TYPE_ASSERTIONS.md](adr/0004_API_TYPE_ASSERTIONS.md) | API response type handling |
-| [0005_REGEX_FETCHXML_PARSING.md](adr/0005_REGEX_FETCHXML_PARSING.md) | FetchXML parsing approach |
-| [0006_MSAL_SKIPPED_TESTS.md](adr/0006_MSAL_SKIPPED_TESTS.md) | MSAL test handling |
-| [0007_XML_FORMATTER_NO_INTERFACE.md](adr/0007_XML_FORMATTER_NO_INTERFACE.md) | XML formatter design |
+| [0002_API_TYPE_ASSERTIONS.md](adr/0002_API_TYPE_ASSERTIONS.md) | API response type handling |
+| [0003_REGEX_FETCHXML_PARSING.md](adr/0003_REGEX_FETCHXML_PARSING.md) | FetchXML parsing approach |
+| [0004_MSAL_SKIPPED_TESTS.md](adr/0004_MSAL_SKIPPED_TESTS.md) | MSAL test handling |
+| [0005_XML_FORMATTER_NO_INTERFACE.md](adr/0005_XML_FORMATTER_NO_INTERFACE.md) | XML formatter design |
 
 ---
 

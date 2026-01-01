@@ -1,4 +1,4 @@
-# ADR-0005: Regex-based FetchXML Parsing for Domain Purity
+# ADR-0003: Regex-based FetchXML Parsing
 
 **Status:** Accepted
 **Date:** 2025-11-30
@@ -8,23 +8,20 @@
 
 The FetchXML transpiler needs to parse XML to convert FetchXML to SQL. Options:
 
-1. **Regex parsing** - Zero dependencies, keeps domain pure, but can't handle nested structures
-2. **XML library** - Proper parsing, but adds infrastructure dependency to domain
-
-Clean Architecture requires domain services have zero external dependencies.
+1. **Regex parsing** - Zero dependencies, simple, but can't handle nested structures
+2. **XML library** - Proper parsing, but adds dependency complexity
 
 ## Decision
 
-Use regex-based parsing to maintain domain layer purity. Accept limitations with nested XML structures.
+Use regex-based parsing for simplicity. Accept limitations with nested XML structures.
 
 ## Consequences
 
 ### Positive
 
-- **Domain layer remains pure** - Zero external dependencies
+- **Simple implementation** - Zero external dependencies
 - **~95% of queries work** - Typical FetchXML doesn't use nested filters
-- **Self-contained** - No DI complexity for parser injection
-- **90.66% branch coverage** - Meets domain threshold
+- **Self-contained** - No complexity for parser injection
 
 ### Negative
 
@@ -60,4 +57,3 @@ class XmlFetchXmlParser implements IFetchXmlParser { }
 ## References
 
 - `src/features/dataExplorer/domain/services/FetchXmlToSqlTranspiler.ts`
-- [DOMAIN_SERVICE_PATTERNS.md](../architecture/DOMAIN_SERVICE_PATTERNS.md) - Transpiler pattern

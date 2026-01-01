@@ -1,4 +1,4 @@
-# ADR-0004: API Response Type Assertions Without Runtime Validation
+# ADR-0002: API Response Type Assertions Without Runtime Validation
 
 **Status:** Accepted
 **Date:** 2025-11-23

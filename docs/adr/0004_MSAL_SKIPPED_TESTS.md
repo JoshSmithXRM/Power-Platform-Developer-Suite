@@ -1,4 +1,4 @@
-# ADR-0006: MSAL Authentication Service Skipped Tests
+# ADR-0004: MSAL Authentication Service Skipped Tests
 
 **Status:** Accepted
 **Date:** 2025-12-03

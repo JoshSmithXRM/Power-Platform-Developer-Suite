@@ -1,4 +1,4 @@
-# ADR-0007: XmlFormatter Without Interface (Rejected Over-Engineering)
+# ADR-0005: XmlFormatter Without Interface (Rejected Over-Engineering)
 
 **Status:** Accepted (Will Not Implement Interface)
 **Date:** 2025-11-22
@@ -6,7 +6,7 @@
 
 ## Context
 
-Code Guardian suggested extracting an `IXmlFormatter` interface to follow Dependency Inversion Principle more strictly.
+A suggestion was made to extract an `IXmlFormatter` interface to follow Dependency Inversion Principle more strictly.
 
 ## Decision
 
@@ -23,10 +23,9 @@ Reject the interface extraction. This would be cargo cult DIP without benefit.
 
 ### Why Interface Is Unnecessary
 
-1. **XmlFormatter is infrastructure** - DIP protects domain from infrastructure, not infrastructure from infrastructure
-2. **Single implementation** - No business reason to swap formatters
-3. **Pure function** - Easy to test/mock without interface
-4. **YAGNI** - "You Aren't Gonna Need It"
+1. **Single implementation** - No business reason to swap formatters
+2. **Pure function** - Easy to test/mock without interface
+3. **YAGNI** - "You Aren't Gonna Need It"
 
 ### When Interface WOULD Be Needed
 
@@ -56,5 +55,3 @@ class SomeInfraService {
 ## References
 
 - `src/shared/infrastructure/formatters/XmlFormatter.ts`
-- [CLEAN_ARCHITECTURE_GUIDE.md](../architecture/CLEAN_ARCHITECTURE_GUIDE.md) - DIP explanation
-- Principle: Interfaces protect domain from infrastructure, not infrastructure from infrastructure
