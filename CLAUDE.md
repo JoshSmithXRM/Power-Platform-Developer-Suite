@@ -324,7 +324,7 @@ git worktree prune             # Clean up stale worktree references
 **Design outside-in** (user perspective: panel → ViewModels → use cases → domain)
 **Implement inside-out** (technical: domain → application → infrastructure → presentation)
 **Review once per feature** (after all 4 layers complete, not per layer)
-**Design docs are temporary** - Delete after PR merge (extract patterns → `docs/architecture/`, ideas → `docs/future/`)
+**Design docs are temporary** - Delete after PR merge (extract patterns → `docs/architecture/`, ideas → GitHub Issues)
 
 ### Building Features
 
@@ -423,8 +423,8 @@ See `.claude/agents/` for agent definitions.
 - `e2e/README.md` - E2E testing infrastructure (Playwright + VS Code)
 
 **Project management:**
-- `docs/technical-debt/` - Technical debt inventory (categorized: accepted-tradeoffs, scheduled, low-priority)
-- `docs/future/` - Planned features and improvements (per-feature files)
+- GitHub Issues - Planned features (filter by `epic:*` labels) and tech debt (filter by `tech-debt` label)
+- `docs/adr/` - Architectural Decision Records (accepted tradeoffs, rejected suggestions)
 - `docs/requirements/` - Feature requirements documentation
 
 ---
