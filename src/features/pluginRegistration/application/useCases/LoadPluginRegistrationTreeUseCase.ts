@@ -40,6 +40,10 @@ export interface PluginRegistrationTreeResult {
 	readonly serviceEndpoints: ReadonlyArray<ServiceEndpoint>;
 	readonly dataProviders: ReadonlyArray<DataProvider>;
 	readonly customApis: ReadonlyArray<CustomApiTreeNode>;
+	/** Steps grouped by service endpoint ID (for WebHook/ServiceEndpoint children) */
+	readonly stepsByServiceEndpointId: Map<string, readonly PluginStep[]>;
+	/** Images grouped by step ID (for step children) */
+	readonly imagesByStepId: Map<string, readonly StepImage[]>;
 	readonly totalNodeCount: number;
 }
 
@@ -299,6 +303,9 @@ export class LoadPluginRegistrationTreeUseCase {
 		const stepsByPluginTypeId = this.groupBy(data.steps, (s) => s.getPluginTypeId());
 		const imagesByStepId = this.groupBy(data.images, (img) => img.getStepId());
 
+		// Group service endpoint steps by their eventHandlerId
+		const stepsByServiceEndpointId = this.groupStepsByServiceEndpoint(data.steps);
+
 		// Group assemblies by package ID (null = standalone)
 		const assembliesByPackageId = this.groupByNullable(
 			data.assemblies,
@@ -347,6 +354,8 @@ export class LoadPluginRegistrationTreeUseCase {
 			serviceEndpoints: data.serviceEndpoints,
 			dataProviders: data.dataProviders,
 			customApis: customApiTrees,
+			stepsByServiceEndpointId,
+			imagesByStepId,
 			totalNodeCount,
 		};
 	}
@@ -372,6 +381,26 @@ export class LoadPluginRegistrationTreeUseCase {
 				responsePropertyCount: responseCount,
 			};
 		});
+	}
+
+	/**
+	 * Groups steps by their service endpoint ID (for WebHook/ServiceEndpoint children).
+	 * Only includes steps where eventHandlerType is 'serviceendpoint'.
+	 */
+	private groupStepsByServiceEndpoint(steps: readonly PluginStep[]): Map<string, PluginStep[]> {
+		const map = new Map<string, PluginStep[]>();
+		for (const step of steps) {
+			const endpointId = step.getServiceEndpointId();
+			if (endpointId !== null) {
+				const existing = map.get(endpointId);
+				if (existing) {
+					existing.push(step);
+				} else {
+					map.set(endpointId, [step]);
+				}
+			}
+		}
+		return map;
 	}
 
 	/**

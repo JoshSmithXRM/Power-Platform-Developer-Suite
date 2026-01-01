@@ -1125,7 +1125,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 				treeResult.webHooks,
 				treeResult.serviceEndpoints,
 				treeResult.dataProviders,
-				treeResult.customApis
+				treeResult.customApis,
+				{
+					stepsByServiceEndpointId: treeResult.stepsByServiceEndpointId,
+					imagesByStepId: treeResult.imagesByStepId,
+				}
 			);
 
 			// Count webhooks and service endpoints in the mapped tree items
@@ -1273,7 +1277,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 			this.cachedTreeResult.webHooks,
 			this.cachedTreeResult.serviceEndpoints,
 			this.cachedTreeResult.dataProviders,
-			this.cachedTreeResult.customApis
+			this.cachedTreeResult.customApis,
+			{
+				stepsByServiceEndpointId: this.cachedTreeResult.stepsByServiceEndpointId,
+				imagesByStepId: this.cachedTreeResult.imagesByStepId,
+			}
 		);
 
 		await this.panel.postMessage({

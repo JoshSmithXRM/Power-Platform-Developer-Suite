@@ -7,6 +7,14 @@ import type { WebHook } from '../../domain/entities/WebHook';
 import type { ServiceEndpoint } from '../../domain/entities/ServiceEndpoint';
 import type { DataProvider } from '../../domain/entities/DataProvider';
 import type { CustomApiTreeNode } from '../useCases/LoadPluginRegistrationTreeUseCase';
+
+/**
+ * Context for building service endpoint step trees.
+ */
+export interface ServiceEndpointStepContext {
+	readonly stepsByServiceEndpointId: Map<string, readonly PluginStep[]>;
+	readonly imagesByStepId: Map<string, readonly StepImage[]>;
+}
 import type {
 	TreeItemViewModel,
 	SdkMessageMetadata,
@@ -91,6 +99,7 @@ export class PluginRegistrationTreeMapper {
 	 * @param serviceEndpoints - Service endpoints (root-level in Assembly view only)
 	 * @param dataProviders - Data providers (root-level in Assembly view only)
 	 * @param customApis - Custom APIs (root-level in Message view only)
+	 * @param stepContext - Context for building service endpoint step trees
 	 * @returns Tree items for rendering
 	 */
 	public toTreeItems(
@@ -100,7 +109,8 @@ export class PluginRegistrationTreeMapper {
 		webHooks: ReadonlyArray<WebHook> = [],
 		serviceEndpoints: ReadonlyArray<ServiceEndpoint> = [],
 		dataProviders: ReadonlyArray<DataProvider> = [],
-		customApis: ReadonlyArray<CustomApiTreeNode> = []
+		customApis: ReadonlyArray<CustomApiTreeNode> = [],
+		stepContext?: ServiceEndpointStepContext
 	): TreeItemViewModel[] {
 		switch (viewMode) {
 			case TreeViewMode.Message:
@@ -114,7 +124,8 @@ export class PluginRegistrationTreeMapper {
 					standaloneAssemblies,
 					webHooks,
 					serviceEndpoints,
-					dataProviders
+					dataProviders,
+					stepContext
 				);
 		}
 	}
@@ -130,7 +141,8 @@ export class PluginRegistrationTreeMapper {
 		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>,
 		webHooks: ReadonlyArray<WebHook>,
 		serviceEndpoints: ReadonlyArray<ServiceEndpoint>,
-		dataProviders: ReadonlyArray<DataProvider>
+		dataProviders: ReadonlyArray<DataProvider>,
+		stepContext?: ServiceEndpointStepContext
 	): TreeItemViewModel[] {
 		const items: TreeItemViewModel[] = [];
 
@@ -154,14 +166,16 @@ export class PluginRegistrationTreeMapper {
 		const standaloneItems = this.mapAssemblyNodes(standaloneAssemblies, null);
 		items.push(...standaloneItems);
 
-		// 3. Map webhooks (root-level, no children initially)
+		// 3. Map webhooks with their steps
 		for (const webHook of webHooks) {
-			items.push(this.webHookMapper.toTreeItem(webHook));
+			const stepItems = this.buildServiceEndpointStepChildren(webHook.getId(), stepContext);
+			items.push(this.webHookMapper.toTreeItem(webHook, stepItems));
 		}
 
-		// 4. Map service endpoints (root-level, no children initially)
+		// 4. Map service endpoints with their steps
 		for (const endpoint of serviceEndpoints) {
-			items.push(this.serviceEndpointMapper.toTreeItem(endpoint));
+			const stepItems = this.buildServiceEndpointStepChildren(endpoint.getId(), stepContext);
+			items.push(this.serviceEndpointMapper.toTreeItem(endpoint, stepItems));
 		}
 
 		// 5. Map data providers (root-level, no children)
@@ -172,6 +186,27 @@ export class PluginRegistrationTreeMapper {
 		// NOTE: Custom APIs are NOT in Assembly View - they appear in Message View only
 
 		return items;
+	}
+
+	/**
+	 * Builds step children for a service endpoint (WebHook or ServiceEndpoint).
+	 */
+	private buildServiceEndpointStepChildren(
+		serviceEndpointId: string,
+		stepContext?: ServiceEndpointStepContext
+	): TreeItemViewModel[] {
+		if (!stepContext) {
+			return [];
+		}
+
+		const steps = stepContext.stepsByServiceEndpointId.get(serviceEndpointId) ?? [];
+		return steps.map((step) => {
+			const images = stepContext.imagesByStepId.get(step.getId()) ?? [];
+			const imageItems = images.map((image) =>
+				this.imageMapper.toTreeItem(image, step.getId())
+			);
+			return this.stepMapper.toTreeItem(step, serviceEndpointId, imageItems);
+		});
 	}
 
 	private mapAssemblyNodes(
