@@ -2,9 +2,13 @@ import type { PluginStep } from '../entities/PluginStep';
 
 /**
  * Input for registering a new plugin step.
+ *
+ * For plugin steps: provide pluginTypeId
+ * For service endpoint steps: provide serviceEndpointId (uses special hidden plugin types)
  */
 export interface RegisterStepInput {
-	readonly pluginTypeId: string;
+	readonly pluginTypeId?: string | undefined; // Required for plugin steps
+	readonly serviceEndpointId?: string | undefined; // Required for WebHook/ServiceEndpoint steps
 	readonly sdkMessageId: string;
 	readonly sdkMessageFilterId?: string | undefined; // Links message to entity (null for entity-agnostic)
 	readonly name: string;

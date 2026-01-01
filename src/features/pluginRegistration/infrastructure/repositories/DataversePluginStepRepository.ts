@@ -263,6 +263,10 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 		this.logger.debug('DataversePluginStepRepository: Step deleted', { stepId });
 	}
 
+	// Special hidden plugin type IDs for service endpoint steps
+	private static readonly WEBHOOK_PLUGIN_TYPE_ID = 'fe4f0cdb-b254-4fa1-84f6-d58d0759b8b3';
+	private static readonly SERVICE_BUS_PLUGIN_TYPE_ID = 'ef521e63-cd2b-4170-99f6-447466a7161e';
+
 	public async register(environmentId: string, input: RegisterStepInput): Promise<string> {
 		this.logger.debug('DataversePluginStepRepository: Registering step', {
 			environmentId,
@@ -270,7 +274,14 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			sdkMessageId: input.sdkMessageId,
 			sdkMessageFilterId: input.sdkMessageFilterId,
 			solutionUniqueName: input.solutionUniqueName,
+			pluginTypeId: input.pluginTypeId,
+			serviceEndpointId: input.serviceEndpointId,
 		});
+
+		// Validate: must have either pluginTypeId or serviceEndpointId
+		if (!input.pluginTypeId && !input.serviceEndpointId) {
+			throw new Error('Either pluginTypeId or serviceEndpointId must be provided');
+		}
 
 		const endpoint = `/api/data/v9.2/${DataversePluginStepRepository.ENTITY_SET}`;
 
@@ -278,7 +289,6 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 		const payload: Record<string, unknown> = {
 			name: input.name,
 			'sdkmessageid@odata.bind': `/sdkmessages(${input.sdkMessageId})`,
-			'plugintypeid@odata.bind': `/plugintypes(${input.pluginTypeId})`,
 			stage: input.stage,
 			mode: input.mode,
 			rank: input.rank,
@@ -288,6 +298,19 @@ export class DataversePluginStepRepository implements IPluginStepRepository {
 			statecode: 0,
 			statuscode: 1,
 		};
+
+		// Set plugin type - use special hidden type for service endpoint steps
+		if (input.serviceEndpointId) {
+			// For service endpoint steps, we need to determine the correct plugin type
+			// based on the service endpoint contract (WebHook vs ServiceBus)
+			// For now, assume WebHook - the caller should provide the correct type
+			// TODO: Query the service endpoint to determine contract type
+			payload['plugintypeid@odata.bind'] = `/plugintypes(${DataversePluginStepRepository.WEBHOOK_PLUGIN_TYPE_ID})`;
+			// Set event handler to point to service endpoint
+			payload['eventhandler_serviceendpoint@odata.bind'] = `/serviceendpoints(${input.serviceEndpointId})`;
+		} else if (input.pluginTypeId) {
+			payload['plugintypeid@odata.bind'] = `/plugintypes(${input.pluginTypeId})`;
+		}
 
 		// Add message filter (links message to entity)
 		if (input.sdkMessageFilterId) {
