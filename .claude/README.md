@@ -4,90 +4,75 @@ Quick start for using Claude Code with this project.
 
 ---
 
+## Project Context
+
+This extension is a **UI shell** - VS Code panels that communicate with Dataverse via the MCP server. The complex business logic lives in the SDK/CLI, not here.
+
+**For cross-repo work**, see the parent workspace at `C:\VS\ppds\` - it has commands for handoffs, retrospectives, and cross-project coordination.
+
+---
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `CLAUDE.md` | Project rules (auto-loaded every response) |
-| `.claude/WORKFLOW.md` | Feature/bug/refactor workflows |
 | `.claude/commands/` | Slash commands |
-| `.claude/templates/` | Design templates |
+| `.claude/templates/` | Panel development templates |
+| `.claude/TROUBLESHOOTING.md` | Common problems and solutions |
 
 ---
 
-## Available Agents
+## Available Commands
 
-| Agent | When | Invoke Via |
-|-------|------|------------|
-| **design-architect** | Before complex features | `/design [feature]` |
-| **code-guardian** | After implementation | `/code-review` |
+| Command | Purpose |
+|---------|---------|
+| `/new-panel [name]` | Scaffold new VS Code panel |
+| `/prepare-pr` | Full PR validation (compile, tests, lint, code review) |
+| `/prepare-release X.Y.Z` | Release prep (PR validation + version bump) |
 
-### Quick Decision
+**From parent workspace (`C:\VS\ppds\`):**
+
+| Command | Purpose |
+|---------|---------|
+| `/handoff` | Generate session summary |
+| `/retrospective` | Session retrospective |
+
+---
+
+## Quick Reference
 
 | Task | Action |
 |------|--------|
-| Complex feature (3+ files) | `/design` first |
-| Simple feature (1-2 files) | Just implement |
-| Before commit | `/code-review` |
-| End session | `/handoff` |
+| New panel | `/new-panel [name]` |
+| Before PR | `/prepare-pr` |
+| For releases | `/prepare-release X.Y.Z` |
+| Switching tasks | `/clear` |
+| End session | Use `/handoff` from parent workspace |
 
 ---
 
-## Architecture Quick Reference
-
-**Layers (depend inward):**
-```
-Presentation → Application → Domain ← Infrastructure
-```
-
-**Rules:**
-- **Domain:** Rich entities with behavior, zero dependencies
-- **Application:** Use cases orchestrate only (no business logic)
-- **Infrastructure:** Implements domain interfaces
-- **Presentation:** Uses use cases, no business logic
-
----
-
-## Commands
+## Development
 
 ```bash
-npm run compile    # After each layer
-npm test           # Before review
-F5                 # Manual testing
+npm run compile       # Full build (lint + tests)
+npm run compile:fast  # Quick build (no lint/tests)
+npm test              # Run tests
+F5                    # Launch Extension Development Host
 ```
 
-**Slash commands:**
-- `/design [feature]` - Design with design-architect
-- `/new-panel [name]` - Scaffold new panel
-- `/code-review` - Review with code-guardian
-- `/cleanup-code` - Fix logging/comment violations
-- `/handoff` - Session summary
-- `/clear` - Reset context
-
 ---
 
-## Common Pitfalls
+## Panel Templates
 
-1. **Anemic domain** - Entities need behavior methods
-2. **Logic in use cases** - Orchestrate only, logic in domain
-3. **Logic in panels** - Panels call use cases only
-4. **Wrong dependency** - Domain never imports outer layers
-
----
-
-## Extended Thinking
-
-| Trigger | When |
-|---------|------|
-| "think" | Standard reasoning |
-| "think hard" | Thorough analysis |
-| "think harder" | Deep architecture evaluation |
+When building new panels, refer to:
+- `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel patterns
+- `.claude/templates/PANEL_INITIALIZATION_PATTERN.md` - Initialization pattern (CRITICAL)
 
 ---
 
 ## References
 
 - `CLAUDE.md` - Project rules
-- `.claude/WORKFLOW.md` - Workflows
-- `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Patterns
-- `docs/testing/TESTING_GUIDE.md` - Testing
+- `docs/architecture/` - Architecture guides
+- `docs/testing/` - Testing guides
