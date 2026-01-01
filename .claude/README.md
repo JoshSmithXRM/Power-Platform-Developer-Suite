@@ -72,5 +72,5 @@ When building new panels, refer to:
 ## References
 
 - `CLAUDE.md` - Project rules
-- `docs/architecture/` - Architecture guides
-- `docs/testing/` - Testing guides
+- `docs/architecture/` - Webview patterns
+- `e2e/README.md` - E2E testing

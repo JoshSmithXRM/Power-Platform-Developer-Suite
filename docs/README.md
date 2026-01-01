@@ -16,30 +16,38 @@
 
 ---
 
-## Architecture Documentation
+## Webview Patterns
 
-### Panel Patterns
+VS Code webview development patterns:
+
 | Document | Purpose |
 |----------|---------|
-| [PANEL_ARCHITECTURE.md](architecture/PANEL_ARCHITECTURE.md) | Panel composition patterns |
-| [WEBVIEW_PATTERNS.md](architecture/WEBVIEW_PATTERNS.md) | Webview message contracts |
-| [STATIC_FACTORY_PATTERN.md](architecture/STATIC_FACTORY_PATTERN.md) | Panel createOrShow pattern |
-
-### Code Quality
-| Document | Purpose |
-|----------|---------|
-| [CODE_QUALITY_GUIDE.md](architecture/CODE_QUALITY_GUIDE.md) | Code quality standards |
-| [LOGGING_GUIDE.md](architecture/LOGGING_GUIDE.md) | Logging patterns |
+| [WEBVIEW_PATTERNS.md](architecture/WEBVIEW_PATTERNS.md) | Message contracts, CSS layout |
+| [DATA_TABLE_PATTERN.md](architecture/DATA_TABLE_PATTERN.md) | Data table rendering |
+| [STATIC_FACTORY_PATTERN.md](architecture/STATIC_FACTORY_PATTERN.md) | Panel singleton pattern |
+| [KEYBOARD_SELECTION_PATTERN.md](architecture/KEYBOARD_SELECTION_PATTERN.md) | Keyboard navigation |
+| [RENDERING_PATTERN_DECISION.md](architecture/RENDERING_PATTERN_DECISION.md) | Server vs client rendering |
+| [RESIZABLE_DETAIL_PANEL_PATTERN.md](architecture/RESIZABLE_DETAIL_PANEL_PATTERN.md) | Resizable panels |
 
 ---
 
-## Testing Documentation
+## Architecture Decision Records
 
-| Document | Purpose |
-|----------|---------|
-| [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) | Unit testing patterns |
-| [INTEGRATION_TESTING_GUIDE.md](testing/INTEGRATION_TESTING_GUIDE.md) | Panel integration tests |
-| [e2e/README.md](../e2e/README.md) | E2E testing with Playwright |
+| Document | Decision |
+|----------|----------|
+| [0001_ESLINT_SUPPRESSIONS.md](adr/0001_ESLINT_SUPPRESSIONS.md) | ESLint suppression policy |
+| [0004_API_TYPE_ASSERTIONS.md](adr/0004_API_TYPE_ASSERTIONS.md) | API response type handling |
+| [0005_REGEX_FETCHXML_PARSING.md](adr/0005_REGEX_FETCHXML_PARSING.md) | FetchXML parsing approach |
+| [0006_MSAL_SKIPPED_TESTS.md](adr/0006_MSAL_SKIPPED_TESTS.md) | MSAL test handling |
+| [0007_XML_FORMATTER_NO_INTERFACE.md](adr/0007_XML_FORMATTER_NO_INTERFACE.md) | XML formatter design |
+
+---
+
+## Testing
+
+- **F5** - Primary testing method (Extension Development Host)
+- **Unit tests** - For complex parsing/transformation logic only
+- **E2E tests** - See [e2e/README.md](../e2e/README.md)
 
 ---
 
@@ -49,18 +57,7 @@
 |----------|---------|
 | [CHANGELOG.md](../CHANGELOG.md) | Version history |
 | [RELEASE_GUIDE.md](RELEASE_GUIDE.md) | Release process |
-| [BRANCH_STRATEGY.md](BRANCH_STRATEGY.md) | Git branching |
-
----
-
-## Claude-Specific Documentation
-
-Located in `.claude/` folder:
-
-| Document | Purpose |
-|----------|---------|
-| [commands/](../.claude/commands/) | Slash commands |
-| [templates/](../.claude/templates/) | Panel development templates |
+| GitHub Issues | Feature tracking and bugs |
 
 ---
 
@@ -69,14 +66,15 @@ Located in `.claude/` folder:
 ```
 docs/
 ├── README.md              # This file
-├── architecture/          # Panel and code patterns
-├── testing/               # Testing guides
-├── future/                # Planned enhancements
-└── technical-debt/        # Technical debt tracking
+├── GETTING_STARTED.md     # Setup guide
+├── RELEASE_GUIDE.md       # Release process
+├── BRANCH_STRATEGY.md     # Git workflow
+├── architecture/          # Webview patterns
+└── adr/                   # Architecture decisions
 ```
 
 ---
 
 ## Documentation Style
 
-See the parent workspace documentation style guide at `../docs/DOCUMENTATION_STYLE_GUIDE.md`.
+See parent workspace: `../docs/DOCUMENTATION_STYLE_GUIDE.md`
