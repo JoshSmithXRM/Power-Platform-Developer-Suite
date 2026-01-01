@@ -408,10 +408,10 @@ function getIcon(type, iconHint) {
 		'pluginType': '🔌',
 		'step': '⚡',
 		'image': '🖼️',
-		'webHook': '🪝',
-		'serviceEndpoint': '📡',
+		'webHook': '🌐',
+		'serviceEndpoint': '🌐',
 		'dataProvider': '🗃️',
-		'customApi': '🎯'
+		'customApi': '📨'
 	};
 
 	return icons[type] || '📄';

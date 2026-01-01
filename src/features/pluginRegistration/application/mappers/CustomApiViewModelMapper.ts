@@ -47,7 +47,7 @@ export class CustomApiViewModelMapper {
 			type: 'customApi',
 			name: customApi.getName(),
 			displayName,
-			icon: '🎯',
+			icon: '📨',
 			metadata,
 			isManaged: customApi.isInManagedState(),
 			children: [], // No children - parameters are managed in modal

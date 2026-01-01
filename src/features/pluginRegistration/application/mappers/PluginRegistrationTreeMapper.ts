@@ -90,7 +90,7 @@ export class PluginRegistrationTreeMapper {
 	 * @param webHooks - WebHooks (root-level in Assembly view only)
 	 * @param serviceEndpoints - Service endpoints (root-level in Assembly view only)
 	 * @param dataProviders - Data providers (root-level in Assembly view only)
-	 * @param customApis - Custom APIs (root-level in BOTH views)
+	 * @param customApis - Custom APIs (root-level in Message view only)
 	 * @returns Tree items for rendering
 	 */
 	public toTreeItems(
@@ -102,32 +102,35 @@ export class PluginRegistrationTreeMapper {
 		dataProviders: ReadonlyArray<DataProvider> = [],
 		customApis: ReadonlyArray<CustomApiTreeNode> = []
 	): TreeItemViewModel[] {
-		if (viewMode === TreeViewMode.Message) {
-			return this.buildMessageViewTree(packages, standaloneAssemblies, customApis);
+		switch (viewMode) {
+			case TreeViewMode.Message:
+				return this.buildMessageViewTree(packages, standaloneAssemblies, customApis);
+			case TreeViewMode.Entity:
+				return this.buildEntityViewTree(packages, standaloneAssemblies);
+			case TreeViewMode.Assembly:
+			default:
+				return this.buildAssemblyViewTree(
+					packages,
+					standaloneAssemblies,
+					webHooks,
+					serviceEndpoints,
+					dataProviders
+				);
 		}
-
-		return this.buildAssemblyViewTree(
-			packages,
-			standaloneAssemblies,
-			webHooks,
-			serviceEndpoints,
-			dataProviders,
-			customApis
-		);
 	}
 
 	/**
 	 * Builds Assembly View tree (default).
 	 * Hierarchy: Packages -> Assemblies -> PluginTypes -> Steps -> Images
-	 * Plus WebHooks, ServiceEndpoints, DataProviders, CustomApis at root.
+	 * Plus WebHooks, ServiceEndpoints, DataProviders at root.
+	 * NOTE: Custom APIs are NOT shown in Assembly View - they appear in Message View only.
 	 */
 	private buildAssemblyViewTree(
 		packages: ReadonlyArray<PackageTreeNode>,
 		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>,
 		webHooks: ReadonlyArray<WebHook>,
 		serviceEndpoints: ReadonlyArray<ServiceEndpoint>,
-		dataProviders: ReadonlyArray<DataProvider>,
-		customApis: ReadonlyArray<CustomApiTreeNode>
+		dataProviders: ReadonlyArray<DataProvider>
 	): TreeItemViewModel[] {
 		const items: TreeItemViewModel[] = [];
 
@@ -166,16 +169,7 @@ export class PluginRegistrationTreeMapper {
 			items.push(this.dataProviderMapper.toTreeItem(dataProvider));
 		}
 
-		// 6. Map custom APIs (root-level, no children - parameters managed in modal)
-		for (const customApiNode of customApis) {
-			items.push(
-				this.customApiMapper.toTreeItem(
-					customApiNode.customApi,
-					customApiNode.requestParameterCount,
-					customApiNode.responsePropertyCount
-				)
-			);
-		}
+		// NOTE: Custom APIs are NOT in Assembly View - they appear in Message View only
 
 		return items;
 	}
@@ -234,8 +228,8 @@ export class PluginRegistrationTreeMapper {
 
 	/**
 	 * Builds Message View tree.
-	 * Hierarchy: Messages -> Entities -> Steps -> Images
-	 * Custom APIs shown at root (same as Assembly view).
+	 * Hierarchy: Custom APIs (root) -> Messages -> Entities -> Steps -> Images
+	 * Custom APIs appear ONLY in this view (not Assembly or Entity views).
 	 */
 	private buildMessageViewTree(
 		packages: ReadonlyArray<PackageTreeNode>,
@@ -371,6 +365,11 @@ export class PluginRegistrationTreeMapper {
 				entityMap
 			);
 
+			// Skip messages with no visible children
+			if (messageChildren.length === 0) {
+				continue;
+			}
+
 			// Create message metadata
 			const messageMetadata: SdkMessageMetadata = {
 				type: 'sdkMessage',
@@ -494,5 +493,186 @@ export class PluginRegistrationTreeMapper {
 			...baseStepItem,
 			parentId,
 		};
+	}
+
+	// ============================================================================
+	// Entity View Methods
+	// ============================================================================
+
+	/**
+	 * Builds Entity View tree.
+	 * Hierarchy: Entities -> Messages -> Steps -> Images
+	 * Custom APIs are NOT shown in Entity View (they appear only in Message View).
+	 */
+	private buildEntityViewTree(
+		packages: ReadonlyArray<PackageTreeNode>,
+		standaloneAssemblies: ReadonlyArray<AssemblyTreeNode>
+	): TreeItemViewModel[] {
+		const items: TreeItemViewModel[] = [];
+
+		// 1. Extract all steps from assembly hierarchy
+		const stepsWithContext = this.extractAllSteps(packages, standaloneAssemblies);
+
+		// 2. Group steps by entity and message
+		const groupedSteps = this.groupStepsByEntityAndMessage(stepsWithContext);
+
+		// 3. Build entity and message nodes
+		const entityItems = this.buildEntityNodes(groupedSteps);
+		items.push(...entityItems);
+
+		return items;
+	}
+
+	/**
+	 * Groups steps by entity name (primary), then by message name.
+	 * Returns: Map<entityName, Map<messageName, StepWithContext[]>>
+	 */
+	private groupStepsByEntityAndMessage(
+		steps: StepWithContext[]
+	): Map<string, Map<string, StepWithContext[]>> {
+		const grouped = new Map<string, Map<string, StepWithContext[]>>();
+
+		for (const stepCtx of steps) {
+			// Use 'none' for steps without entity (global operations)
+			const entityName = stepCtx.step.getPrimaryEntityLogicalName() ?? 'none';
+			const messageName = stepCtx.step.getMessageName();
+
+			if (!grouped.has(entityName)) {
+				grouped.set(entityName, new Map());
+			}
+
+			const messageMap = grouped.get(entityName)!;
+			if (!messageMap.has(messageName)) {
+				messageMap.set(messageName, []);
+			}
+
+			messageMap.get(messageName)!.push(stepCtx);
+		}
+
+		return grouped;
+	}
+
+	/**
+	 * Builds entity and message tree nodes from grouped steps.
+	 */
+	private buildEntityNodes(
+		groupedSteps: Map<string, Map<string, StepWithContext[]>>
+	): TreeItemViewModel[] {
+		const items: TreeItemViewModel[] = [];
+
+		// Sort entities alphabetically ('none' last for global operations)
+		const sortedEntities = [...groupedSteps.keys()].sort((a, b) => {
+			if (a === 'none') return 1;
+			if (b === 'none') return -1;
+			return a.localeCompare(b, undefined, { sensitivity: 'base' });
+		});
+
+		for (const entityName of sortedEntities) {
+			const messageMap = groupedSteps.get(entityName)!;
+			const entityNodeId = `entity:${entityName}`;
+
+			// Count total steps for this entity
+			let totalStepCount = 0;
+			for (const messageSteps of messageMap.values()) {
+				totalStepCount += messageSteps.length;
+			}
+
+			// Build message children
+			const entityChildren = this.buildEntityChildren(entityNodeId, entityName, messageMap);
+
+			// Skip entities with no visible children
+			if (entityChildren.length === 0) {
+				continue;
+			}
+
+			// Create entity metadata
+			const entityMetadata: EntityGroupMetadata = {
+				type: 'entityGroup',
+				messageName: '', // Not applicable at entity level
+				entityLogicalName: entityName === 'none' ? null : entityName,
+				stepCount: totalStepCount,
+			};
+
+			// Create entity node
+			const displayName =
+				entityName === 'none' ? `(Global) (${totalStepCount})` : `${entityName} (${totalStepCount})`;
+
+			const entityNode: TreeItemViewModel = {
+				id: entityNodeId,
+				parentId: null,
+				type: 'entityGroup',
+				name: entityName,
+				displayName,
+				icon: '📋', // Entity icon
+				metadata: entityMetadata,
+				isManaged: false, // Entity nodes are grouping nodes
+				children: entityChildren,
+			};
+
+			items.push(entityNode);
+		}
+
+		return items;
+	}
+
+	/**
+	 * Builds children for an entity node (message groups with steps).
+	 */
+	private buildEntityChildren(
+		entityNodeId: string,
+		entityName: string,
+		messageMap: Map<string, StepWithContext[]>
+	): TreeItemViewModel[] {
+		const children: TreeItemViewModel[] = [];
+
+		// Sort messages alphabetically
+		const sortedMessages = [...messageMap.keys()].sort((a, b) =>
+			a.localeCompare(b, undefined, { sensitivity: 'base' })
+		);
+
+		for (const messageName of sortedMessages) {
+			const stepsWithContext = messageMap.get(messageName)!;
+
+			// Skip messages with no steps
+			if (stepsWithContext.length === 0) {
+				continue;
+			}
+
+			const messageNodeId = `entity:${entityName}:msg:${messageName}`;
+
+			const messageMetadata: SdkMessageMetadata = {
+				type: 'sdkMessage',
+				messageName,
+				stepCount: stepsWithContext.length,
+				hasEntityGroups: false, // Not applicable under entity
+			};
+
+			// Build step children for this message
+			const messageStepItems: TreeItemViewModel[] = [];
+			for (const stepCtx of stepsWithContext) {
+				const imageItems = stepCtx.images.map((image) =>
+					this.imageMapper.toTreeItem(image, stepCtx.step.getId())
+				);
+
+				const stepItem = this.createStepForMessageView(stepCtx.step, messageNodeId, imageItems);
+				messageStepItems.push(stepItem);
+			}
+
+			const messageNode: TreeItemViewModel = {
+				id: messageNodeId,
+				parentId: entityNodeId,
+				type: 'sdkMessage',
+				name: messageName,
+				displayName: `${messageName} (${stepsWithContext.length})`,
+				icon: '📨', // Message icon
+				metadata: messageMetadata,
+				isManaged: false, // Message nodes are grouping nodes
+				children: messageStepItems,
+			};
+
+			children.push(messageNode);
+		}
+
+		return children;
 	}
 }

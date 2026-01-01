@@ -603,7 +603,11 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 
 		this.coordinator.registerHandler('viewModeChange', async (data) => {
 			const viewMode = (data as { itemId?: string })?.itemId;
-			if (viewMode === TreeViewMode.Assembly || viewMode === TreeViewMode.Message) {
+			if (
+				viewMode === TreeViewMode.Assembly ||
+				viewMode === TreeViewMode.Message ||
+				viewMode === TreeViewMode.Entity
+			) {
 				await this.handleViewModeChange(viewMode);
 			}
 		});
@@ -1302,6 +1306,9 @@ export class PluginRegistrationPanelComposed extends EnvironmentScopedPanel<Plug
 		const savedMode = viewModes[environmentId];
 		if (savedMode === TreeViewMode.Message) {
 			return TreeViewMode.Message;
+		}
+		if (savedMode === TreeViewMode.Entity) {
+			return TreeViewMode.Entity;
 		}
 
 		return TreeViewMode.Assembly; // Default

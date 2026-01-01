@@ -64,7 +64,7 @@ function setupDropdownItems() {
  * Action dropdowns: Export, Delete (one-time actions)
  */
 function isStateDropdown(dropdownId) {
-	const stateDropdowns = ['traceLevelDropdown', 'autoRefreshDropdown'];
+	const stateDropdowns = ['traceLevelDropdown', 'autoRefreshDropdown', 'viewModeDropdown'];
 	return stateDropdowns.includes(dropdownId);
 }
 
@@ -261,6 +261,11 @@ function updateDropdownButtonLabel(dropdownId, selectedId) {
 			'10': 'Auto-Refresh: 10s',
 			'30': 'Auto-Refresh: 30s',
 			'60': 'Auto-Refresh: 60s'
+		},
+		'viewModeDropdown': {
+			'assembly': 'Assembly View',
+			'message': 'Message View',
+			'entity': 'Entity View'
 		}
 	};
 
@@ -347,6 +352,12 @@ function handleDropdownItemClick(dropdownId, itemId) {
 			'customApi': 'registerCustomApi',
 			'step': 'registerStep',
 			'image': 'registerImage'
+		},
+		// Plugin Registration View Mode dropdown
+		'viewModeDropdown': {
+			'assembly': 'viewModeChange',
+			'message': 'viewModeChange',
+			'entity': 'viewModeChange'
 		}
 	};
 
@@ -373,6 +384,9 @@ function handleDropdownItemClick(dropdownId, itemId) {
 	} else if (dropdownId === 'exportDropdown' || dropdownId === 'deleteDropdown') {
 		// Get visible trace IDs from table (respects search/filter)
 		data = { traceIds: getVisibleTraceIds() };
+	} else if (dropdownId === 'viewModeDropdown') {
+		// Pass the selected view mode (assembly or message)
+		data = { itemId };
 	}
 
 	// Post message to extension

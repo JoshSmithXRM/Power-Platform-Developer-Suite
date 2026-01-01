@@ -217,15 +217,16 @@ export interface SdkMessageMetadata {
 }
 
 /**
- * Entity Group metadata for Message View grouping nodes.
- * Groups plugin steps by entity under an SDK message.
+ * Entity Group metadata for Message/Entity View grouping nodes.
+ * Groups plugin steps by entity under an SDK message (Message View)
+ * or by message under an entity (Entity View).
  */
 export interface EntityGroupMetadata {
 	readonly type: 'entityGroup';
-	/** The parent SDK message name */
+	/** The parent SDK message name (empty in Entity View root) */
 	readonly messageName: string;
-	/** The entity logical name (e.g., "account", "contact") */
-	readonly entityLogicalName: string;
+	/** The entity logical name (e.g., "account", "contact"), null for global operations */
+	readonly entityLogicalName: string | null;
 	/** Number of steps for this message/entity combination */
 	readonly stepCount: number;
 }

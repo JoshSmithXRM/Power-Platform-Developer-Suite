@@ -47,11 +47,23 @@ export class ViewModeSection extends DropdownSection {
 				label: 'Message View',
 				icon: 'symbol-event',
 			},
+			{
+				id: TreeViewMode.Entity,
+				label: 'Entity View',
+				icon: 'database',
+			},
 		];
 	}
 
 	protected getButtonLabel(): string {
-		return this.currentMode === TreeViewMode.Assembly ? 'Assembly View' : 'Message View';
+		switch (this.currentMode) {
+			case TreeViewMode.Assembly:
+				return 'Assembly View';
+			case TreeViewMode.Message:
+				return 'Message View';
+			case TreeViewMode.Entity:
+				return 'Entity View';
+		}
 	}
 
 	protected getCurrentSelectionId(): string | undefined {
