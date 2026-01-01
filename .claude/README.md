@@ -8,7 +8,7 @@ Quick start for using Claude Code with this project.
 
 This extension is a **UI shell** - VS Code panels that communicate with Dataverse via the MCP server. The complex business logic lives in the SDK/CLI, not here.
 
-**For cross-repo work**, see the parent workspace at `C:\VS\ppds\` - it has commands for handoffs, retrospectives, and cross-project coordination.
+**For cross-repo work**, see the parent workspace (`../`) - it has cross-project coordination commands.
 
 ---
 
@@ -19,7 +19,6 @@ This extension is a **UI shell** - VS Code panels that communicate with Datavers
 | `CLAUDE.md` | Project rules (auto-loaded every response) |
 | `.claude/commands/` | Slash commands |
 | `.claude/templates/` | Panel development templates |
-| `.claude/TROUBLESHOOTING.md` | Common problems and solutions |
 
 ---
 
@@ -28,15 +27,14 @@ This extension is a **UI shell** - VS Code panels that communicate with Datavers
 | Command | Purpose |
 |---------|---------|
 | `/new-panel [name]` | Scaffold new VS Code panel |
-| `/prepare-pr` | Full PR validation (compile, tests, lint, code review) |
+| `/prepare-pr` | Full PR validation (compile, tests, CHANGELOG) |
 | `/prepare-release X.Y.Z` | Release prep (PR validation + version bump) |
 
-**From parent workspace (`C:\VS\ppds\`):**
+**From parent workspace (`../`):**
 
 | Command | Purpose |
 |---------|---------|
 | `/handoff` | Generate session summary |
-| `/retrospective` | Session retrospective |
 
 ---
 
@@ -48,7 +46,7 @@ This extension is a **UI shell** - VS Code panels that communicate with Datavers
 | Before PR | `/prepare-pr` |
 | For releases | `/prepare-release X.Y.Z` |
 | Switching tasks | `/clear` |
-| End session | Use `/handoff` from parent workspace |
+| End session | `/handoff` from parent workspace |
 
 ---
 
