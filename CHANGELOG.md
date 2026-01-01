@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now shows: `0` or `1` (matches SQL filter syntax: `WHERE ishidden = 0`)
 
 ### Security
+
 - **Dependency Update** - Patched `qs` vulnerability (dependency of `axios`)
 
 ## [0.3.3] - 2025-12-10
