@@ -45,5 +45,4 @@ All suppressions must include inline documentation explaining why.
 
 ## References
 
-- [ODATA_DOMAIN_PATTERN.md](../architecture/ODATA_DOMAIN_PATTERN.md) - OData in domain rationale
 - [STATIC_FACTORY_PATTERN.md](../architecture/STATIC_FACTORY_PATTERN.md) - Static factory pattern
