@@ -8,7 +8,6 @@ import type { CellLink } from '../../../../shared/infrastructure/ui/types/CellLi
  * Mapper: WebResource to View Models
  *
  * Maps domain entities to presentation DTOs using formatters.
- * Handles simple presentation sorting per MAPPER_PATTERNS.md Pattern 2.
  */
 export class WebResourceViewModelMapper {
 	/**
@@ -72,7 +71,6 @@ export class WebResourceViewModelMapper {
 
 	/**
 	 * Sorts view models alphabetically by name.
-	 * Simple presentation sorting - acceptable inline per MAPPER_PATTERNS.md Pattern 2.
 	 */
 	private sortByName(viewModels: WebResourceViewModel[]): WebResourceViewModel[] {
 		return viewModels.sort((a, b) => a.name.localeCompare(b.name));

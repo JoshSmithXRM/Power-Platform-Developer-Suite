@@ -294,16 +294,10 @@ The extension supports 4 authentication methods. Choose based on your use case:
    - Monitor solution imports
    - View detailed logs
 
-### Learn the Architecture
+### Learn the Codebase
 
-- [Clean Architecture Guide](./architecture/CLEAN_ARCHITECTURE_GUIDE.md)
-- [Testing Guide](./testing/TESTING_GUIDE.md)
 - [CLAUDE.md](../CLAUDE.md) - Development standards
-
-### Contribute
-
 - [Contributing Guide](../CONTRIBUTING.md)
-- [Development Workflows](../.claude/WORKFLOW.md)
 
 ---
 

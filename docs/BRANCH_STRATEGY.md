@@ -67,11 +67,9 @@ main (protected)
 Use regular merge commits for most PRs.
 
 **Why:**
-- Preserves per-layer commit granularity (domain → application → infrastructure → presentation)
 - Maintains collaboration history when multiple contributors work on a PR
 - Enables surgical cherry-picks and reverts of individual commits
 - Supports `git bisect` for regression hunting
-- Aligns with inside-out implementation workflow
 
 **Viewing history:**
 ```bash
@@ -101,9 +99,8 @@ Force pushing to main is prohibited. If you need to fix something on main, creat
 
 - [ ] All tests pass (`npm test`)
 - [ ] Compilation succeeds (`npm run compile`)
-- [ ] Code review completed (`/code-review` - code-guardian approval)
 - [ ] Manual testing completed (F5 in VS Code)
-- [ ] Tracking doc deleted from `docs/work/` (if applicable)
+- [ ] CHANGELOG.md updated (if user-facing changes)
 
 ### PR Validation Pipeline
 

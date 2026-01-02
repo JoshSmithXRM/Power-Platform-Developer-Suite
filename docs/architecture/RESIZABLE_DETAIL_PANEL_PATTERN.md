@@ -1175,8 +1175,6 @@ if (resizeHandle && !this.resizeSetup) {
 - `resources/webview/js/behaviors/PluginTraceViewerBehavior.js:108-341`
 
 **Related Patterns:**
-- `docs/architecture/PANEL_ARCHITECTURE.md` - Panel composition system
-- `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Layer responsibilities
 - `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel decision guide
 
 ---

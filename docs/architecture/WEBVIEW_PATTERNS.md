@@ -646,6 +646,5 @@ function escapeHtml(str) {
 
 - `.claude/templates/PANEL_DEVELOPMENT_GUIDE.md` - Panel architecture decision guide
 - `.claude/templates/PANEL_INITIALIZATION_PATTERN.md` - Two-phase initialization pattern
-- `docs/architecture/CLEAN_ARCHITECTURE_GUIDE.md` - Layer boundaries
 - `src/shared/infrastructure/ui/types/WebviewMessage.ts` - Message type definition
 - `src/shared/infrastructure/ui/coordinators/PanelCoordinator.ts` - Coordinator implementation
